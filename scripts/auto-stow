@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOTFILES_DIR="$HOME/Projects/arch-niri"
+CONFIG_DIR="$DOTFILES_DIR/config"
+SCRIPTS_DIR="$DOTFILES_DIR/scripts"
+
+# 1. Limpia enlaces simbólicos rotos que apunten al repositorio
+find "$HOME" -maxdepth 3 -xtype l -lname "*Projects/arch-niri*" -delete 2>/dev/null || true
+
+# 2. Enlaza los paquetes dentro de config/ hacia $HOME
+if [ $# -gt 0 ]; then
+  PACKAGES=("$@")
+else
+  mapfile -t PACKAGES < <(find "$CONFIG_DIR" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | sort)
+fi
+
+echo "-> Enlazando paquetes desde config/: ${PACKAGES[*]}"
+stow -R -v -d "$CONFIG_DIR" -t "$HOME" "${PACKAGES[@]}"
+
+# 3. Valida sintaxis, otorga +x y enlaza todos los scripts mediante auto-permission-add
+echo "-> Validando y enlazando scripts..."
+bash "$SCRIPTS_DIR/auto-permission-add"
+
+echo "✓ Dotfiles y scripts actualizados correctamente."
