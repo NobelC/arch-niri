@@ -1,0 +1,16 @@
+window-rule{
+  geometry-corner-radius 10
+  clip-to-geometry true
+}
+window-rule{
+  match app-id=r#"^(pavucontrol|nm-connection-editor|blueman-manager)$"#
+  open-floating true
+}
+window-rule{
+  match title="^Picture-in-Pictures$"
+  open-floating true
+}
+window-rule{
+  match app-id=r#"^org\.keepassxc\.KeePassXC$"#
+  block-out-from "screen-capture"
+}

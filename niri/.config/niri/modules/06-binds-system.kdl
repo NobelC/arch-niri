@@ -1,0 +1,35 @@
+binds {
+    // --- AUDIO (PipeWire / WirePlumber) ---
+    // "-l 1.0" evita que el volumen supere el 100% para no distorsionar los altavoces
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05+ -l 1.0"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05-"; }
+    XF86AudioMute        allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
+    XF86AudioMicMute     allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
+
+    // --- BRILLO DE PANTALLA (backlight) ---
+    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+5%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "5%-"; }
+
+    // --- MULTIMEDIA (MPRIS / playerctl) ---
+    XF86AudioPlay  allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioPause allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioStop  allow-when-locked=true { spawn "playerctl" "stop"; }
+    XF86AudioPrev  allow-when-locked=true { spawn "playerctl" "previous"; }
+    XF86AudioNext  allow-when-locked=true { spawn "playerctl" "next"; }
+
+    // --- CAPTURAS DE PANTALLA ---
+    Print      { screenshot; }
+    Ctrl+Print { screenshot-screen; }
+    Alt+Print  { screenshot-window; }
+
+    // --- ENERGÍA Y BLOQUEO DE PANTALLA ---
+    // Apaga el panel al instante (se enciende al mover el ratón o pulsar cualquier tecla)
+    Mod+Shift+P { power-off-monitors; }
+
+    // Bloqueo manual inmediato con swaylock
+    Mod+Alt+L hotkey-overlay-title="Bloquear pantalla" { spawn "swaylock" "-f"; }
+
+    // Salir de Niri (muestra confirmación para evitar cierres accidentales)
+    Mod+Shift+E     { quit; }
+    Ctrl+Alt+Delete { quit; }
+}
