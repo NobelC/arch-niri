@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import "../services"
 
 PanelWindow {
     id: bar
@@ -10,59 +9,47 @@ PanelWindow {
         left: true
         right: true
     }
-    implicitHeight: 32
-    color: "#1e1e2e" // Base Catppuccin Mocha (luego la conectaremos a theme-switch)
+    implicitHeight: 30
+    color: "#1e1e2e"
 
+    // Borde inferior sutil
+    Rectangle {
+        anchors {
+            bottom: parent.bottom
+            left: parent.left
+            right: parent.right
+        }
+        height: 1
+        color: "#313244"
+    }
+
+    // Contenedor principal modular de 3 zonas
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: 12
         anchors.rightMargin: 12
+        spacing: 8
 
-        // Workspaces de Niri
-        Row {
-            spacing: 6
-            Repeater {
-                model: Niri.workspaces
-                delegate: Rectangle {
-                    width: 24
-                    height: 22
-                    radius: 6
-                    color: modelData.is_active ? "#89b4fa" : "#313244"
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: modelData.idx
-                        color: modelData.is_active ? "#11111b" : "#cdd6f4"
-                        font.bold: modelData.is_active
-                        font.pixelSize: 12
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: Niri.focusWorkspace(modelData.idx)
-                    }
-                }
-            }
+        // --- ZONA IZQUIERDA ---
+        RowLayout {
+            id: leftModules
+            spacing: 8
         }
 
         Item { Layout.fillWidth: true }
 
-        // Reloj
-        Text {
-            id: clockText
-            color: "#cdd6f4"
-            font.pixelSize: 13
-            font.bold: true
+        // --- ZONA CENTRAL ---
+        RowLayout {
+            id: centerModules
+            spacing: 8
+        }
 
-            Timer {
-                interval: 1000
-                running: true
-                repeat: true
-                triggeredOnStart: true
-                onTriggered: {
-                    clockText.text = Qt.formatDateTime(new Date(), "ddd dd MMM  HH:mm");
-                }
-            }
+        Item { Layout.fillWidth: true }
+
+        // --- ZONA DERECHA ---
+        RowLayout {
+            id: rightModules
+            spacing: 8
         }
     }
 }
