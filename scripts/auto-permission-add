@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPTS_DIR="$HOME/Projects/arch-niri/scripts"
+BIN_TARGET="$HOME/.local/bin"
+
+mkdir -p "$BIN_TARGET"
+
+# Si pasas nombres como argumentos, valida solo esos; si no, revisa toda la carpeta scripts/
+if [ $# -gt 0 ]; then
+  TARGETS=()
+  for arg in "$@"; do
+    if [ -f "$arg" ]; then
+      TARGETS+=("$(realpath "$arg")")
+    elif [ -f "$SCRIPTS_DIR/$arg" ]; then
+      TARGETS+=("$SCRIPTS_DIR/$arg")
+    else
+      echo "✗ No encontrado: $arg" >&2
+    fi
+  done
+else
+  mapfile -t TARGETS < <(find "$SCRIPTS_DIR" -maxdepth 1 -type f | sort)
+fi
+
+validate_syntax() {
+  local file="$1"
+  local first_line
+  first_line=$(head -n 1 "$file")
+
+  case "$first_line" in
+    *bash*)
+      bash -n "$file" || return 1
+      if command -v shellcheck &>/dev/null; then
+        shellcheck --severity=warning "$file" || return 1
+      fi
+      ;;
+    *sh*)
+      sh -n "$file" || return 1
+      if command -v shellcheck &>/dev/null; then
+        shellcheck --severity=warning "$file" || return 1
+      fi
+      ;;
+    *python*)
+      python3 -m py_compile "$file" || return 1
+      ;;
+    *)
+      echo "  ⚠ Sin shebang reconocido en $file (se omitirá validación estricta)"
+      return 0
+      ;;
+  esac
+}
+for script in "${TARGETS[@]}"; do
+  name=$(basename "$script")
+  clean_name="${name%.*}" # Permite tener script.sh en el repo y llamarlo 'script' en terminal
+
+  if validate_syntax "$script"; then
+    chmod +x "$script"
+    ln -sf "$script" "$BIN_TARGET/$clean_name"
+    echo "✓ [$name] Sintaxis válida -> Permisos +x y enlazado como '$clean_name'"
+  else
+    chmod -x "$script" 2>/dev/null || true
+    echo "✗ [$name] Error de sintaxis -> Permisos denegados" >&2
+  fi
+done
