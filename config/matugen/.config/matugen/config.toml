@@ -7,4 +7,28 @@ output_path = '~/.local/state/quickshell/colors.json'
 
 [templates.niri]
 input_path = '~/.config/matugen/templates/niri-colors.kdl'
-output_path = '~/.config/niri/colors.kdl'
+output_path = '~/.local/state/matugen/colors.kdl'
+post_hook = 'ln -sf "$HOME/.local/state/matugen/colors.kdl" "$HOME/.config/niri/colors.kdl"'
+
+[templates.ghostty]
+input_path = '~/.config/matugen/templates/ghostty-theme'
+output_path = '~/.local/state/matugen/ghostty-theme'
+post_hook = 'pkill -USR2 -x ghostty || true'
+
+[templates.nvchad]
+input_path = '~/.config/matugen/templates/nvchad-colors.lua'
+output_path = '~/.local/state/matugen/nvchad-colors.lua'
+
+[templates.mpv]
+input_path = '~/.config/matugen/templates/mpv-colors.conf'
+output_path = '~/.local/state/matugen/mpv-colors.conf'
+
+[templates.btop]
+input_path = '~/.config/matugen/templates/btop.theme'
+output_path = '~/.local/state/matugen/btop.theme'
+post_hook = 'mkdir -p "$HOME/.config/btop/themes" && ln -sf "$HOME/.local/state/matugen/btop.theme" "$HOME/.config/btop/themes/matugen.theme" && pkill -USR2 btop || true'
+
+[templates.yazi]
+input_path = '~/.config/matugen/templates/yazi-theme.toml'
+output_path = '~/.local/state/matugen/yazi-theme.toml'
+post_hook = 'ln -sf "$HOME/.local/state/matugen/yazi-theme.toml" "$HOME/.config/yazi/theme.toml"'

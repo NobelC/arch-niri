@@ -9,6 +9,8 @@ spawn-at-startup "qs"
 
 // --- 4. WALLPAPER DINÁMICO (awww) ---
 spawn-at-startup "awww-daemon" "--format" "xrgb"
-spawn-sh-at-startup "[ -L \"$HOME/.local/state/quickshell/current-wallpaper\" ] && awww img \"$(readlink -f \"$HOME/.local/state/quickshell/current-wallpaper\")\" --transition-type none"// --- 5. ENERGÍA Y TEMPERATURA DE COLOR ---
-spawn-sh-at-startup "swayidle -w timeout 300 'qs ipc call lock lock' timeout 330 'niri msg action power-off-monitors' resume 'niri msg action power-off-monitors' before-sleep 'qs ipc call lock lock'"
+spawn-sh-at-startup "[ -L \"$HOME/.local/state/quickshell/current-wallpaper\" ] && awww img \"$(readlink -f \"$HOME/.local/state/quickshell/current-wallpaper\")\" --transition-type none"
+
+// --- 5. ENERGÍA Y TEMPERATURA DE COLOR ---
+spawn-sh-at-startup "pkill -x swayidle; swayidle -w timeout 300 'qs ipc call lock lock >/dev/null 2>&1 &' timeout 330 'niri msg action power-off-monitors' resume 'niri msg action power-off-monitors' before-sleep 'qs ipc call lock lock >/dev/null 2>&1; sleep 0.4'"
 spawn-at-startup "wlsunset" "-l" "8.4" "-L" "-80.1" "-t" "4000" "-T" "6500"

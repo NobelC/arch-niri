@@ -26,9 +26,6 @@ binds {
     // Apaga el panel al instante (se enciende al mover el ratón o pulsar cualquier tecla)
     Mod+Shift+P { power-off-monitors; }
 
-    // Bloqueo manual inmediato con swaylock
-    Mod+Alt+L hotkey-overlay-title="Bloquear pantalla" { spawn "swaylock" "-f"; }
-
     // Salir de Niri (muestra confirmación para evitar cierres accidentales)
     Mod+Shift+E     { quit; }
     Ctrl+Alt+Delete { quit; }

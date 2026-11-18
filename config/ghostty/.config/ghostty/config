@@ -12,6 +12,8 @@ window-padding-balance = true
 # --- TIPOGRAFÍA ---
 
 # --- ESTILO Y COLORES ---
+# --- ESTILO Y COLORES ---
+config-file = ?~/.local/state/matugen/ghostty-theme
 
 # --- CURSOR Y COMPORTAMIENTO ---
 cursor-style = block

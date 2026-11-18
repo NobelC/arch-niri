@@ -1,32 +1,47 @@
-local theme_file = vim.fn.expand("~/.config/nvim/current-theme")
+local palette_file = vim.fn.expand("~/.local/state/matugen/nvchad-colors.lua")
 
-local function apply_nvchad_theme()
-  if vim.fn.filereadable(theme_file) == 1 then
-    local lines = vim.fn.readfile(theme_file)
-    local theme_name = lines[1] and vim.trim(lines[1]) or ""
-    if theme_name ~= "" then
-      vim.schedule(function()
-        require("nvconfig").base46.theme = theme_name
-        require("base46").load_all_highlights()
-      end)
-    end
+local function apply_matugen_theme()
+  if vim.fn.filereadable(palette_file) ~= 1 then
+    return
   end
+
+  local ok_load, palette = pcall(dofile, palette_file)
+  if not ok_load or type(palette) ~= "table" then
+    return
+  end
+
+  vim.schedule(function()
+    local ok_cfg, nvconfig = pcall(require, "nvconfig")
+    local ok_b46, base46 = pcall(require, "base46")
+    if not ok_cfg or not ok_b46 then
+      return
+    end
+
+    local current = nvconfig.base46.theme
+    nvconfig.base46.changed_themes = nvconfig.base46.changed_themes or {}
+    nvconfig.base46.changed_themes[current] = palette
+    base46.load_all_highlights()
+  end)
 end
 
--- Aplica el tema guardado al abrir Neovim
-apply_nvchad_theme()
+-- Aplica los colores al abrir Neovim
+apply_matugen_theme()
 
--- Vigila cambios en vivo cuando ejecutes theme-switch
+-- Vigila cambios en vivo cuando matugen regenera el archivo
 local watcher = vim.uv.new_fs_event()
 if watcher then
-  watcher:start(theme_file, {}, function(err)
-    if not err then
-      watcher:stop()
-      apply_nvchad_theme()
-      vim.defer_fn(function()
-        package.loaded["theme-sync"] = nil
-        require("theme-sync")
-      end, 100)
+  local function start_watch()
+    if vim.fn.filereadable(palette_file) == 1 then
+      watcher:start(palette_file, {}, function(err)
+        if not err then
+          watcher:stop()
+          apply_matugen_theme()
+          vim.defer_fn(start_watch, 150)
+        end
+      end)
+    else
+      vim.defer_fn(start_watch, 1000)
     end
-  end)
+  end
+  start_watch()
 end

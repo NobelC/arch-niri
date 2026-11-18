@@ -29,8 +29,16 @@ elif command -v swww >/dev/null 2>&1; then
     swww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
 fi
 
-# 3. Extrae paleta dinámica con matugen
+# 3. Extrae paleta dinámica con matugen (con soporte garantizado para WebP/AVIF)
 if command -v matugen >/dev/null 2>&1; then
-    mkdir -p "$HOME/.config/niri"
-    matugen image "$ABS_WALL"
+    mkdir -p "$HOME/.config/niri" "$HOME/.local/state/matugen"
+    if ! matugen image "$ABS_WALL" --source-color-index 0 2>/dev/null; then
+        TMP_PNG="/tmp/matugen-wallpaper-fallback.png"
+        if command -v dwebp >/dev/null 2>&1; then
+            dwebp "$ABS_WALL" -o "$TMP_PNG" >/dev/null 2>&1
+        elif command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -y -i "$ABS_WALL" -vframes 1 "$TMP_PNG" >/dev/null 2>&1
+        fi
+        [ -f "$TMP_PNG" ] && matugen image "$TMP_PNG" --source-color-index 0
+    fi
 fi

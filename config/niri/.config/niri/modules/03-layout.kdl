@@ -1,25 +1,21 @@
-layout{
-  //Espaciado
+layout {
+  // Espaciado
   gaps 8
-  //Centrado automaticamente de las columnas
+  // Centrado automático de las columnas
   center-focused-column "never"
-  //Anchos definidos al pulsar mod + R
-  preset-column-widths{
+  // Anchos definidos al pulsar mod + R
+  preset-column-widths {
     proportion 0.33333
     proportion 0.5
     proportion 0.66667
     proportion 1.0
   }
-  default-column-width {proportion 1.0;}
-  focus-ring{
-    width  2
-    active-color "#7fc8ff"
-    inactive-color "#505050"
+  default-column-width { proportion 1.0; }
+  focus-ring {
+    width 2
   }
-  border{
+  border {
     off
     width 2
-    active-color "#ffc87f"
-    inactive-color "#505050"
   }
 }

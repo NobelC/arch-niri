@@ -78,11 +78,9 @@ PanelWindow {
         }
     }
 
-    // Proceso dedicado para aplicar el wallpaper (swww + symlink + matugen)
+    // Proceso dedicado para aplicar el wallpaper (awww + symlink + matugen)
     Process {
         id: applyProc
-        property string targetWall: ""
-        command: ["bash", pickerWindow.setScript, targetWall]
     }
 
     function openPicker() {
@@ -112,7 +110,8 @@ PanelWindow {
         if (!selected) return;
 
         LockState.currentWallpaper = selected;
-        applyProc.targetWall = selected;
+        applyProc.running = false;
+        applyProc.command = ["bash", pickerWindow.setScript, selected];
         applyProc.running = true;
         closePicker();
     }
@@ -129,7 +128,7 @@ PanelWindow {
         }
     }
 
-// ---------- Animación de Apertura (Estela difuminada -> círculo nítido -> expansión) ----------
+    // ---------- Animación de Apertura (Estela difuminada -> círculo nítido -> expansión) ----------
     SequentialAnimation {
         id: openAnim
 
@@ -308,13 +307,15 @@ PanelWindow {
                 pickerWindow.isOpen = false;
             }
         }
-    }    MouseArea {
+    }
+
+    MouseArea {
         anchors.fill: parent
         enabled: pickerWindow.isOpen
         onClicked: pickerWindow.closePicker()
     }
 
-// ---------- Contenedor Morphing ----------
+    // ---------- Contenedor Morphing ----------
     Rectangle {
         id: morphBox
 
