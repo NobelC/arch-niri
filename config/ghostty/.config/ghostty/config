@@ -1,0 +1,24 @@
+# --- VENTANA Y MÁRGENES ---
+# Elimina la barra de título GTK
+window-decoration = false
+
+# Márgenes internos (en píxeles) para que el texto no quede pegado al borde de Niri
+window-padding-x = 5
+window-padding-y = 5
+
+# Centra el grid de caracteres si sobra espacio al redimensionar la ventana
+window-padding-balance = true
+
+# --- TIPOGRAFÍA ---
+
+# --- ESTILO Y COLORES ---
+
+# --- CURSOR Y COMPORTAMIENTO ---
+cursor-style = block
+cursor-style-blink = false
+
+# Oculta el puntero del ratón mientras escribes
+mouse-hide-while-typing = true
+
+# Evita confirmación al cerrar pestañas/ventanas si no hay procesos activos
+confirm-close-surface = false

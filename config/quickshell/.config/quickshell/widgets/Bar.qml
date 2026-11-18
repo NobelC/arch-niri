@@ -1,6 +1,13 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import "workspaces"
+import "arch"
+import "clock"
+import "bluetooth"
+import "network"
+import "audio"
+import "battery"
 
 PanelWindow {
     id: bar
@@ -23,33 +30,40 @@ PanelWindow {
         color: "#313244"
     }
 
-    // Contenedor principal modular de 3 zonas
+    // --- ZONA IZQUIERDA ---
     RowLayout {
-        anchors.fill: parent
-        anchors.leftMargin: 12
-        anchors.rightMargin: 12
+        id: leftModules
+        anchors {
+            left: parent.left
+            leftMargin: 5
+            verticalCenter: parent.verticalCenter
+        }
+        spacing: 2
+        ArchIcon{}
+        Workspaces{}
+    }
+
+    // --- ZONA CENTRAL (Anclada de forma absoluta) ---
+    RowLayout {
+        id: centerModules
+        anchors.centerIn: parent
         spacing: 8
 
-        // --- ZONA IZQUIERDA ---
-        RowLayout {
-            id: leftModules
-            spacing: 8
+        Clock{}
+    }
+
+    // --- ZONA DERECHA ---
+    RowLayout {
+        id: rightModules
+        anchors {
+            right: parent.right
+            rightMargin: 5
+            verticalCenter: parent.verticalCenter
         }
-
-        Item { Layout.fillWidth: true }
-
-        // --- ZONA CENTRAL ---
-        RowLayout {
-            id: centerModules
-            spacing: 8
-        }
-
-        Item { Layout.fillWidth: true }
-
-        // --- ZONA DERECHA ---
-        RowLayout {
-            id: rightModules
-            spacing: 8
-        }
+        spacing: 0
+        Battery{}
+        Network{}
+        Bluetooth{}
+        Audio{}
     }
 }

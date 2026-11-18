@@ -1,0 +1,7 @@
+singleton Niri 1.0 Niri.qml
+singleton Bluetooth 1.0 Bluetooth.qml
+singleton Network 1.0 Network.qml
+singleton Audio 1.0 Audio.qml
+singleton Battery 1.0 Battery.qml
+singleton Brightness 1.0 Brightness.qml
+singleton CapsLock 1.0 CapsLock.qml

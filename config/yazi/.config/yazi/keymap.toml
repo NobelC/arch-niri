@@ -1,0 +1,18 @@
+# 1. Enter: Si es carpeta, entra en ella y cierra Yazi dejándote en esa ruta en Ghostty.
+#           Si es archivo, lo abre con su opener (nvim, mpv, zathura, etc.).
+[[mgr.prepend_keymap]]
+on   = [ "<Enter>" ]
+run  = "plugin smart-enter"
+desc = "Entrar a carpeta en Ghostty o abrir archivo"
+
+# 2. Shift+Enter (o 'E' mayúscula): Abre la carpeta seleccionada (o la actual si estás sobre un archivo)
+#    directamente como root en Neovim.
+[[mgr.prepend_keymap]]
+on   = [ "<S-Enter>" ]
+run  = 'shell --block -- nvim "${0:-.}"'
+desc = "Abrir carpeta en Neovim"
+
+[[mgr.prepend_keymap]]
+on   = [ "E" ]
+run  = 'shell --block -- nvim "${0:-.}"'
+desc = "Abrir carpeta en Neovim (alternativo)"
