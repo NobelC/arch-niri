@@ -1,0 +1,14 @@
+{
+  "dark": true,
+  "bg": "{{colors.surface.default.hex}}",
+  "card": "{{colors.surface_container.default.hex}}",
+  "cardAlt": "{{colors.surface_container_high.default.hex}}",
+  "text": "{{colors.on_surface.default.hex}}",
+  "sub": "{{colors.on_surface_variant.default.hex}}",
+  "muted": "{{colors.outline.default.hex}}",
+  "border": "{{colors.outline_variant.default.hex}}",
+  "accent": "{{colors.primary.default.hex}}",
+  "accentSoft": "{{colors.secondary.default.hex}}",
+  "highlight": "{{colors.tertiary.default.hex}}",
+  "warn": "{{colors.error.default.hex}}"
+}

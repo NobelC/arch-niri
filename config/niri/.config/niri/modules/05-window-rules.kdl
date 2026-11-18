@@ -40,3 +40,26 @@ window-rule {
     default-column-width { proportion 0.50; }
     default-window-height { proportion 0.60; }
 }
+
+window-rule {
+    match app-id="^(wps|wpp|et|wpspdf)$"
+    open-maximized true
+}
+
+window-rule {
+    match app-id="^(wps|wpp|et|wpspdf|wpsoffice)$" title=".*(License|Agreement|Settings|Options|Save|Open).*"
+    open-floating true
+}
+
+// Ventana principal de Steam en mosaico / maximizada
+window-rule {
+    match app-id="^steam$" title="^Steam$"
+    open-maximized true
+}
+
+// Ventanas emergentes de Steam (Amigos, Chat, Ofertas/Anuncios, Ajustes) flotantes
+window-rule {
+    match app-id="^steam$"
+    exclude title="^Steam$"
+    open-floating true
+}

@@ -19,16 +19,15 @@ Item {
     }
 
     function networkColor() {
-        if (Network.connectionType === "ethernet") return "#a6e3a1";
-        if (!Network.wifiEnabled || Network.connectionType === "none") return "#6c7086";
-        return "#89b4fa";
+        if (Network.connectionType === "ethernet") return Theme.highlight;
+        if (!Network.wifiEnabled || Network.connectionType === "none") return Theme.muted;
+        return Theme.accentSoft;
     }
 
-    // Fondo sutil tipo pastilla al pasar el cursor
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? "#313244" : "transparent"
+        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -39,7 +38,7 @@ Item {
         anchors.centerIn: parent
         text: root.networkIcon()
         color: root.networkColor()
-        font.family: "JetBrainsMono Nerd Font"
+        font.family: Theme.fontFamily
         font.pixelSize: 14
 
         Behavior on color { ColorAnimation { duration: 150 } }

@@ -5,3 +5,5 @@ singleton Audio 1.0 Audio.qml
 singleton Battery 1.0 Battery.qml
 singleton Brightness 1.0 Brightness.qml
 singleton CapsLock 1.0 CapsLock.qml
+singleton LockState 1.0 LockState.qml
+singleton Theme 1.0 Theme.qml

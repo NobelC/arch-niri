@@ -10,8 +10,9 @@ binds {
     Mod+W { spawn "ghostty" "-e" "btop";}
 
     // --- QUICKSHELL --
-    Mod+D { spawn "qs" "ipc" "call" "launcher" "toggle"; }
-
+    Mod+Space { spawn "qs" "ipc" "call" "launcher" "toggle"; }
+    Mod+Alt+L { spawn "qs" "ipc" "call" "lock" "lock"; }
+    Mod+Shift+W hotkey-overlay-title="Selector de wallpapers" { spawn "qs" "ipc" "call" "wallpaper" "toggle"; }
     // Ejemplo para lanzar una función de Bash interactiva en Ghostty (como tu selector de proyectos):
     // Mod+Alt+P hotkey-overlay-title="Selector de proyectos" { spawn "ghostty" "-e" "bash" "-ic" "pp; exec bash"; }
 

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import "../services"
 import "workspaces"
 import "arch"
 import "clock"
@@ -17,7 +18,9 @@ PanelWindow {
         right: true
     }
     implicitHeight: 30
-    color: "#1e1e2e"
+    color: Theme.bg
+
+    Behavior on color { ColorAnimation { duration: 200 } }
 
     // Borde inferior sutil
     Rectangle {
@@ -27,7 +30,8 @@ PanelWindow {
             right: parent.right
         }
         height: 1
-        color: "#313244"
+        color: Theme.cardAlt
+        Behavior on color { ColorAnimation { duration: 200 } }
     }
 
     // --- ZONA IZQUIERDA ---

@@ -29,17 +29,16 @@ Item {
     }
 
     function batteryColor() {
-        if (Battery.charging || Battery.full) return "#a6e3a1";
-        if (Battery.capacity <= 15) return "#f38ba8";
-        if (Battery.capacity <= 30) return "#f9e2af";
-        return "#89b4fa";
+        if (Battery.charging || Battery.full) return Theme.accent;
+        if (Battery.capacity <= 15) return Theme.warn;
+        if (Battery.capacity <= 30) return Theme.highlight;
+        return Theme.accentSoft;
     }
 
-    // Fondo sutil tipo pastilla al pasar el cursor
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? "#313244" : "transparent"
+        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -55,7 +54,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: root.batteryIcon()
             color: root.batteryColor()
-            font.family: "JetBrainsMono Nerd Font"
+            font.family: Theme.fontFamily
             font.pixelSize: 14
 
             Behavior on color { ColorAnimation { duration: 150 } }
@@ -64,10 +63,12 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: Battery.capacity + "%"
-            color: Battery.capacity <= 15 && !Battery.charging ? "#f38ba8" : "#cdd6f4"
-            font.family: "JetBrainsMono Nerd Font"
+            color: Battery.capacity <= 15 && !Battery.charging ? Theme.warn : Theme.text
+            font.family: Theme.fontFamily
             font.pixelSize: 11
             font.bold: true
+
+            Behavior on color { ColorAnimation { duration: 150 } }
         }
     }
 

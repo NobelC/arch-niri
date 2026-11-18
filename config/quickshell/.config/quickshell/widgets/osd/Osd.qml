@@ -44,14 +44,14 @@ PanelWindow {
 
     function osdAccentColor() {
         if (mode === "layout") {
-            return Niri.keyboardLayoutCode === "ES" ? "#a6e3a1" : "#89b4fa";
+            return Niri.keyboardLayoutCode === "ES" ? Theme.highlight : Theme.accentSoft;
         }
         if (mode === "capslock") {
-            return CapsLock.active ? "#cba6f7" : "#a6adc8";
+            return CapsLock.active ? Theme.accent : Theme.sub;
         }
-        if (mode === "brightness") return "#f9e2af";
-        if (Audio.muted) return "#f38ba8";
-        return "#89b4fa";
+        if (mode === "brightness") return Theme.highlight;
+        if (Audio.muted) return Theme.warn;
+        return Theme.accentSoft;
     }
 
     function osdLabelText() {
@@ -100,9 +100,12 @@ PanelWindow {
         id: card
         anchors.fill: parent
         radius: 12
-        color: "#1e1e2e"
+        color: Theme.bg
         border.width: 1
-        border.color: "#313244"
+        border.color: Theme.cardAlt
+
+        Behavior on color { ColorAnimation { duration: 150 } }
+        Behavior on border.color { ColorAnimation { duration: 150 } }
 
         opacity: osdWindow.isShown ? 1.0 : 0.0
         transform: Translate {
@@ -121,24 +124,22 @@ PanelWindow {
             anchors.centerIn: parent
             spacing: 12
 
-            // Ícono (solo en modos con barra de progreso: audio y brillo)
             Text {
                 visible: osdWindow.isBarMode
                 anchors.verticalCenter: parent.verticalCenter
                 text: osdWindow.osdIcon()
                 color: osdWindow.osdAccentColor()
-                font.family: "JetBrainsMono Nerd Font"
+                font.family: Theme.fontFamily
                 font.pixelSize: 16
             }
 
-            // Barra de progreso (solo en audio y brillo)
             Rectangle {
                 visible: osdWindow.isBarMode
                 anchors.verticalCenter: parent.verticalCenter
                 width: 115
                 height: 6
                 radius: 3
-                color: "#313244"
+                color: Theme.cardAlt
 
                 Rectangle {
                     anchors {
@@ -159,14 +160,13 @@ PanelWindow {
                 }
             }
 
-            // Texto principal
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 width: osdWindow.isBarMode ? 34 : implicitWidth
                 horizontalAlignment: osdWindow.isBarMode ? Text.AlignRight : Text.AlignHCenter
                 text: osdWindow.osdLabelText()
-                color: osdWindow.isBarMode ? "#cdd6f4" : osdWindow.osdAccentColor()
-                font.family: "JetBrainsMono Nerd Font"
+                color: osdWindow.isBarMode ? Theme.text : osdWindow.osdAccentColor()
+                font.family: Theme.fontFamily
                 font.pixelSize: osdWindow.isBarMode ? 11 : 12
                 font.bold: true
                 font.letterSpacing: osdWindow.isBarMode ? 0 : 0.8

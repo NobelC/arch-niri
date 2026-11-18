@@ -66,3 +66,4 @@ function mpv() {
         command mpv
     fi
 }
+export PATH="$HOME/.npm-global/bin:$PATH"

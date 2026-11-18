@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "../../services"
 
 PanelWindow {
     id: launcherWindow
@@ -28,14 +29,27 @@ PanelWindow {
     property int selectedIndex: 0
     property var usageCounts: ({})
 
-    // Panel más ancho y cómodo para nombres e iconos nítidos
+    onIsOpenChanged: {
+        Niri.notifyLauncherState(isOpen);
+    }
+
     readonly property real panelWidth: 460
-    readonly property real panelHeight: 344
     readonly property real topRadius: 15
     readonly property real concaveRadius: 10
 
-    readonly property real openY: launcherWindow.height - launcherWindow.panelHeight
-    readonly property real hiddenY: launcherWindow.height + 12
+    readonly property int visibleRowCount: topApps.length
+    readonly property real appsBlockHeight: visibleRowCount > 0
+        ? (visibleRowCount * 48) + ((visibleRowCount - 1) * 4) + 10
+        : 0
+    readonly property real targetPanelHeight: 72 + appsBlockHeight
+
+    property real panelHeight: targetPanelHeight
+    Behavior on panelHeight {
+        NumberAnimation {
+            duration: 160
+            easing.type: Easing.OutCubic
+        }
+    }
 
     Process {
         id: loadUsageProc
@@ -157,27 +171,27 @@ PanelWindow {
         }
     }
 
-    // Clic fuera del panel para cerrar
     MouseArea {
         anchors.fill: parent
         enabled: launcherWindow.isOpen
         onClicked: launcherWindow.closeLauncher()
     }
 
-    // Contenedor anclado abajo con silueta continua
     Item {
         id: dockContainer
         anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: launcherWindow.isOpen ? 0 : -(launcherWindow.panelHeight + 16)
+
         width: launcherWindow.panelWidth + (launcherWindow.concaveRadius * 2)
         height: launcherWindow.panelHeight
 
-        y: launcherWindow.isOpen ? launcherWindow.openY : launcherWindow.hiddenY
         opacity: launcherWindow.isOpen ? 1.0 : 0.0
         visible: opacity > 0.01
 
-        Behavior on y {
+        Behavior on anchors.bottomMargin {
             NumberAnimation {
-                duration: 230
+                duration: 210
                 easing.type: launcherWindow.isOpen ? Easing.OutCubic : Easing.InCubic
             }
         }
@@ -189,11 +203,19 @@ PanelWindow {
             }
         }
 
-        // Silueta única continua: curvas cóncavas abajo + esquinas superiores redondeadas
+        Connections {
+            target: Theme
+            function onBgChanged() { silhouetteCanvas.requestPaint(); }
+            function onAccentChanged() { silhouetteCanvas.requestPaint(); }
+        }
+
         Canvas {
             id: silhouetteCanvas
             anchors.fill: parent
             antialiasing: true
+
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
 
             onPaint: {
                 const ctx = getContext("2d");
@@ -202,7 +224,7 @@ PanelWindow {
                 const bw = 2;
                 const half = bw / 2;
                 const c = launcherWindow.concaveRadius;
-                const r = launcherWindow.topRadius;
+                const r = Math.min(launcherWindow.topRadius, (height - c) / 2);
                 const leftX = c;
                 const rightX = width - c;
                 const topY = half;
@@ -210,34 +232,24 @@ PanelWindow {
 
                 function buildPath() {
                     ctx.beginPath();
-                    // Empieza en el pie cóncavo izquierdo
                     ctx.moveTo(0, bottomY);
-                    // Curva cóncava inferior izquierda hacia la pared izquierda
                     ctx.arc(leftX - c, bottomY - c, c, Math.PI / 2, 0, true);
-                    // Pared izquierda hasta antes de la esquina superior izquierda
                     ctx.lineTo(leftX, topY + r);
-                    // Esquina superior izquierda redondeada
                     ctx.arcTo(leftX, topY, leftX + r, topY, r);
-                    // Techo hasta antes de la esquina superior derecha
                     ctx.lineTo(rightX - r, topY);
-                    // Esquina superior derecha redondeada
                     ctx.arcTo(rightX, topY, rightX, topY + r, r);
-                    // Pared derecha hasta antes de la curva cóncava derecha
                     ctx.lineTo(rightX, bottomY - c);
-                    // Curva cóncava inferior derecha hacia el borde de pantalla
                     ctx.arc(rightX + c, bottomY - c, c, Math.PI, Math.PI / 2, true);
                 }
 
-                // 1. Relleno completo cerrado por la base
                 buildPath();
                 ctx.lineTo(0, bottomY);
                 ctx.closePath();
-                ctx.fillStyle = "#1e1e2e";
+                ctx.fillStyle = Theme.bg.toString();
                 ctx.fill();
 
-                // 2. Trazo continuo del borde superior, laterales y curvas cóncavas
                 buildPath();
-                ctx.strokeStyle = "#cba6f7";
+                ctx.strokeStyle = Theme.accent.toString();
                 ctx.lineWidth = bw;
                 ctx.lineJoin = "round";
                 ctx.lineCap = "round";
@@ -245,7 +257,6 @@ PanelWindow {
             }
         }
 
-        // Zona central del contenido (absorbe clics internos)
         Item {
             id: innerArea
             anchors {
@@ -254,6 +265,7 @@ PanelWindow {
                 horizontalCenter: parent.horizontalCenter
             }
             width: launcherWindow.panelWidth
+            clip: true
 
             MouseArea {
                 anchors.fill: parent
@@ -261,18 +273,19 @@ PanelWindow {
 
             ColumnLayout {
                 anchors {
-                    fill: parent
-                    topMargin: 16
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
                     leftMargin: 18
                     rightMargin: 18
                     bottomMargin: 14
                 }
                 spacing: 10
 
-                // 1. TOP 5 APLICACIONES (arriba)
+                // 1. LISTA DE APPS
                 ColumnLayout {
+                    visible: launcherWindow.visibleRowCount > 0
                     Layout.fillWidth: true
-                    Layout.fillHeight: true
                     spacing: 4
 
                     Repeater {
@@ -288,9 +301,9 @@ PanelWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 48
                             radius: 10
-                            color: isSelected ? "#313244" : (itemHover.containsMouse ? "#242436" : "transparent")
+                            color: isSelected ? Theme.cardAlt : (itemHover.containsMouse ? Theme.card : "transparent")
                             border.width: isSelected ? 1 : 0
-                            border.color: "#45475a"
+                            border.color: Theme.border
 
                             Behavior on color {
                                 ColorAnimation { duration: 90 }
@@ -304,7 +317,6 @@ PanelWindow {
                                 }
                                 spacing: 14
 
-                                // Ícono en mayor resolución y con mipmap para evitar pixelado
                                 Item {
                                     Layout.preferredWidth: 30
                                     Layout.preferredHeight: 30
@@ -327,8 +339,8 @@ PanelWindow {
                                         anchors.centerIn: parent
                                         visible: !appIconImg.visible
                                         text: "󰣆"
-                                        color: appDelegate.isSelected ? "#cba6f7" : "#89b4fa"
-                                        font.family: "JetBrainsMono Nerd Font"
+                                        color: appDelegate.isSelected ? Theme.accent : Theme.accentSoft
+                                        font.family: Theme.fontFamily
                                         font.pixelSize: 20
                                     }
                                 }
@@ -340,8 +352,8 @@ PanelWindow {
                                     Text {
                                         Layout.fillWidth: true
                                         text: appDelegate.modelData.name || "Application"
-                                        color: appDelegate.isSelected ? "#cba6f7" : "#cdd6f4"
-                                        font.family: "JetBrainsMono Nerd Font"
+                                        color: appDelegate.isSelected ? Theme.accent : Theme.text
+                                        font.family: Theme.fontFamily
                                         font.pixelSize: 13
                                         font.bold: appDelegate.isSelected
                                         elide: Text.ElideRight
@@ -351,8 +363,8 @@ PanelWindow {
                                         Layout.fillWidth: true
                                         visible: text.length > 0
                                         text: appDelegate.modelData.genericName || appDelegate.modelData.comment || ""
-                                        color: "#a6adc8"
-                                        font.family: "JetBrainsMono Nerd Font"
+                                        color: Theme.sub
+                                        font.family: Theme.fontFamily
                                         font.pixelSize: 11
                                         elide: Text.ElideRight
                                     }
@@ -372,20 +384,16 @@ PanelWindow {
                             }
                         }
                     }
-
-                    Item {
-                        Layout.fillHeight: true
-                    }
                 }
 
-                // 2. BARRA DE BÚSQUEDA ABAJO CON ">"
+                // 2. BARRA DE BÚSQUEDA ANCLADA ABAJO
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 42
                     radius: 10
-                    color: "#181825"
+                    color: Theme.card
                     border.width: 1
-                    border.color: searchInput.activeFocus ? "#cba6f7" : "#313244"
+                    border.color: searchInput.activeFocus ? Theme.accent : Theme.cardAlt
 
                     RowLayout {
                         anchors {
@@ -397,8 +405,8 @@ PanelWindow {
 
                         Text {
                             text: ">"
-                            color: "#cba6f7"
-                            font.family: "JetBrainsMono Nerd Font"
+                            color: Theme.accent
+                            font.family: Theme.fontFamily
                             font.pixelSize: 15
                             font.bold: true
                         }
@@ -406,10 +414,10 @@ PanelWindow {
                         TextInput {
                             id: searchInput
                             Layout.fillWidth: true
-                            color: "#cdd6f4"
-                            selectionColor: "#cba6f7"
-                            selectedTextColor: "#11111b"
-                            font.family: "JetBrainsMono Nerd Font"
+                            color: Theme.text
+                            selectionColor: Theme.accent
+                            selectedTextColor: Theme.bg
+                            font.family: Theme.fontFamily
                             font.pixelSize: 13
                             clip: true
 
@@ -420,7 +428,7 @@ PanelWindow {
                                 anchors.fill: parent
                                 verticalAlignment: Text.AlignVCenter
                                 text: "Search applications..."
-                                color: "#6c7086"
+                                color: Theme.muted
                                 font: searchInput.font
                                 visible: searchInput.text.length === 0
                             }

@@ -14,16 +14,15 @@ Item {
     }
 
     function volumeColor() {
-        if (Audio.muted) return "#f38ba8";
-        if (Audio.volume === 0) return "#6c7086";
-        return "#89b4fa";
+        if (Audio.muted) return Theme.warn;
+        if (Audio.volume === 0) return Theme.muted;
+        return Theme.accentSoft;
     }
 
-    // Fondo sutil tipo pastilla al pasar el cursor
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? "#313244" : "transparent"
+        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -34,7 +33,7 @@ Item {
         anchors.centerIn: parent
         text: root.volumeIcon()
         color: root.volumeColor()
-        font.family: "JetBrainsMono Nerd Font"
+        font.family: Theme.fontFamily
         font.pixelSize: 14
 
         Behavior on color { ColorAnimation { duration: 150 } }

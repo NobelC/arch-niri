@@ -12,7 +12,6 @@ PanelWindow {
         right: true
     }
 
-    // No reserva espacio exclusivo para no empujar ventanas
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
 
@@ -28,7 +27,6 @@ PanelWindow {
 
     property bool isShown: false
 
-    // Temporizador de ocultado automático al dejar de moverse por la cinta
     Timer {
         id: hideTimer
         interval: 1400
@@ -37,33 +35,51 @@ PanelWindow {
                 dockWindow.isShown = false;
             }
         }
-      }
-
-    Connections {
-      target: Niri
-      function onRibbonActivity() {
-        if (Niri.activeRibbonWindows.length > 0) {
-            dockWindow.isShown = true;
-            hideTimer.restart();
-        } else {
-            dockWindow.isShown = false;
-        }
-      }
-      function onActiveRibbonWindowsChanged() {
-        if (Niri.activeRibbonWindows.length === 0) {
-            dockWindow.isShown = false;
-        }
-      }
     }
 
-    // Contenedor centrado que emerge pegado al borde inferior de la pantalla
+    Connections {
+        target: Niri
+
+        function onLauncherOpenChanged() {
+            if (Niri.launcherOpen) {
+                hideTimer.stop();
+                dockWindow.isShown = false;
+            }
+        }
+
+        function onRibbonActivity() {
+            if (Niri.launcherOpen || Niri.suppressDock) {
+                dockWindow.isShown = false;
+                return;
+            }
+
+            if (Niri.activeRibbonWindows.length > 0) {
+                dockWindow.isShown = true;
+                hideTimer.restart();
+            } else {
+                dockWindow.isShown = false;
+            }
+        }
+
+        function onActiveRibbonWindowsChanged() {
+            if (Niri.activeRibbonWindows.length === 0) {
+                dockWindow.isShown = false;
+            }
+        }
+    }
+
+    Connections {
+        target: Theme
+        function onBgChanged() { bgCanvas.requestPaint(); }
+        function onCardAltChanged() { bgCanvas.requestPaint(); }
+    }
+
     Item {
         id: dockContainer
         width: dockWindow.totalWidth
         height: dockWindow.dockHeight
         anchors.horizontalCenter: parent.horizontalCenter
 
-        // Se desplaza hacia abajo para esconderse y sube hasta y = parent.height - height sin despegarse nunca
         y: dockWindow.isShown ? (parent.height - height) : parent.height
 
         Behavior on y {
@@ -81,7 +97,6 @@ PanelWindow {
         onWidthChanged: bgCanvas.requestPaint()
         onHeightChanged: bgCanvas.requestPaint()
 
-        // Forma con esquinas superiores redondeadas y faldas inferiores cóncavas hacia adentro
         Canvas {
             id: bgCanvas
             anchors.fill: parent
@@ -97,32 +112,25 @@ PanelWindow {
                 const rBot = dockWindow.scoopRadius;
 
                 ctx.beginPath();
-                // Empieza en el extremo inferior izquierdo (falda cóncava)
                 ctx.moveTo(0, h);
                 ctx.quadraticCurveTo(rBot, h, rBot, h - rBot);
-                // Sube por el lateral izquierdo hasta la esquina superior redondeada
                 ctx.lineTo(rBot, rTop);
                 ctx.quadraticCurveTo(rBot, 0, rBot + rTop, 0);
-                // Borde superior recto
                 ctx.lineTo(w - rBot - rTop, 0);
-                // Esquina superior derecha redondeada
                 ctx.quadraticCurveTo(w - rBot, 0, w - rBot, rTop);
-                // Baja por el lateral derecho hasta la falda cóncava inferior derecha
                 ctx.lineTo(w - rBot, h - rBot);
                 ctx.quadraticCurveTo(w - rBot, h, w, h);
                 ctx.closePath();
 
-                ctx.fillStyle = "#1e1e2e";
+                ctx.fillStyle = Theme.bg.toString();
                 ctx.fill();
 
-                // Trazo sutil solo en el contorno superior y lateral (sin línea abajo para fundirse con el borde)
-                ctx.strokeStyle = "#313244";
+                ctx.strokeStyle = Theme.cardAlt.toString();
                 ctx.lineWidth = 1;
                 ctx.stroke();
             }
         }
 
-        // Fila de glifos de las aplicaciones en la cinta actual
         Row {
             id: iconsRow
             anchors.centerIn: parent
@@ -138,22 +146,22 @@ PanelWindow {
 
                     readonly property bool isFocused: modelData.is_focused
 
-                    // Fondo resaltado cuando la ventana de la cinta está enfocada
                     Rectangle {
                         anchors.fill: parent
                         radius: 8
-                        color: isFocused ? "#313244" : "transparent"
+                        color: isFocused ? Theme.cardAlt : "transparent"
                         border.width: isFocused ? 1 : 0
-                        border.color: "#89b4fa"
+                        border.color: Theme.accentSoft
 
                         Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on border.color { ColorAnimation { duration: 150 } }
                     }
 
                     Text {
                         anchors.centerIn: parent
                         text: AppGlyphs.resolve(modelData.app_id, modelData.title)
-                        color: isFocused ? "#89b4fa" : "#a6adc8"
-                        font.family: "JetBrainsMono Nerd Font"
+                        color: isFocused ? Theme.accentSoft : Theme.sub
+                        font.family: Theme.fontFamily
                         font.pixelSize: 16
 
                         Behavior on color { ColorAnimation { duration: 150 } }
@@ -161,6 +169,7 @@ PanelWindow {
 
                     MouseArea {
                         anchors.fill: parent
+                        enabled: dockWindow.isShown
                         cursorShape: Qt.PointingHandCursor
                         onClicked: Niri.focusWindow(modelData.id)
                     }
@@ -168,10 +177,10 @@ PanelWindow {
             }
         }
 
-        // Mantiene visible el dock mientras el cursor esté encima
         MouseArea {
             id: hoverArea
             anchors.fill: parent
+            enabled: dockWindow.isShown && !Niri.launcherOpen && !Niri.suppressDock
             hoverEnabled: true
             acceptedButtons: Qt.NoButton
             onExited: hideTimer.restart()

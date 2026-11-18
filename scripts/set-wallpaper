@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+WALL="${1:-}"
+if [ -z "$WALL" ] || [ ! -f "$WALL" ]; then
+    echo "Uso: set-wallpaper /ruta/a/imagen" >&2
+    exit 1
+fi
+
+ABS_WALL="$(realpath "$WALL")"
+STATE_DIR="$HOME/.local/state/quickshell"
+mkdir -p "$STATE_DIR"
+
+# 1. Actualiza enlace de estado para LockScreen y persistencia
+ln -sf "$ABS_WALL" "$STATE_DIR/current-wallpaper"
+
+# 2. Aplica wallpaper con awww (o swww como respaldo)
+if command -v awww >/dev/null 2>&1; then
+    if ! pgrep -x awww-daemon >/dev/null 2>&1; then
+        awww-daemon --format xrgb >/dev/null 2>&1 &
+        sleep 0.3
+    fi
+    awww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
+elif command -v swww >/dev/null 2>&1; then
+    if ! pgrep -x swww-daemon >/dev/null 2>&1; then
+        swww-daemon --format xrgb >/dev/null 2>&1 &
+        sleep 0.3
+    fi
+    swww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
+fi
+
+# 3. Extrae paleta dinámica con matugen
+if command -v matugen >/dev/null 2>&1; then
+    mkdir -p "$HOME/.config/niri"
+    matugen image "$ABS_WALL"
+fi

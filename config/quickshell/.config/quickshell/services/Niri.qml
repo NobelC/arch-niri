@@ -19,6 +19,34 @@ Singleton {
         return "US";
     }
 
+    property bool launcherOpen: false
+    property bool suppressDock: false
+
+    Timer {
+        id: dockCooldownTimer
+        interval: 350
+        repeat: false
+        onTriggered: root.suppressDock = false
+    }
+
+    function notifyLauncherState(open) {
+        root.launcherOpen = open;
+        if (open) {
+            dockCooldownTimer.stop();
+            root.suppressDock = true;
+        } else {
+            // Mantiene el bloqueo 350 ms tras cerrar para ignorar eventos residuales
+            root.suppressDock = true;
+            dockCooldownTimer.restart();
+        }
+    }
+
+    function triggerRibbonActivity() {
+        if (!root.launcherOpen && !root.suppressDock) {
+            root.ribbonActivity();
+        }
+    }
+
     signal ribbonActivity()
     signal keyboardLayoutOsdTriggered()
 
@@ -106,7 +134,7 @@ Singleton {
                     } catch (e) {}
                 } else if (line.includes("WorkspaceActivated") || line.includes("WorkspacesChanged")) {
                     if (!fetchWs.running) fetchWs.running = true;
-                    root.ribbonActivity();
+                    root.triggerRibbonActivity();
                     if (!closeUnfocusedPopups.running) {
                         closeUnfocusedPopups.running = true;
                     }
@@ -118,12 +146,12 @@ Singleton {
                     try {
                         const ev = JSON.parse(line);
                         if (ev.WindowFocusChanged && ev.WindowFocusChanged.id !== null) {
-                            root.ribbonActivity();
+                            root.triggerRibbonActivity();
                         }
                     } catch (e) {}
                 } else if (line.includes("WindowLayoutsChanged")) {
                     if (!fetchWin.running) fetchWin.running = true;
-                    root.ribbonActivity();
+                    root.triggerRibbonActivity();
                 } else if (line.includes("WindowsChanged") || line.includes("WindowOpenedOrClosed")) {
                     if (!fetchWin.running) fetchWin.running = true;
                 }

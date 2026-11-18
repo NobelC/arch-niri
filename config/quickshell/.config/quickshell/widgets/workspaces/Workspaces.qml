@@ -20,11 +20,11 @@ Row {
             width: isActive ? 28 : 10
             height: 10
             radius: height / 2
-            color: isActive ? "#89b4fa" : (hasWindows ? "#6c7086" : "#45475a")
+            color: isActive ? Theme.accentSoft : (hasWindows ? Theme.muted : Theme.border)
 
             // Borde interior luminoso en la pastilla activa
             border.width: isActive ? 1 : 0
-            border.color: "#b4befe"
+            border.color: Theme.highlight
 
             Behavior on width {
                 NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -39,12 +39,15 @@ Row {
                 width: parent.width + 8
                 height: parent.height + 8
                 radius: height / 2
-                color: "#89b4fa"
+                color: Theme.accentSoft
                 opacity: pill.isActive ? 0.16 : 0.0
                 z: -2
 
                 Behavior on opacity {
                     NumberAnimation { duration: 200 }
+                }
+                Behavior on color {
+                    ColorAnimation { duration: 200 }
                 }
             }
 
@@ -54,12 +57,15 @@ Row {
                 width: parent.width + 4
                 height: parent.height + 4
                 radius: height / 2
-                color: "#89b4fa"
+                color: Theme.accentSoft
                 opacity: pill.isActive ? 0.28 : 0.0
                 z: -1
 
                 Behavior on opacity {
                     NumberAnimation { duration: 200 }
+                }
+                Behavior on color {
+                    ColorAnimation { duration: 200 }
                 }
             }
 

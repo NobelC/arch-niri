@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import "../../services"
 
 Item {
     id: root
@@ -13,11 +14,10 @@ Item {
         precision: SystemClock.Minutes
     }
 
-    // Fondo sutil tipo pastilla al pasar el cursor
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? "#313244" : "transparent"
+        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -28,10 +28,12 @@ Item {
         id: clockText
         anchors.centerIn: parent
         text: root.enLocale.toString(sysClock.date, "MMMM | dddd d , yyyy | hh:mm AP")
-        color: "#cdd6f4"
-        font.family: "JetBrainsMono Nerd Font"
+        color: Theme.text
+        font.family: Theme.fontFamily
         font.pixelSize: 12
         font.bold: true
+
+        Behavior on color { ColorAnimation { duration: 150 } }
     }
 
     MouseArea {

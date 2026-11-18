@@ -6,11 +6,10 @@ Item {
     implicitWidth: 26
     implicitHeight: 24
 
-    // Fondo sutil tipo pastilla al pasar el cursor
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? "#313244" : "transparent"
+        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -20,8 +19,8 @@ Item {
     Text {
         anchors.centerIn: parent
         text: !Bluetooth.powered ? "󰂲" : (Bluetooth.connected ? "󰂱" : "")
-        color: !Bluetooth.powered ? "#6c7086" : (Bluetooth.connected ? "#b4befe" : "#89b4fa")
-        font.family: "JetBrainsMono Nerd Font"
+        color: !Bluetooth.powered ? Theme.muted : (Bluetooth.connected ? Theme.highlight : Theme.accentSoft)
+        font.family: Theme.fontFamily
         font.pixelSize: 14
 
         Behavior on color { ColorAnimation { duration: 150 } }
