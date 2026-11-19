@@ -74,6 +74,7 @@ PanelWindow {
                 } else if (pickerWindow.currentIndex >= lines.length) {
                     pickerWindow.currentIndex = 0;
                 }
+                carouselView.positionViewAtIndex(pickerWindow.currentIndex, PathView.Center);
             }
         }
     }
@@ -99,16 +100,17 @@ PanelWindow {
     }
 
     function move(delta) {
-        const len = wallpapers.length;
-        if (len === 0) return;
-        currentIndex = (currentIndex + delta + len) % len;
+        if (wallpapers.length === 0) return;
+        if (delta < 0) carouselView.decrementCurrentIndex();
+        else if (delta > 0) carouselView.incrementCurrentIndex();
     }
 
     function applySelected() {
         if (wallpapers.length === 0) return;
-        const selected = wallpapers[currentIndex];
+        const selected = wallpapers[carouselView.currentIndex];
         if (!selected) return;
 
+        pickerWindow.currentIndex = carouselView.currentIndex;
         LockState.currentWallpaper = selected;
         applyProc.running = false;
         applyProc.command = ["bash", pickerWindow.setScript, selected];
@@ -132,7 +134,6 @@ PanelWindow {
     SequentialAnimation {
         id: openAnim
 
-        // Estado inicial: estela estirada y difuminada bajo el borde inferior
         ScriptAction {
             script: {
                 morphBox.width = 16;
@@ -145,7 +146,6 @@ PanelWindow {
             }
         }
 
-        // Fase 1: Sube como una estela luminosa con motion blur
         ParallelAnimation {
             NumberAnimation {
                 target: morphBox
@@ -161,7 +161,6 @@ PanelWindow {
                 duration: 110
                 easing.type: Easing.OutQuad
             }
-            // Se condensa en el círculo perfecto justo al frenar en el centro
             NumberAnimation {
                 target: morphBox
                 property: "width"
@@ -192,7 +191,6 @@ PanelWindow {
             }
         }
 
-        // Fase 2: Expansión al rectángulo de 3 wallpapers
         ParallelAnimation {
             NumberAnimation {
                 target: morphBox
@@ -338,7 +336,6 @@ PanelWindow {
         border.color: Theme.accent
         clip: true
 
-        // Desenfoque de movimiento mientras la cápsula viaja
         layer.enabled: motionBlur > 0.01
         layer.effect: MultiEffect {
             blurEnabled: true
@@ -377,115 +374,160 @@ PanelWindow {
             }
         }
 
-        // ---------- Cinta infinita centrada (solo imágenes) ----------
-        Row {
-            id: stripRow
-            anchors.centerIn: parent
-            spacing: pickerWindow.cardSpacing
+        // ---------- Carrusel infinito con desplazamiento continuo ----------
+        PathView {
+            id: carouselView
+            anchors.fill: parent
             visible: pickerWindow.expanded && pickerWindow.wallpapers.length > 0
             opacity: pickerWindow.expanded ? 1.0 : 0.0
+            clip: true
+
+            model: pickerWindow.wallpapers
+            currentIndex: pickerWindow.currentIndex
+            onCurrentIndexChanged: pickerWindow.currentIndex = currentIndex
+
+            // 5 elementos visibles en el recorrido (3 en pantalla + 2 entrando/saliendo suavemente por los bordes)
+            pathItemCount: Math.min(5, Math.max(1, pickerWindow.wallpapers.length))
+            preferredHighlightBegin: 0.5
+            preferredHighlightEnd: 0.5
+            highlightRangeMode: PathView.StrictlyEnforceRange
+            highlightMoveDuration: 260
+            snapMode: PathView.SnapToItem
+            interactive: true
+            dragMargin: height
+
+            readonly property real stepX: pickerWindow.cardWidth + pickerWindow.cardSpacing
+            readonly property real spanX: stepX * (pathItemCount / 2.0)
 
             Behavior on opacity {
                 NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
             }
 
-            Repeater {
-                model: [-1, 0, 1]
+            // Soporte para rueda del ratón / scroll horizontal del touchpad
+            WheelHandler {
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                onWheel: event => {
+                    const delta = Math.abs(event.angleDelta.x) > Math.abs(event.angleDelta.y)
+                        ? event.angleDelta.x
+                        : event.angleDelta.y;
+                    if (delta > 0) carouselView.decrementCurrentIndex();
+                    else if (delta < 0) carouselView.incrementCurrentIndex();
+                }
+            }
 
-                delegate: Item {
-                    id: slotItem
-                    required property int modelData
+            path: Path {
+                startX: (carouselView.width / 2) - carouselView.spanX
+                startY: carouselView.height / 2
 
-                    readonly property int len: pickerWindow.wallpapers.length
-                    readonly property int wallIdx: len > 0
-                        ? (pickerWindow.currentIndex + modelData + len) % len
-                        : -1
-                    readonly property string wallPath: wallIdx >= 0 ? pickerWindow.wallpapers[wallIdx] : ""
-                    readonly property bool isCenter: modelData === 0
+                PathAttribute { name: "cardScale"; value: 0.72 }
+                PathAttribute { name: "cardOpacity"; value: 0.0 }
+                PathAttribute { name: "cardZ"; value: 0 }
 
-                    width: pickerWindow.cardWidth
-                    height: pickerWindow.cardHeight
-                    z: isCenter ? 2 : 1
+                PathLine {
+                    x: (carouselView.width / 2) - carouselView.stepX
+                    y: carouselView.height / 2
+                }
+                PathAttribute { name: "cardScale"; value: pickerWindow.sideScale }
+                PathAttribute { name: "cardOpacity"; value: 0.55 }
+                PathAttribute { name: "cardZ"; value: 1 }
 
-                    Item {
-                        id: cardContainer
-                        anchors.centerIn: parent
-                        width: parent.width
-                        height: parent.height
+                PathLine {
+                    x: carouselView.width / 2
+                    y: carouselView.height / 2
+                }
+                PathAttribute { name: "cardScale"; value: pickerWindow.centerScale }
+                PathAttribute { name: "cardOpacity"; value: 1.0 }
+                PathAttribute { name: "cardZ"; value: 3 }
 
-                        scale: slotItem.isCenter ? pickerWindow.centerScale : pickerWindow.sideScale
-                        opacity: slotItem.isCenter ? 1.0 : 0.50
+                PathLine {
+                    x: (carouselView.width / 2) + carouselView.stepX
+                    y: carouselView.height / 2
+                }
+                PathAttribute { name: "cardScale"; value: pickerWindow.sideScale }
+                PathAttribute { name: "cardOpacity"; value: 0.55 }
+                PathAttribute { name: "cardZ"; value: 1 }
 
-                        Behavior on scale {
-                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-                        }
-                        Behavior on opacity {
-                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-                        }
+                PathLine {
+                    x: (carouselView.width / 2) + carouselView.spanX
+                    y: carouselView.height / 2
+                }
+                PathAttribute { name: "cardScale"; value: 0.72 }
+                PathAttribute { name: "cardOpacity"; value: 0.0 }
+                PathAttribute { name: "cardZ"; value: 0 }
+            }
 
-                        // Fondo de la tarjeta
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 14
-                            color: Theme.card
-                        }
+            delegate: Item {
+                id: cardDelegate
+                required property string modelData
+                required property int index
 
-                        // Imagen fuente oculta (se renderiza recortada por MultiEffect)
-                        Image {
-                            id: thumb
-                            anchors.fill: parent
-                            anchors.margins: 2
-                            visible: false
-                            source: slotItem.wallPath !== "" ? "file://" + slotItem.wallPath : ""
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            cache: true
-                            sourceSize.width: 640
-                            sourceSize.height: 384
-                        }
+                readonly property bool isCenter: PathView.isCurrentItem
+                readonly property real vScale: PathView.cardScale !== undefined ? PathView.cardScale : pickerWindow.sideScale
+                readonly property real vOpacity: PathView.cardOpacity !== undefined ? PathView.cardOpacity : 0.55
 
-                        // Máscara redondeada para recortar las esquinas de la imagen
-                        Rectangle {
-                            id: roundMask
-                            anchors.fill: thumb
-                            radius: 12
-                            visible: false
-                            layer.enabled: true
-                        }
+                width: pickerWindow.cardWidth
+                height: pickerWindow.cardHeight
+                scale: vScale
+                opacity: vOpacity
+                z: PathView.cardZ !== undefined ? PathView.cardZ : 1
 
-                        MultiEffect {
-                            anchors.fill: thumb
-                            source: thumb
-                            visible: thumb.status === Image.Ready
-                            maskEnabled: true
-                            maskSource: roundMask
-                            maskThresholdMin: 0.5
-                            maskSpreadAtMin: 1.0
-                        }
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 14
+                    color: Theme.card
+                }
 
-                        // Borde exterior encima de la imagen ya recortada
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 14
-                            color: "transparent"
-                            border.width: slotItem.isCenter ? 2 : 1
-                            border.color: slotItem.isCenter ? Theme.accent : Theme.border
+                Image {
+                    id: thumb
+                    anchors.fill: parent
+                    anchors.margins: 2
+                    visible: false
+                    source: cardDelegate.modelData !== "" ? "file://" + cardDelegate.modelData : ""
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: true
+                    sourceSize.width: 640
+                    sourceSize.height: 384
+                }
 
-                            Behavior on border.color {
-                                ColorAnimation { duration: 150 }
-                            }
-                        }
+                Rectangle {
+                    id: roundMask
+                    anchors.fill: thumb
+                    radius: 12
+                    visible: false
+                    layer.enabled: true
+                }
 
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (slotItem.isCenter) {
-                                    pickerWindow.applySelected();
-                                } else {
-                                    pickerWindow.move(slotItem.modelData);
-                                }
-                            }
+                MultiEffect {
+                    anchors.fill: thumb
+                    source: thumb
+                    visible: thumb.status === Image.Ready
+                    maskEnabled: true
+                    maskSource: roundMask
+                    maskThresholdMin: 0.5
+                    maskSpreadAtMin: 1.0
+                }
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 14
+                    color: "transparent"
+                    border.width: cardDelegate.isCenter ? 2 : 1
+                    border.color: cardDelegate.isCenter ? Theme.accent : Theme.border
+
+                    Behavior on border.color {
+                        ColorAnimation { duration: 150 }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (cardDelegate.isCenter) {
+                            pickerWindow.applySelected();
+                        } else {
+                            carouselView.currentIndex = cardDelegate.index;
                         }
                     }
                 }

@@ -56,19 +56,15 @@ PanelWindow {
 
         width: drawerWindow.panelWidth + (drawerWindow.topConcave * 2)
         height: drawerWindow.isOpen ? drawerWindow.targetHeight : 0
-        opacity: drawerWindow.isOpen ? 1.0 : 0.0
-        visible: height > 1 || opacity > 0.01
+        visible: height > 0.5
         clip: true
 
+        // Estirado fluido al desplegar desde la barra y recogida rápida al guardar
         Behavior on height {
             NumberAnimation {
-                duration: 210
-                easing.type: drawerWindow.isOpen ? Easing.OutCubic : Easing.InCubic
+                duration: drawerWindow.isOpen ? 260 : 200
+                easing.type: drawerWindow.isOpen ? Easing.OutExpo : Easing.InCubic
             }
-        }
-
-        Behavior on opacity {
-            NumberAnimation { duration: 150 }
         }
 
         Connections {
@@ -78,7 +74,7 @@ PanelWindow {
         }
 
         function syncSeamGap() {
-            if (drawerWindow.isOpen || height > 1) {
+            if (drawerWindow.isOpen || height > 0.5) {
                 Niri.activeBarDrawerX = x;
                 Niri.activeBarDrawerWidth = width;
             } else if (Niri.activeBarMenu === "") {
@@ -107,10 +103,11 @@ PanelWindow {
 
                 const w = width;
                 const h = height;
-                if (h <= 2) return;
+                if (h <= 0.5) return;
 
-                const c = drawerWindow.topConcave;
-                const r = Math.min(drawerWindow.bottomRadius, (h - c) / 2);
+                // Escala proporcionalmente las curvas cuando el cajón está casi cerrado
+                const c = Math.min(drawerWindow.topConcave, h * 0.45);
+                const r = Math.min(drawerWindow.bottomRadius, Math.max(0, h - c));
                 const leftX = c;
                 const rightX = w - c;
 
@@ -142,13 +139,15 @@ PanelWindow {
             anchors.fill: parent
         }
 
+        // Anclado al borde inferior del cajón: el contenido emerge desde la barra al estirarse
+        // y se guarda hacia arriba sin aplastarse
         Item {
             id: innerContent
             anchors {
-                top: parent.top
+                bottom: parent.bottom
                 left: parent.left
                 right: parent.right
-                topMargin: 10
+                bottomMargin: 18
                 leftMargin: drawerWindow.topConcave + 14
                 rightMargin: drawerWindow.topConcave + 14
             }

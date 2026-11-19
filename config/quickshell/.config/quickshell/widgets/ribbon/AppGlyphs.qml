@@ -1,10 +1,11 @@
 pragma Singleton
 import QtQuick
 import Quickshell
+
 Singleton {
     id: root
 
-    // 1. Coincidencia exacta o parcial por app_id (en minúsculas)
+    // 1. Coincidencia exacta por app_id (en minúsculas)
     readonly property var exactMap: ({
         // Terminales
         "com.mitchellh.ghostty": "󰆍",
@@ -46,7 +47,34 @@ Singleton {
         "mpv": "",
         "obs": "󰑋",
 
-        // WebApps específicas (Chromium/Brave --app=... o perfiles Zen)
+        // WebApps creadas con Pake (StartupWMClass = <slug> / pake-<slug>)
+        "whatsapp": "",
+        "pake-whatsapp": "",
+        "youtube-music": "󰎆",
+        "pake-youtube-music": "󰎆",
+        "youtube": "",
+        "pake-youtube": "",
+        "spotify": "",
+        "pake-spotify": "",
+        "simpmusic": "󰎆",
+        "github": "",
+        "pake-github": "",
+        "discord": "",
+        "pake-discord": "",
+        "telegram": "",
+        "pake-telegram": "",
+        "gemini": "󰚩",
+        "pake-gemini": "󰚩",
+        "chatgpt": "󰚩",
+        "pake-chatgpt": "󰚩",
+        "claude": "󰚩",
+        "pake-claude": "󰚩",
+        "gmail": "󰊫",
+        "pake-gmail": "󰊫",
+        "notion": "󰈙",
+        "pake-notion": "󰈙",
+
+        // Respaldo Chromium/Brave --app=...
         "chrome-music.youtube.com__-default": "󰎆",
         "chrome-open.spotify.com__-default": "",
         "chrome-web.whatsapp.com__-default": "",
@@ -56,38 +84,48 @@ Singleton {
         "chrome-gemini.google.com__app-default": "󰚩"
     })
 
-    // 2. Respaldo por palabras clave en app_id o título (útil para webapps dinámicas o TUIs en terminal)
+    // 2. Respaldo por palabras clave en título o app_id (TUIs en Ghostty y WebApps dinámicas)
     readonly property var keywordRules: [
         { keys: ["nvim", "neovim"], glyph: "" },
         { keys: ["keepass"], glyph: "󰌋" },
         { keys: ["krita"], glyph: "" },
         { keys: ["mgba", "game boy", "retroarch"], glyph: "󰊴" },
         { keys: ["whatsapp"], glyph: "" },
-        { keys: ["youtube music", "spotify"], glyph: "󰎆" },
+        { keys: ["spotify"], glyph: "" },
+        { keys: ["youtube music", "youtube-music", "simpmusic"], glyph: "󰎆" },
         { keys: ["youtube"], glyph: "" },
         { keys: ["github"], glyph: "" },
         { keys: ["discord", "vesktop"], glyph: "" },
         { keys: ["telegram"], glyph: "" },
+        { keys: ["gemini", "chatgpt", "claude", "perplexity"], glyph: "󰚩" },
+        { keys: ["gmail", "outlook", "proton mail"], glyph: "󰊫" },
+        { keys: ["notion", "obsidian"], glyph: "󰈙" },
         { keys: ["btop", "htop"], glyph: "󰍛" },
         { keys: ["yazi", "ranger", "lf"], glyph: "󰉋" },
         { keys: ["docker", "lazydocker"], glyph: "" },
         { keys: ["git", "lazygit"], glyph: "󰊢" },
         { keys: [".pdf", "zathura"], glyph: "" },
         { keys: ["ghostty", "kitty", "terminal"], glyph: "󰆍" },
-        { keys: ["zen", "firefox"], glyph: "󰈹" }
+        { keys: ["zen", "firefox"], glyph: "󰈹" },
+        { keys: ["pake-", "webapp-"], glyph: "󰖟" }
     ]
 
     function resolve(appId, title) {
         const id = (appId || "").toLowerCase().trim();
         const t = (title || "").toLowerCase().trim();
 
-        // Primero busca coincidencia directa en exactMap
+        // 1. Coincidencia directa en exactMap
         if (exactMap[id] !== undefined) {
             return exactMap[id];
         }
 
-        // Luego evalúa reglas por palabra clave en título o app_id
-        // (Prioriza el título para detectar TUIs como nvim/btop corriendo dentro de Ghostty)
+        // 2. Coincidencia sin prefijo "pake-" o "webapp-"
+        const strippedId = id.replace(/^(pake|webapp)-/, "");
+        if (strippedId !== id && exactMap[strippedId] !== undefined) {
+            return exactMap[strippedId];
+        }
+
+        // 3. Reglas por palabra clave en título o app_id
         for (let i = 0; i < keywordRules.length; i++) {
             const rule = keywordRules[i];
             for (let j = 0; j < rule.keys.length; j++) {
@@ -98,7 +136,7 @@ Singleton {
             }
         }
 
-        // Glifo genérico para aplicaciones no registradas
+        // 4. Glifo genérico para aplicaciones no registradas
         return "󰣆";
     }
 }

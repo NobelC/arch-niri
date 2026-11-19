@@ -1,6 +1,6 @@
 layout {
   // Espaciado
-  gaps 8
+  gaps 10
   // Centrado automático de las columnas
   center-focused-column "never"
   // Anchos definidos al pulsar mod + R
@@ -18,4 +18,28 @@ layout {
     off
     width 2
   }
+  shadow {
+    on
+    softness 20
+    spread 2
+    offset x=0 y=4
+    color "#00000055"
+  }
+}
+
+overview {
+  zoom 0.65
+  workspace-shadow {
+    on
+    softness 28
+    spread 4
+    offset x=0 y=8
+    color "#00000077"
+  }
+}
+
+// Coloca swaybg (wallpaper difuminado) exclusivamente en el backdrop del Overview
+layer-rule {
+  match namespace="^wallpaper$"
+  place-within-backdrop true
 }

@@ -8,3 +8,7 @@ layout {
         inactive-color "{{colors.surface_container_high.default.hex}}"
     }
 }
+
+overview {
+    backdrop-color "{{colors.surface_container_lowest.default.hex}}"
+}

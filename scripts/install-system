@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $EUID -ne 0 ]]; then
+  echo "✗ Este script debe ejecutarse con sudo:" >&2
+  echo "  sudo bash $0" >&2
+  exit 1
+fi
+
+REAL_USER="${SUDO_USER:-}"
+if [[ -z "$REAL_USER" || "$REAL_USER" == "root" ]]; then
+  echo "✗ Ejecuta el script usando 'sudo' desde tu usuario normal (no directamente como root)." >&2
+  exit 1
+fi
+
+REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
+DOTFILES_DIR="$REAL_HOME/Projects/arch-niri"
+PACKAGES_DIR="$DOTFILES_DIR/packages"
+SCRIPTS_DIR="$DOTFILES_DIR/scripts"
+ICONS_DIR="$REAL_HOME/Pictures/WebAppIcons"
+
+run_as_user() {
+  sudo -u "$REAL_USER" HOME="$REAL_HOME" "$@"
+}
+
+read_pkg_list() {
+  local file="$1"
+  [[ -f "$file" ]] || return 0
+  sed -E 's/#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//' "$file" | grep -v '^$' || true
+}
+
+install_pacman_hook() {
+  mkdir -p /etc/pacman.d/hooks
+  cat > /etc/pacman.d/hooks/99-arch-niri-packages.hook <<EOF
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Sincronizando listas de paquetes explícitos en arch-niri...
+When = PostTransaction
+Exec = /usr/bin/env SUDO_USER=$REAL_USER /usr/bin/bash $SCRIPTS_DIR/sync-packages
+EOF
+}
+
+echo "============================================================"
+echo "  Despliegue completo arch-niri (Usuario: $REAL_USER)"
+echo "============================================================"
+
+# 1. Crea carpeta de iconos de WebApps en Pictures
+run_as_user mkdir -p "$ICONS_DIR"
+
+# 2. Actualiza repositorios e instala paquetes oficiales (pacman)
+mapfile -t PACMAN_PKGS < <(read_pkg_list "$PACKAGES_DIR/pacman.txt")
+if [[ ${#PACMAN_PKGS[@]} -gt 0 ]]; then
+  echo "-> [1/5] Instalando paquetes de pacman (${#PACMAN_PKGS[@]})..."
+  pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"
+fi
+
+# 3. Verifica o compila 'paru' si aún no está instalado
+if ! command -v paru &>/dev/null; then
+  echo "-> [2/5] Instalando paru desde AUR..."
+  pacman -S --needed --noconfirm base-devel git
+  TMP_PARU="/tmp/paru-build-$REAL_USER"
+  rm -rf "$TMP_PARU"
+  run_as_user git clone https://aur.archlinux.org/paru.git "$TMP_PARU"
+  (
+    cd "$TMP_PARU"
+    run_as_user makepkg -si --noconfirm
+  )
+  rm -rf "$TMP_PARU"
+fi
+
+# 4. Instala paquetes de AUR con paru (ejecutado como usuario real)
+mapfile -t PARU_PKGS < <(read_pkg_list "$PACKAGES_DIR/paru.txt")
+if [[ ${#PARU_PKGS[@]} -gt 0 ]]; then
+  echo "-> [3/5] Instalando paquetes de AUR con paru (${#PARU_PKGS[@]})..."
+  run_as_user paru -S --needed --noconfirm "${PARU_PKGS[@]}"
+fi
+
+# 5. Ejecuta auto-stow (enlaza dotfiles + valida y enlaza scripts)
+echo "-> [4/5] Enlazando dotfiles y scripts con auto-stow..."
+run_as_user bash "$SCRIPTS_DIR/auto-stow"
+
+# 6. Sincroniza e instala todas las WebApps declaradas con Pake
+echo "-> [5/5] Sincronizando WebApps de Pake..."
+run_as_user bash "$SCRIPTS_DIR/webapp" sync
+
+# 7. Instala el hook de pacman para mantener pacman.txt y paru.txt siempre al día
+install_pacman_hook
+run_as_user bash "$SCRIPTS_DIR/sync-packages"
+
+# 8. Habilita servicios base del sistema
+systemctl enable --now NetworkManager bluetooth 2>/dev/null || true
+systemctl enable --now power-profiles-daemon 2>/dev/null || true
+
+echo "============================================================"
+echo "✓ Instalación completa finalizada sin errores."
+echo "============================================================"

@@ -1,0 +1,152 @@
+# arch-niri
+
+Entorno de escritorio personal, modular y declarativo para **Arch Linux** construido sobre el compositor scrollable **Niri** y una interfaz completa en **Quickshell**, con generación dinámica de paleta de colores mediante **Matugen** y gestión automatizada de dotfiles con **GNU Stow**.
+
+---
+
+## Arquitectura del Repositorio
+
+```text
+~/Projects/arch-niri/
+├── config/                  # Paquetes de configuración gestionados por GNU Stow
+│   ├── bash/                # Respaldo minimalista para Bash
+│   ├── clangd/              # Flags globales de C++20 para LSP
+│   ├── ghostty/             # Terminal acelerada por GPU con recarga de tema en vivo
+│   ├── matugen/             # Plantillas y hooks para sincronización global de colores
+│   ├── mpv/                 # Reproductor multimedia de alta calidad (uosc + thumbfast)
+│   ├── niri/                # Configuración modular del compositor Wayland (01 a 08)
+│   ├── nvim/                # Configuración de Neovim (NvChad v2.5 + sincronización Matugen)
+│   ├── quickshell/          # Barra, cajones cóncavos, OSD, Dock, Launcher y LockScreen
+│   ├── yazi/                # Gestor de archivos en terminal con integración de directorio
+│   └── zsh/                 # Shell interactivo modularizado en ~/.config/zsh/conf.d/
+├── packages/                # Estado declarativo del software instalado
+│   ├── pacman.txt           # Paquetes explícitos de repositorios oficiales
+│   ├── paru.txt             # Paquetes explícitos de AUR
+│   └── webapps.tsv          # WebApps empaquetadas con Pake
+└── scripts/                 # Herramientas ejecutables enlazadas en ~/.local/bin/
+    ├── auto-permission-add  # Valida sintaxis, otorga +x y enlaza scripts en ~/.local/bin
+    ├── auto-stow            # Limpia enlaces muertos, aplica Stow y registra scripts
+    ├── install-system       # Despliegue integral automatizado para instalaciones limpias
+    ├── set-wallpaper        # Aplica wallpaper (awww) y regenera paleta (Matugen)
+    ├── sync-packages        # Extrae paquetes explícitos hacia pacman.txt y paru.txt
+    └── webapp               # Crea, instala, sincroniza y elimina WebApps con Pake
+```
+
+---
+
+## Instalación desde Cero (Arch Linux limpio)
+
+### 1. Requisitos previos
+Asegúrate de tener una instalación base de Arch Linux con acceso a internet, `git` y `sudo` configurado para tu usuario:
+
+```bash
+sudo pacman -S --needed git base-devel
+```
+
+### 2. Clonar el repositorio
+Clona el repositorio en la ruta estándar esperada por los scripts (`~/Projects/arch-niri`):
+
+```bash
+mkdir -p ~/Projects
+git clone https://github.com/<tu-usuario>/arch-niri.git ~/Projects/arch-niri
+cd ~/Projects/arch-niri
+```
+
+### 3. Ejecutar el instalador integral
+Ejecuta `install-system` con `sudo` desde tu usuario normal (no como `root` directo). El script:
+1. Instala todos los paquetes oficiales listados en `packages/pacman.txt`.
+2. Compila e instala `paru` automáticamente si no está presente.
+3. Instala los paquetes de AUR listados en `packages/paru.txt` (incluyendo `pake-cli`).
+4. Ejecuta `auto-stow` para enlazar todos los dotfiles en `$HOME` y registrar los scripts en `~/.local/bin`.
+5. Compila e instala las WebApps declaradas en `packages/webapps.tsv`.
+6. Instala un **Pacman Hook** (`/etc/pacman.d/hooks/99-arch-niri-packages.hook`) para mantener las listas de paquetes sincronizadas automáticamente.
+7. Habilita los servicios base (`NetworkManager`, `bluetooth`, `power-profiles-daemon`).
+
+```bash
+sudo bash ~/Projects/arch-niri/scripts/install-system
+```
+
+### 4. Cambiar el shell interactivo a Zsh y reiniciar sesión
+```bash
+chsh -s /usr/bin/zsh
+```
+Cierra sesión o reinicia el equipo e inicia **Niri** desde tu gestor de sesión o TTY (`niri-session`).
+
+---
+
+## Comandos y Scripts del Sistema
+
+Todos los scripts dentro de `scripts/` son validados y enlazados en `~/.local/bin/`, por lo que están disponibles globalmente en la terminal.
+
+### Gestión de Dotfiles y Scripts
+
+| Comando | Descripción |
+| :--- | :--- |
+| `auto-stow` | Limpia symlinks rotos, enlaza todos los paquetes de `config/` hacia `$HOME` con GNU Stow y ejecuta `auto-permission-add`. |
+| `auto-stow <paquete>` | Re-enlaza únicamente un paquete específico (ej. `auto-stow zsh` o `auto-stow quickshell`). |
+| `auto-permission-add` | Valida la sintaxis (`bash -n`, `shellcheck`, `py_compile`) de todos los archivos en `scripts/`, les otorga permisos `+x` y los enlaza en `~/.local/bin/`. |
+| `auto-permission-add <script>` | Valida y enlaza únicamente el script indicado. |
+
+### Gestión de WebApps (`webapp` + Pake)
+
+Las WebApps se compilan como paquetes nativos de Arch (`.pkg.tar.zst`) usando **Pake**, quedan registradas en `packages/webapps.tsv` y toman sus iconos de `~/Pictures/WebAppIcons/`.
+
+| Comando | Descripción |
+| :--- | :--- |
+| `webapp add "<Nombre>" "<URL>" [icono] [flags]` | Compila, instala y registra una nueva WebApp. Si omites `[icono]`, busca automáticamente `<slug>.png/.svg/.ico` en `~/Pictures/WebAppIcons/`. |
+| `webapp remove "<Nombre>"` | Desinstala el paquete de la WebApp del sistema y la elimina de `packages/webapps.tsv`. |
+| `webapp sync` | Instala todas las WebApps declaradas en `packages/webapps.tsv` que aún no estén en el sistema. |
+| `webapp list` | Muestra en tabla las WebApps registradas en el repositorio. |
+
+**Ejemplos:**
+```bash
+# Coloca previamente ~/Pictures/WebAppIcons/gemini.png y ejecuta:
+webapp add "Gemini" "https://gemini.google.com"
+
+# Con dimensiones de ventana personalizadas:
+webapp add "Spotify" "https://open.spotify.com" "" "--width 1280 --height 820"
+```
+
+### Paquetes y Sincronización
+
+| Comando | Descripción |
+| :--- | :--- |
+| `sync-packages` | Extrae todos los paquetes instalados explícitamente (sin dependencias) hacia `packages/pacman.txt` y `packages/paru.txt`. Se ejecuta también de forma automática tras cada operación de `pacman`/`paru`/`webapp`. |
+
+### Apariencia y Wallpapers
+
+| Comando | Descripción |
+| :--- | :--- |
+| `set-wallpaper /ruta/imagen` | Actualiza el wallpaper con transición radial (`awww`), guarda el enlace de estado para la pantalla de bloqueo (`LockScreen`) y regenera los temas de **Niri, Quickshell, Ghostty, Neovim, Yazi, mpv y btop** mediante **Matugen**. |
+
+---
+
+## Atajos de Teclado Principales (Niri)
+
+| Atajo | Acción |
+| :--- | :--- |
+| `Mod + Return` | Abrir terminal (**Ghostty**) |
+| `Mod + Space` | Abrir lanzador de aplicaciones (**Quickshell Launcher**) |
+| `Mod + F` | Abrir gestor de archivos (**Yazi**) y permanecer en la ruta elegida al salir |
+| `Mod + M` | Desplegar/ocultar reproductor multimedia (**MediaMenu**) |
+| `Mod + Shift + W` | Abrir selector visual de wallpapers (**WallpaperPicker**) |
+| `Mod + Alt + L` | Bloquear pantalla (**LockScreen**) |
+| `Mod + W` | Monitor del sistema (**btop**) |
+| `Mod + Q` | Cerrar ventana activa |
+| `Mod + O` | Vista general de workspaces (**Overview**) |
+| `Mod + H/J/K/L` o Flechas | Mover foco entre columnas y ventanas |
+| `Mod + Ctrl + H/J/K/L` | Mover columnas y ventanas |
+| `Mod + R` | Alternar ancho predefinido de columna (`33%`, `50%`, `66%`, `100%`) |
+| `Mod + Alt + F` | Maximizar columna respetando barra y márgenes |
+| `Mod + Shift + F` | Pantalla completa real |
+| `Mod + V` | Alternar ventana flotante |
+| `Mod + 1..9` | Cambiar al workspace `1..9` |
+| `Alt + Shift` | Alternar distribución de teclado (`US` / `LATAM`) con indicador OSD |
+
+---
+
+## Notas Post-Instalación
+
+* **Wallpapers:** Coloca tus fondos de pantalla en `~/Pictures/Wallpapers/` para que aparezcan en el carrusel (`Mod + Shift + W`).
+* **Configuración local de Zsh:** Si necesitas variables o alias privados exclusivos de una máquina que no deban subirse a Git, créalos en `~/.config/zsh/local.zsh`.
+* **Medir rendimiento de Zsh:** Ejecuta `ZSH_PROF=1 zsh -i -c exit` para perfilar el tiempo de carga de cada módulo en `conf.d/`.

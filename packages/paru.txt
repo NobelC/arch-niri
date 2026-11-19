@@ -1,0 +1,12 @@
+# Paquetes explícitos de AUR (generado automáticamente)
+elecwhat-bin
+libtiff5
+localsend-bin
+matugen-bin
+pake-cli
+paru-bin
+paru-bin-debug
+ttf-ms-win11-auto
+vesktop-bin
+wps-office
+wps-office-mime

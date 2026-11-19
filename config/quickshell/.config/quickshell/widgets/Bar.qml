@@ -1,88 +1,124 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Wayland
 import "../services"
-import "workspaces"
-import "arch"
-import "clock"
-import "bluetooth"
-import "network"
-import "audio"
-import "battery"
+import "./arch"
+import "./workspaces"
+import "./clock"
+import "./colortemp"
+import "./battery"
+import "./network"
+import "./bluetooth"
+import "./audio"
 
 PanelWindow {
-    id: bar
+    id: barWindow
+
     anchors {
         top: true
         left: true
         right: true
     }
+
     implicitHeight: 30
-    color: Theme.bg
+    exclusiveZone: Niri.overviewOpen ? 0 : 30
+    color: "transparent"
 
-    Behavior on color { ColorAnimation { duration: 200 } }
+    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.namespace: "quickshell-bar"
 
-    // Borde inferior izquierdo (hasta el inicio de la curva cóncava del cajón activo)
-    Rectangle {
-        anchors {
-            bottom: parent.bottom
-            left: parent.left
+    Item {
+        id: barSlideContainer
+        anchors.left: parent.left
+        anchors.right: parent.right
+        height: parent.height
+        y: Niri.overviewOpen ? -height : 0
+        opacity: Niri.overviewOpen ? 0.0 : 1.0
+        visible: opacity > 0.01
+
+        Behavior on y {
+            NumberAnimation {
+                duration: 210
+                easing.type: Niri.overviewOpen ? Easing.InCubic : Easing.OutCubic
+            }
         }
-        width: Niri.activeBarDrawerWidth > 0
-            ? Math.max(0, Math.min(parent.width, Niri.activeBarDrawerX + 1))
-            : parent.width
-        height: 1
-        color: Theme.cardAlt
-        Behavior on color { ColorAnimation { duration: 200 } }
-    }
 
-    // Borde inferior derecho (desde el final de la curva cóncava hasta el borde de pantalla)
-    Rectangle {
-        visible: Niri.activeBarDrawerWidth > 0
-        anchors {
-            bottom: parent.bottom
-            right: parent.right
+        Behavior on opacity {
+            NumberAnimation { duration: 150 }
         }
-        width: Math.max(0, parent.width - (Niri.activeBarDrawerX + Niri.activeBarDrawerWidth - 1))
-        height: 1
-        color: Theme.cardAlt
-        Behavior on color { ColorAnimation { duration: 200 } }
-    }
 
-    // --- ZONA IZQUIERDA ---
-    RowLayout {
-        id: leftModules
-        anchors {
-            left: parent.left
-            leftMargin: 5
-            verticalCenter: parent.verticalCenter
+        // Fondo de la barra
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.bg
+
+            Behavior on color {
+                ColorAnimation { duration: 150 }
+            }
+
+            // Línea inferior (se interrumpe automáticamente bajo el cajón activo)
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.cardAlt
+                visible: Niri.activeBarDrawerWidth <= 0
+
+                Behavior on color { ColorAnimation { duration: 150 } }
+            }
+
+            // Segmento izquierdo cuando hay un BarDrawer abierto
+            Rectangle {
+                anchors.left: parent.left
+                anchors.bottom: parent.bottom
+                width: Math.max(0, Niri.activeBarDrawerX)
+                height: 1
+                color: Theme.cardAlt
+                visible: Niri.activeBarDrawerWidth > 0
+            }
+
+            // Segmento derecho cuando hay un BarDrawer abierto
+            Rectangle {
+                anchors.left: parent.left
+                anchors.leftMargin: Niri.activeBarDrawerX + Niri.activeBarDrawerWidth
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 1
+                color: Theme.cardAlt
+                visible: Niri.activeBarDrawerWidth > 0
+            }
         }
-        spacing: 2
-        ArchIcon{}
-        Workspaces{}
-    }
 
-    // --- ZONA CENTRAL (Anclada de forma absoluta) ---
-    RowLayout {
-        id: centerModules
-        anchors.centerIn: parent
-        spacing: 8
+        // Módulos izquierdos: Arch + Workspaces
+        RowLayout {
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
 
-        Clock{}
-    }
-
-    // --- ZONA DERECHA ---
-    RowLayout {
-        id: rightModules
-        anchors {
-            right: parent.right
-            rightMargin: 5
-            verticalCenter: parent.verticalCenter
+            ArchIcon {}
+            Workspaces {}
         }
-        spacing: 0
-        Battery{}
-        Network{}
-        Bluetooth{}
-        Audio{}
+
+        // Módulo central: Reloj / Dashboard
+        Clock {
+            anchors.centerIn: parent
+        }
+
+        // Módulos derechos: Temperatura de color + Batería + Red + Bluetooth + Audio
+        RowLayout {
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 4
+
+            ColorTemp {}
+            Battery {}
+            Network {}
+            Bluetooth {}
+            Audio {}
+        }
     }
 }

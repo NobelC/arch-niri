@@ -40,6 +40,13 @@ PanelWindow {
     Connections {
         target: Niri
 
+        function onOverviewOpenChanged() {
+            if (Niri.overviewOpen) {
+                hideTimer.stop();
+                dockWindow.isShown = false;
+            }
+        }
+
         function onLauncherOpenChanged() {
             if (Niri.launcherOpen) {
                 hideTimer.stop();
@@ -48,7 +55,7 @@ PanelWindow {
         }
 
         function onRibbonActivity() {
-            if (Niri.launcherOpen || Niri.suppressDock) {
+            if (Niri.launcherOpen || Niri.suppressDock || Niri.overviewOpen) {
                 dockWindow.isShown = false;
                 return;
             }
@@ -180,7 +187,7 @@ PanelWindow {
         MouseArea {
             id: hoverArea
             anchors.fill: parent
-            enabled: dockWindow.isShown && !Niri.launcherOpen && !Niri.suppressDock
+            enabled: dockWindow.isShown && !Niri.launcherOpen && !Niri.suppressDock && !Niri.overviewOpen
             hoverEnabled: true
             acceptedButtons: Qt.NoButton
             onExited: hideTimer.restart()

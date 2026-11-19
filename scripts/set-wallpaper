@@ -9,27 +9,39 @@ fi
 
 ABS_WALL="$(realpath "$WALL")"
 STATE_DIR="$HOME/.local/state/quickshell"
+OVERVIEW_WALL="$STATE_DIR/overview-wallpaper.jpg"
 mkdir -p "$STATE_DIR"
 
 # 1. Actualiza enlace de estado para LockScreen y persistencia
 ln -sf "$ABS_WALL" "$STATE_DIR/current-wallpaper"
 
-# 2. Aplica wallpaper con awww (o swww como respaldo)
+# 2. Aplica wallpaper nítido en el escritorio con awww
 if command -v awww >/dev/null 2>&1; then
     if ! pgrep -x awww-daemon >/dev/null 2>&1; then
         awww-daemon --format xrgb >/dev/null 2>&1 &
         sleep 0.3
     fi
     awww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
-elif command -v swww >/dev/null 2>&1; then
-    if ! pgrep -x swww-daemon >/dev/null 2>&1; then
-        swww-daemon --format xrgb >/dev/null 2>&1 &
-        sleep 0.3
-    fi
-    swww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
 fi
 
-# 3. Extrae paleta dinámica con matugen (con soporte garantizado para WebP/AVIF)
+# 3. Genera versión difuminada con textura y contraste para el backdrop del Overview
+if command -v swaybg >/dev/null 2>&1; then
+    if command -v magick >/dev/null 2>&1; then
+        magick "$ABS_WALL" -resize 1920x1080^ -gravity center -extent 1920x1080 \
+               -blur 0x9 -modulate 68,110,100 "$OVERVIEW_WALL" 2>/dev/null || cp "$ABS_WALL" "$OVERVIEW_WALL"
+    else
+        cp "$ABS_WALL" "$OVERVIEW_WALL"
+    fi
+
+    OLD_PID=$(pgrep -x swaybg || true)
+    setsid -f swaybg -i "$OVERVIEW_WALL" -m fill >/dev/null 2>&1
+    sleep 0.15
+    if [ -n "$OLD_PID" ]; then
+        kill $OLD_PID 2>/dev/null || true
+    fi
+fi
+
+# 4. Extrae paleta dinámica con matugen (con soporte garantizado para WebP/AVIF)
 if command -v matugen >/dev/null 2>&1; then
     mkdir -p "$HOME/.config/niri" "$HOME/.local/state/matugen"
     if ! matugen image "$ABS_WALL" --source-color-index 0 2>/dev/null; then

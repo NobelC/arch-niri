@@ -19,6 +19,7 @@ Singleton {
         return "US";
     }
 
+    property bool overviewOpen: false
     property bool launcherOpen: false
     property bool suppressDock: false
 
@@ -27,9 +28,9 @@ Singleton {
         interval: 350
         repeat: false
         onTriggered: root.suppressDock = false
-      }
+    }
 
-    property string activeBarMenu: "" // "" | "wifi" | "bluetooth" | "audio" | "battery"
+    property string activeBarMenu: "" // "" | "wifi" | "bluetooth" | "audio" | "battery" | "dashboard" | "media"
     property real activeBarDrawerX: 0
     property real activeBarDrawerWidth: 0
 
@@ -65,7 +66,7 @@ Singleton {
     }
 
     function triggerRibbonActivity() {
-        if (!root.launcherOpen && !root.suppressDock) {
+        if (!root.launcherOpen && !root.suppressDock && !root.overviewOpen) {
             root.ribbonActivity();
         }
     }
@@ -142,7 +143,17 @@ Singleton {
         running: true
         stdout: SplitParser {
             onRead: line => {
-                if (line.includes("KeyboardLayoutsChanged")) {
+                if (line.includes("OverviewOpenedOrClosed")) {
+                    try {
+                        const ev = JSON.parse(line);
+                        if (ev.OverviewOpenedOrClosed !== undefined) {
+                            root.overviewOpen = Boolean(ev.OverviewOpenedOrClosed.is_open);
+                            if (root.overviewOpen) {
+                                root.closeBarMenu();
+                            }
+                        }
+                    } catch (e) {}
+                } else if (line.includes("KeyboardLayoutsChanged")) {
                     try {
                         const ev = JSON.parse(line);
                         const kl = ev.KeyboardLayoutsChanged.keyboard_layouts;
