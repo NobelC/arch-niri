@@ -9,7 +9,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
+        color: (mouseArea.containsMouse || Niri.activeBarMenu === "bluetooth") ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -37,7 +37,7 @@ Item {
             if (mouse.button === Qt.RightButton) {
                 Bluetooth.togglePower();
             } else {
-                Bluetooth.openManager();
+                Niri.toggleBarMenu("bluetooth");
             }
         }
     }

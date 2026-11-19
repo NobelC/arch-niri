@@ -5,9 +5,21 @@ import "widgets/osd"
 import "widgets/launcher"
 import "widgets/lock"
 import "widgets/wallpaper"
+import "widgets/network"
+import "widgets/bluetooth"
+import "widgets/audio"
+import "widgets/battery"
+import "widgets/media"
+import "widgets/clock"
 
 ShellRoot {
     Bar {}
+    DashboardMenu {}
+    MediaMenu {}
+    WifiMenu {}
+    BluetoothMenu {}
+    AudioMenu {}
+    BatteryMenu {}
     RibbonDock {}
     Osd {}
     Launcher {}

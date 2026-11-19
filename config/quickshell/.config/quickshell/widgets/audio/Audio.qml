@@ -22,7 +22,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
+        color: (mouseArea.containsMouse || Niri.activeBarMenu === "audio") ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -50,7 +50,7 @@ Item {
             if (mouse.button === Qt.RightButton) {
                 Audio.toggleMute();
             } else {
-                Audio.openMixer();
+                Niri.toggleBarMenu("audio");
             }
         }
 

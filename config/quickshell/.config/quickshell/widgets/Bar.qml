@@ -22,13 +22,28 @@ PanelWindow {
 
     Behavior on color { ColorAnimation { duration: 200 } }
 
-    // Borde inferior sutil
+    // Borde inferior izquierdo (hasta el inicio de la curva cóncava del cajón activo)
     Rectangle {
         anchors {
             bottom: parent.bottom
             left: parent.left
+        }
+        width: Niri.activeBarDrawerWidth > 0
+            ? Math.max(0, Math.min(parent.width, Niri.activeBarDrawerX + 1))
+            : parent.width
+        height: 1
+        color: Theme.cardAlt
+        Behavior on color { ColorAnimation { duration: 200 } }
+    }
+
+    // Borde inferior derecho (desde el final de la curva cóncava hasta el borde de pantalla)
+    Rectangle {
+        visible: Niri.activeBarDrawerWidth > 0
+        anchors {
+            bottom: parent.bottom
             right: parent.right
         }
+        width: Math.max(0, parent.width - (Niri.activeBarDrawerX + Niri.activeBarDrawerWidth - 1))
         height: 1
         color: Theme.cardAlt
         Behavior on color { ColorAnimation { duration: 200 } }

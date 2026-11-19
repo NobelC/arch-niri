@@ -27,7 +27,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
+        color: (mouseArea.containsMouse || Niri.activeBarMenu === "wifi") ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -55,7 +55,7 @@ Item {
             if (mouse.button === Qt.RightButton) {
                 Network.toggleWifi();
             } else {
-                Network.openManager();
+                Niri.toggleBarMenu("wifi");
             }
         }
     }

@@ -137,6 +137,7 @@ config/
             LockSurface.qml
           network/
             Network.qml
+            WifiMenu.qml
           osd/
             Osd.qml
           ribbon/
@@ -148,6 +149,7 @@ config/
           workspaces/
             Workspaces.qml
           Bar.qml
+          BarDrawer.qml
         shell.qml
   yazi/
     .config/
@@ -166,6 +168,797 @@ scripts/
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="config/quickshell/.config/quickshell/widgets/network/WifiMenu.qml">
+import QtQuick
+import QtQuick.Layouts
+import Quickshell.Io
+import Quickshell.Networking
+import "../../services"
+import ".."
+
+BarDrawer {
+    id: drawer
+    menuName: "wifi"
+    panelWidth: 340
+    rightOffset: 32
+    contentHeight: root.implicitHeight
+
+    ColumnLayout {
+        id: root
+        width: parent.width
+        spacing: 10
+
+        readonly property bool active: drawer.isOpen
+        property string askingFor: ""
+        readonly property real maxListHeight: 5 * 42
+
+        // ---------- Estado ----------
+        readonly property var wifiDevice: {
+            const devs = Networking.devices.values;
+            for (let i = 0; i < devs.length; i++) {
+                if (devs[i].type === DeviceType.Wifi)
+                    return devs[i];
+            }
+            return null;
+        }
+        readonly property bool hasAdapter: wifiDevice !== null
+        readonly property bool wifiOn: Networking.wifiEnabled !== false
+        readonly property string ifName: wifiDevice && wifiDevice.name ? wifiDevice.name : ""
+
+        readonly property var networks: {
+            if (!wifiDevice)
+                return [];
+
+            const list = wifiDevice.networks.values.slice();
+            list.sort((a, b) => {
+                if (a.connected !== b.connected)
+                    return a.connected ? -1 : 1;
+                return b.signalStrength - a.signalStrength;
+            });
+            return list;
+        }
+        readonly property var current: networks.length > 0 && networks[0].connected ? networks[0] : null
+        readonly property var others: current ? networks.slice(1) : networks
+
+        // ---------- Utilidades ----------
+        function pct(s) {
+            return Math.round(Math.max(0, Math.min(1, s)) * 100);
+        }
+
+        function quality(s) {
+            if (s >= 0.75) return "Excellent";
+            if (s >= 0.5)  return "Good";
+            if (s >= 0.25) return "Fair";
+            return "Weak";
+        }
+
+        function sigGlyph(s) {
+            if (s >= 0.75) return "󰤨";
+            if (s >= 0.5)  return "󰤥";
+            if (s >= 0.25) return "󰤢";
+            return "󰤟";
+        }
+
+        function setWifi(on) {
+            if (Networking.wifiEnabled !== undefined) {
+                Networking.wifiEnabled = on;
+            } else {
+                radio.command = ["nmcli", "radio", "wifi", on ? "on" : "off"];
+                radio.running = true;
+            }
+        }
+
+        function updateScanner() {
+            if (wifiDevice)
+                wifiDevice.scannerEnabled = root.active && root.wifiOn;
+        }
+
+        onActiveChanged: {
+            root.updateScanner();
+            if (!active)
+                root.askingFor = "";
+        }
+        onWifiOnChanged: root.updateScanner()
+        onWifiDeviceChanged: root.updateScanner()
+        Component.onCompleted: root.updateScanner()
+        Component.onDestruction: {
+            if (wifiDevice)
+                wifiDevice.scannerEnabled = false;
+        }
+
+        // ---------- Detalles de la conexión ----------
+        property string band: ""
+        property string channel: ""
+        property string rate: ""
+        property string ip: ""
+
+        readonly property var details: {
+            const out = [];
+            if (root.band !== "")
+                out.push({ k: "Band", v: root.band + (root.channel !== "" ? "  ·  ch " + root.channel : "") });
+            if (root.rate !== "")
+                out.push({ k: "Speed", v: root.rate });
+            if (root.ip !== "")
+                out.push({ k: "IP", v: root.ip });
+            return out;
+        }
+
+        function parseInfo(text) {
+            let band = "", chan = "", rate = "", ip = "";
+            const lines = text.split("\n");
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (line.indexOf("ip:") === 0) {
+                    ip = line.slice(3).split("/")[0].trim();
+                } else if (line.indexOf("*:") === 0) {
+                    const p = line.split(":");
+                    chan = p[1] || "";
+                    const mhz = parseInt(p[2]);
+                    if (!isNaN(mhz))
+                        band = mhz >= 5925 ? "6 GHz" : (mhz >= 4900 ? "5 GHz" : "2.4 GHz");
+                    rate = (p[3] || "").replace("Mbit/s", "Mb/s").trim();
+                }
+            }
+            root.band = band;
+            root.channel = chan;
+            root.rate = rate;
+            root.ip = ip;
+        }
+
+        onCurrentChanged: {
+            root.band = "";
+            root.channel = "";
+            root.rate = "";
+            root.ip = "";
+        }
+
+        Process {
+            id: infoProc
+            command: ["sh", "-c", "nmcli -t -f IN-USE,CHAN,FREQ,RATE dev wifi list ifname \"$1\" 2>/dev/null | grep '^\\*' | head -n1; echo \"ip:$(ip -4 -o addr show dev \"$1\" 2>/dev/null | awk '{print $4}' | head -n1)\"", "sh", root.ifName]
+            stdout: StdioCollector {
+                onStreamFinished: root.parseInfo(text)
+            }
+        }
+
+        Timer {
+            interval: 5000
+            repeat: true
+            triggeredOnStart: true
+            running: root.active && root.current !== null && root.ifName !== ""
+            onTriggered: {
+                if (!infoProc.running)
+                    infoProc.running = true;
+            }
+        }
+
+        Process { id: radio }
+        Process { id: portal; command: ["xdg-open", "http://detectportal.firefox.com"] }
+
+        component Hint: Rectangle {
+            id: hint
+            property string hintIcon: ""
+            property string hintText: ""
+            property string hintSub: ""
+
+            Layout.fillWidth: true
+            implicitHeight: hintCol.implicitHeight + 24
+            radius: 12
+            color: Theme.card
+
+            Column {
+                id: hintCol
+                anchors.centerIn: parent
+                spacing: 3
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: hint.hintIcon !== ""
+                    text: hint.hintIcon
+                    color: Theme.muted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 20
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: hint.hintText
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 12
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: hint.hintSub !== ""
+                    text: hint.hintSub
+                    color: Theme.muted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 10
+                }
+            }
+        }
+
+        // ---------- Cabecera integrada ----------
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+
+            Rectangle {
+                width: 32
+                height: 32
+                radius: 9
+                color: (root.wifiOn && root.current) ? Theme.cardAlt : Theme.card
+
+                Text {
+                    anchors.centerIn: parent
+                    text: root.wifiOn && root.current ? root.sigGlyph(root.current.signalStrength) : "󰤭"
+                    color: (root.wifiOn && root.current) ? Theme.accentSoft : Theme.muted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 15
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 1
+
+                Text {
+                    text: "Wi-Fi"
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                    font.bold: true
+                }
+                Text {
+                    Layout.fillWidth: true
+                    text: {
+                        if (!root.hasAdapter) return "No adapter";
+                        if (!root.wifiOn) return "Off";
+                        if (root.current) return root.current.name;
+                        return root.networks.length > 0 ? "Not connected" : "Searching…";
+                    }
+                    color: Theme.sub
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
+                }
+            }
+
+            // Botón respaldo técnico (nmtui)
+            Rectangle {
+                width: 26
+                height: 26
+                radius: 7
+                color: tuiHover.containsMouse ? Theme.cardAlt : "transparent"
+
+                Text {
+                    anchors.centerIn: parent
+                    text: ""
+                    color: Theme.sub
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                }
+
+                MouseArea {
+                    id: tuiHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        Niri.closeBarMenu();
+                        Network.openManager();
+                    }
+                }
+            }
+
+            // Interruptor On/Off
+            Rectangle {
+                width: 40
+                height: 22
+                radius: 11
+                opacity: root.hasAdapter ? 1.0 : 0.4
+                color: root.wifiOn ? Theme.accent : Theme.cardAlt
+
+                Behavior on color { ColorAnimation { duration: 150 } }
+
+                Rectangle {
+                    width: 16
+                    height: 16
+                    radius: 8
+                    y: 3
+                    x: root.wifiOn ? 21 : 3
+                    color: root.wifiOn ? Theme.bg : Theme.sub
+
+                    Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: root.hasAdapter
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.setWifi(!root.wifiOn)
+                }
+            }
+        }
+
+        // ---------- Portal cautivo ----------
+        Rectangle {
+            visible: root.wifiOn && Networking.connectivity === NetworkConnectivity.Portal
+            Layout.fillWidth: true
+            implicitHeight: 30
+            radius: 10
+            color: Theme.accent
+
+            Text {
+                anchors.centerIn: parent
+                text: "Sign in to the network"
+                color: Theme.bg
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                font.bold: true
+            }
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: portal.startDetached()
+            }
+        }
+
+        // ---------- Avisos de estado ----------
+        Hint {
+            visible: !root.hasAdapter
+            hintIcon: "󰤭"
+            hintText: "No Wi-Fi adapter found"
+        }
+        Hint {
+            visible: root.hasAdapter && !root.wifiOn
+            hintIcon: "󰤭"
+            hintText: "Wi-Fi is off"
+            hintSub: "Turn it on to see nearby networks"
+        }
+
+        // ---------- Red conectada ----------
+        Rectangle {
+            id: card
+            visible: root.wifiOn && root.current !== null
+            Layout.fillWidth: true
+            implicitHeight: cardCol.implicitHeight + 24
+            radius: 12
+            color: Theme.card
+
+            ColumnLayout {
+                id: cardCol
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: 12
+                spacing: 8
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 1
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: root.current ? root.current.name : ""
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                            font.bold: true
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: root.current ? "Connected  ·  " + root.quality(root.current.signalStrength) + "  " + root.pct(root.current.signalStrength) + "%" : ""
+                            color: Theme.sub
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Rectangle {
+                        implicitWidth: dcText.implicitWidth + 18
+                        implicitHeight: 26
+                        radius: 8
+                        color: dcArea.containsMouse ? Theme.border : Theme.cardAlt
+
+                        Text {
+                            id: dcText
+                            anchors.centerIn: parent
+                            text: "Disconnect"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                        }
+                        MouseArea {
+                            id: dcArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (root.current)
+                                    root.current.disconnect();
+                            }
+                        }
+                    }
+                }
+
+                // Barra de intensidad
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: 4
+                    radius: 2
+                    color: Theme.cardAlt
+
+                    Rectangle {
+                        width: parent.width * (root.current ? Math.max(0, Math.min(1, root.current.signalStrength)) : 0)
+                        height: parent.height
+                        radius: 2
+                        color: Theme.accent
+
+                        Behavior on width {
+                            NumberAnimation { duration: 200 }
+                        }
+                    }
+                }
+
+                Repeater {
+                    model: root.details
+
+                    delegate: RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Text {
+                            Layout.preferredWidth: 48
+                            text: parent.modelData.k
+                            color: Theme.muted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: parent.modelData.v
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            horizontalAlignment: Text.AlignRight
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+            }
+        }
+
+        // ---------- Redes disponibles ----------
+        RowLayout {
+            visible: root.wifiOn && root.hasAdapter && root.others.length > 0
+            Layout.fillWidth: true
+
+            Text {
+                Layout.fillWidth: true
+                text: "Available networks"
+                color: Theme.sub
+                font.family: Theme.fontFamily
+                font.pixelSize: 11
+            }
+            Text {
+                text: root.others.length
+                color: Theme.muted
+                font.family: Theme.fontFamily
+                font.pixelSize: 11
+            }
+        }
+
+        ListView {
+            id: list
+            visible: root.wifiOn && root.hasAdapter && root.others.length > 0
+            Layout.fillWidth: true
+            Layout.preferredHeight: Math.min(contentHeight, root.maxListHeight)
+            clip: true
+            spacing: 2
+            boundsBehavior: Flickable.StopAtBounds
+            model: root.others
+
+            delegate: Rectangle {
+                id: row
+                required property var modelData
+                readonly property var net: modelData
+                readonly property bool secured: net.security !== WifiSecurityType.Open
+                readonly property bool asking: root.askingFor === net.name
+
+                width: list.width
+                height: asking ? 78 : 40
+                radius: 10
+                color: rowArea.containsMouse && !asking ? Theme.card : "transparent"
+
+                Item {
+                    id: head
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: 40
+
+                    Text {
+                        id: sig
+                        anchors.left: parent.left
+                        anchors.leftMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 22
+                        text: root.sigGlyph(row.net.signalStrength)
+                        color: Theme.muted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 16
+                    }
+
+                    Column {
+                        anchors.left: sig.right
+                        anchors.leftMargin: 8
+                        anchors.right: lockIcon.left
+                        anchors.rightMargin: 8
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Text {
+                            width: parent.width
+                            text: row.net.name && row.net.name.length > 0 ? row.net.name : "Hidden network"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            elide: Text.ElideRight
+                        }
+                        Text {
+                            width: parent.width
+                            text: (row.net.known ? "Saved  ·  " : "") + (row.secured ? "Secured" : "Open") + "  ·  " + root.pct(row.net.signalStrength) + "%"
+                            color: Theme.muted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Text {
+                        id: lockIcon
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: row.secured
+                        text: ""
+                        color: Theme.muted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                    }
+
+                    MouseArea {
+                        id: rowArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (!row.secured || row.net.known)
+                                row.net.connect();
+                            else
+                                root.askingFor = row.asking ? "" : row.net.name;
+                        }
+                    }
+                }
+
+                // Contraseña de redes protegidas nuevas
+                Rectangle {
+                    visible: row.asking
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 6
+                    height: 28
+                    radius: 8
+                    color: Theme.cardAlt
+                    border.width: 1
+                    border.color: pass.activeFocus ? Theme.accentSoft : "transparent"
+
+                    TextInput {
+                        id: pass
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        verticalAlignment: TextInput.AlignVCenter
+                        echoMode: TextInput.Password
+                        color: Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        focus: row.asking
+                        clip: true
+                        Keys.onEscapePressed: {
+                            root.askingFor = "";
+                            text = "";
+                        }
+                        onAccepted: {
+                            if (text.length === 0)
+                                return;
+                            row.net.connectWithPsk(text);
+                            root.askingFor = "";
+                            text = "";
+                        }
+
+                        Text {
+                            visible: pass.text === ""
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "Password · Enter to connect"
+                            color: Theme.muted
+                            font: pass.font
+                        }
+                    }
+                }
+            }
+        }
+
+        Hint {
+            visible: root.wifiOn && root.hasAdapter && root.others.length === 0
+            hintIcon: "󰤟"
+            hintText: root.current ? "No other networks nearby" : "Searching for networks…"
+        }
+    }
+}
+</file>
+
+<file path="config/quickshell/.config/quickshell/widgets/BarDrawer.qml">
+import QtQuick
+import Quickshell
+import Quickshell.Wayland
+import "../services"
+
+PanelWindow {
+    id: drawerWindow
+
+    required property string menuName
+    required property real contentHeight
+    property real panelWidth: 340
+    property real rightOffset: 12
+
+    readonly property bool isOpen: Niri.activeBarMenu === menuName
+    readonly property real topConcave: 12
+    readonly property real bottomRadius: 16
+    readonly property real targetHeight: contentHeight + 28
+
+    anchors {
+        top: true
+        bottom: true
+        left: true
+        right: true
+    }
+
+    margins.top: 30 // Justo debajo de Bar.qml (implicitHeight: 30)
+    color: "transparent"
+    visible: true
+    exclusionMode: ExclusionMode.Ignore
+    mask: isOpen ? null : emptyRegion
+
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "quickshell-bar-drawer"
+    WlrLayershell.keyboardFocus: isOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+
+    Region { id: emptyRegion }
+
+    // Cierra el menú al hacer clic fuera
+    MouseArea {
+        anchors.fill: parent
+        enabled: drawerWindow.isOpen
+        onClicked: Niri.closeBarMenu()
+    }
+
+    Item {
+        id: drawerContainer
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.rightMargin: Math.max(0, drawerWindow.rightOffset - drawerWindow.topConcave)
+
+        width: drawerWindow.panelWidth + (drawerWindow.topConcave * 2)
+        height: drawerWindow.isOpen ? drawerWindow.targetHeight : 0
+        opacity: drawerWindow.isOpen ? 1.0 : 0.0
+        visible: height > 1 || opacity > 0.01
+        clip: true
+
+        Behavior on height {
+            NumberAnimation {
+                duration: 210
+                easing.type: drawerWindow.isOpen ? Easing.OutCubic : Easing.InCubic
+            }
+        }
+
+        Behavior on opacity {
+            NumberAnimation { duration: 150 }
+        }
+
+        Connections {
+            target: Theme
+            function onBgChanged() { bgCanvas.requestPaint(); }
+            function onCardAltChanged() { bgCanvas.requestPaint(); }
+        }
+
+        onWidthChanged: bgCanvas.requestPaint()
+        onHeightChanged: bgCanvas.requestPaint()
+
+        // Silueta con esquinas superiores cóncavas hacia afuera y borde superior abierto
+        Canvas {
+            id: bgCanvas
+            anchors.fill: parent
+            antialiasing: true
+
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.reset();
+
+                const w = width;
+                const h = height;
+                if (h <= 2) return;
+
+                const c = drawerWindow.topConcave;
+                const r = Math.min(drawerWindow.bottomRadius, (h - c) / 2);
+                const leftX = c;
+                const rightX = w - c;
+
+                function buildOutline() {
+                    ctx.beginPath();
+                    // Empieza en extremo superior izquierdo (falda cóncava)
+                    ctx.moveTo(0, 0);
+                    ctx.quadraticCurveTo(leftX, 0, leftX, c);
+                    // Baja hasta esquina inferior izquierda redondeada
+                    ctx.lineTo(leftX, h - r);
+                    ctx.quadraticCurveTo(leftX, h, leftX + r, h);
+                    // Borde inferior
+                    ctx.lineTo(rightX - r, h);
+                    // Esquina inferior derecha redondeada
+                    ctx.quadraticCurveTo(rightX, h, rightX, h - r);
+                    // Sube hasta falda cóncava superior derecha
+                    ctx.lineTo(rightX, c);
+                    ctx.quadraticCurveTo(rightX, 0, w, 0);
+                }
+
+                // Relleno fundido con la barra
+                buildOutline();
+                ctx.closePath();
+                ctx.fillStyle = Theme.bg.toString();
+                ctx.fill();
+
+                // Trazo solo en laterales y abajo (sin línea arriba para fusionarse con Bar)
+                buildOutline();
+                ctx.strokeStyle = Theme.cardAlt.toString();
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        // Bloquea clics internos para que no cierren el menú
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        default property alias body: innerContent.data
+
+        Item {
+            id: innerContent
+            anchors {
+                top: parent.top
+                left: parent.left
+                right: parent.right
+                topMargin: 10
+                leftMargin: drawerWindow.topConcave + 14
+                rightMargin: drawerWindow.topConcave + 14
+            }
+            height: drawerWindow.contentHeight
+        }
+    }
+}
+</file>
+
+<file path="config/clangd/.config/clangd/config.yaml">
+CompileFlags:
+  Add: [-std=c++20, -Wall, -Wextra]
+</file>
 
 <file path="config/matugen/.config/matugen/templates/btop.theme">
 # Main background, empty for terminal default, need to be empty if you want transparent background
@@ -304,6 +1097,19 @@ osd-selected-color='{{colors.primary.default.hex}}'
 script-opts-append=uosc-color=foreground={{colors.on_surface.default.hex_stripped}},foreground_text={{colors.surface.default.hex_stripped}},background={{colors.surface.default.hex_stripped}},background_text={{colors.on_surface.default.hex_stripped}},curtain={{colors.surface_container_lowest.default.hex_stripped}},success={{colors.tertiary.default.hex_stripped}},error={{colors.error.default.hex_stripped}}
 </file>
 
+<file path="config/matugen/.config/matugen/templates/niri-colors.kdl">
+layout {
+    focus-ring {
+        active-color "{{colors.primary.default.hex}}"
+        inactive-color "{{colors.outline_variant.default.hex}}"
+    }
+    border {
+        active-color "{{colors.primary.default.hex}}"
+        inactive-color "{{colors.surface_container_high.default.hex}}"
+    }
+}
+</file>
+
 <file path="config/matugen/.config/matugen/templates/nvchad-colors.lua">
 return {
   base_30 = {
@@ -356,6 +1162,23 @@ return {
     base0E = "{{colors.tertiary_fixed_dim.default.hex}}",
     base0F = "{{colors.error.default.hex}}",
   },
+}
+</file>
+
+<file path="config/matugen/.config/matugen/templates/quickshell-colors.json">
+{
+  "dark": true,
+  "bg": "{{colors.surface.default.hex}}",
+  "card": "{{colors.surface_container.default.hex}}",
+  "cardAlt": "{{colors.surface_container_high.default.hex}}",
+  "text": "{{colors.on_surface.default.hex}}",
+  "sub": "{{colors.on_surface_variant.default.hex}}",
+  "muted": "{{colors.outline.default.hex}}",
+  "border": "{{colors.outline_variant.default.hex}}",
+  "accent": "{{colors.primary.default.hex}}",
+  "accentSoft": "{{colors.secondary.default.hex}}",
+  "highlight": "{{colors.tertiary.default.hex}}",
+  "warn": "{{colors.error.default.hex}}"
 }
 </file>
 
@@ -462,111 +1285,6 @@ rules = [
   { url = "*", is = "exec", fg = "{{colors.tertiary.default.hex}}" },
   { url = "*/", fg = "{{colors.primary.default.hex}}", bold = true },
 ]
-</file>
-
-<file path=".gitignore">
-config/niri/.config/niri/colors.kdl
-</file>
-
-<file path="config/clangd/.config/clangd/config.yaml">
-CompileFlags:
-  Add: [-std=c++20, -Wall, -Wextra]
-</file>
-
-<file path="config/ghostty/.config/ghostty/config">
-# --- VENTANA Y MÁRGENES ---
-# Elimina la barra de título GTK
-window-decoration = false
-
-# Márgenes internos (en píxeles) para que el texto no quede pegado al borde de Niri
-window-padding-x = 5
-window-padding-y = 5
-
-# Centra el grid de caracteres si sobra espacio al redimensionar la ventana
-window-padding-balance = true
-
-# --- TIPOGRAFÍA ---
-
-# --- ESTILO Y COLORES ---
-# --- ESTILO Y COLORES ---
-config-file = ?~/.local/state/matugen/ghostty-theme
-
-# --- CURSOR Y COMPORTAMIENTO ---
-cursor-style = block
-cursor-style-blink = false
-
-# Oculta el puntero del ratón mientras escribes
-mouse-hide-while-typing = true
-
-# Evita confirmación al cerrar pestañas/ventanas si no hay procesos activos
-confirm-close-surface = false
-</file>
-
-<file path="config/matugen/.config/matugen/templates/niri-colors.kdl">
-layout {
-    focus-ring {
-        active-color "{{colors.primary.default.hex}}"
-        inactive-color "{{colors.outline_variant.default.hex}}"
-    }
-    border {
-        active-color "{{colors.primary.default.hex}}"
-        inactive-color "{{colors.surface_container_high.default.hex}}"
-    }
-}
-</file>
-
-<file path="config/matugen/.config/matugen/templates/quickshell-colors.json">
-{
-  "dark": true,
-  "bg": "{{colors.surface.default.hex}}",
-  "card": "{{colors.surface_container.default.hex}}",
-  "cardAlt": "{{colors.surface_container_high.default.hex}}",
-  "text": "{{colors.on_surface.default.hex}}",
-  "sub": "{{colors.on_surface_variant.default.hex}}",
-  "muted": "{{colors.outline.default.hex}}",
-  "border": "{{colors.outline_variant.default.hex}}",
-  "accent": "{{colors.primary.default.hex}}",
-  "accentSoft": "{{colors.secondary.default.hex}}",
-  "highlight": "{{colors.tertiary.default.hex}}",
-  "warn": "{{colors.error.default.hex}}"
-}
-</file>
-
-<file path="config/matugen/.config/matugen/config.toml">
-[config]
-reload_apps = true
-
-[templates.quickshell]
-input_path = '~/.config/matugen/templates/quickshell-colors.json'
-output_path = '~/.local/state/quickshell/colors.json'
-
-[templates.niri]
-input_path = '~/.config/matugen/templates/niri-colors.kdl'
-output_path = '~/.local/state/matugen/colors.kdl'
-post_hook = 'ln -sf "$HOME/.local/state/matugen/colors.kdl" "$HOME/.config/niri/colors.kdl"'
-
-[templates.ghostty]
-input_path = '~/.config/matugen/templates/ghostty-theme'
-output_path = '~/.local/state/matugen/ghostty-theme'
-post_hook = 'pkill -USR2 -x ghostty || true'
-
-[templates.nvchad]
-input_path = '~/.config/matugen/templates/nvchad-colors.lua'
-output_path = '~/.local/state/matugen/nvchad-colors.lua'
-
-[templates.mpv]
-input_path = '~/.config/matugen/templates/mpv-colors.conf'
-output_path = '~/.local/state/matugen/mpv-colors.conf'
-
-[templates.btop]
-input_path = '~/.config/matugen/templates/btop.theme'
-output_path = '~/.local/state/matugen/btop.theme'
-post_hook = 'mkdir -p "$HOME/.config/btop/themes" && ln -sf "$HOME/.local/state/matugen/btop.theme" "$HOME/.config/btop/themes/matugen.theme" && pkill -USR2 btop || true'
-
-[templates.yazi]
-input_path = '~/.config/matugen/templates/yazi-theme.toml'
-output_path = '~/.local/state/matugen/yazi-theme.toml'
-post_hook = 'ln -sf "$HOME/.local/state/matugen/yazi-theme.toml" "$HOME/.config/yazi/theme.toml"'
 </file>
 
 <file path="config/mpv/.config/mpv/scripts/autoload.lua">
@@ -3225,201 +3943,6 @@ Ctrl+f script-binding quality_menu/video_formats_toggle
 Alt+f  script-binding quality_menu/audio_formats_toggle
 </file>
 
-<file path="config/mpv/.config/mpv/mpv.conf">
-include=~/.local/state/matugen/mpv-colors.conf
-# ~/.config/mpv/mpv.conf
-# mpv al máximo en Arch Linux (uosc + thumbfast como interfaz)
-
-# --- Base de render ---
-# NOTA: se eliminó "profile=gpu-hq" (obsoleto en mpv recientes); todo está explícito abajo.
-vo=gpu-next
-gpu-api=vulkan
-gpu-context=auto
-# Si Vulkan da problemas en tu GPU: gpu-api=opengl  (o vo=gpu)
-
-# --- Interfaz (uosc reemplaza al OSC por defecto) ---
-osc=no
-osd-bar=no
-border=no
-
-# --- Decodificación ---
-hwdec=auto-safe
-hwdec-codecs=all
-vd-lavc-dr=yes
-
-# --- Comportamiento general ---
-keep-open=yes
-save-position-on-quit=yes
-watch-later-directory=~/.cache/mpv/watch_later
-autofit-larger=90%x90%
-force-window=immediate
-cursor-autohide=1000
-osd-duration=1500
-osd-font-size=32
-terminal=yes
-icc-profile-auto=yes
-
-# --- Idiomas preferidos ---
-alang=spa,es,eng,en,jpn,ja
-slang=spa,es,eng,en
-
-# --- Caché ---
-cache=yes
-demuxer-max-bytes=1024M
-demuxer-max-back-bytes=256M
-cache-secs=120
-prefetch-playlist=yes
-
-# --- Vídeo: máxima calidad de escalado ---
-scale=ewa_lanczossharp
-cscale=ewa_lanczossharp
-dscale=mitchell
-scale-antiring=0.6
-cscale-antiring=0.6
-correct-downscaling=yes
-linear-downscaling=yes
-sigmoid-upscaling=yes
-dither-depth=auto
-dither=fruit
-temporal-dither=no
-blend-subtitles=yes
-
-# --- Movimiento suave (efecto "soap opera": pulsa z para desactivar) ---
-video-sync=display-resample
-interpolation=yes
-tscale=oversample
-
-# --- Color / HDR ---
-target-prim=auto
-target-trc=auto
-tone-mapping=auto
-hdr-compute-peak=auto
-# Monitor HDR real: descomenta
-# target-colorspace-hint=yes
-
-# --- Audio ---
-volume=100
-volume-max=150
-audio-pitch-correction=yes
-audio-normalize-downmix=yes
-audio-channels=auto-safe
-audio-file-auto=fuzzy
-# Receptor AV con passthrough:
-# audio-spdif=ac3,dts,dtshd,eac3,truehd
-
-# --- Subtítulos ---
-sub-auto=fuzzy
-sub-file-paths=~/Subtitles
-sub-font-size=48
-sub-color="#FFFFFF"
-sub-border-color="#000000"
-sub-border-size=2.0
-sub-shadow-offset=0.5
-sub-use-margins=yes
-sub-ass-force-margins=yes
-sub-ass-use-video-data=all
-demuxer-mkv-subtitle-preroll=yes
-
-# --- Capturas ---
-screenshot-directory=~/Pictures/mpv-screenshots
-screenshot-format=png
-screenshot-high-bit-depth=yes
-screenshot-template="%f-%n"
-
-# --- Streaming / yt-dlp ---
-ytdl-format=bestvideo+bestaudio/best
-# Limitar a 4K si va pesado:
-# ytdl-format=bestvideo[height<=?2160]+bestaudio/best
-
-# --- Perfiles automáticos por tipo de archivo ---
-[extension.gif]
-loop-file=inf
-profile-restore=copy
-
-[extension.png]
-loop-file=inf
-video-sync=audio
-interpolation=no
-
-[extension.jpg]
-loop-file=inf
-video-sync=audio
-interpolation=no
-
-[extension.webp]
-loop-file=inf
-video-sync=audio
-interpolation=no
-
-# --- Perfiles manuales (F1-F4) ---
-
-[high-quality]
-profile-desc=Calidad máxima
-hwdec=auto-safe
-hwdec-codecs=all
-scale=ewa_lanczossharp
-cscale=ewa_lanczossharp
-dscale=mitchell
-correct-downscaling=yes
-linear-downscaling=yes
-sigmoid-upscaling=yes
-video-sync=display-resample
-interpolation=yes
-tscale=oversample
-deband=no
-temporal-dither=no
-
-[fast]
-profile-desc=Rendimiento alto, calidad menor
-hwdec=auto-safe
-hwdec-codecs=all
-scale=bilinear
-cscale=bilinear
-dscale=bilinear
-correct-downscaling=no
-linear-downscaling=no
-sigmoid-upscaling=no
-video-sync=audio
-interpolation=no
-deband=no
-
-[anime]
-profile-desc=Calidad alta + deband para anime/animación
-hwdec=auto-safe
-hwdec-codecs=all
-scale=ewa_lanczossharp
-cscale=ewa_lanczossharp
-dscale=mitchell
-correct-downscaling=yes
-linear-downscaling=yes
-sigmoid-upscaling=yes
-video-sync=display-resample
-interpolation=yes
-tscale=oversample
-deband=yes
-deband-iterations=2
-deband-threshold=35
-deband-range=16
-deband-grain=5
-
-[hdr-to-sdr]
-profile-desc=Forzar tonemap a SDR si HDR se ve raro
-hwdec=auto-safe
-hwdec-codecs=all
-scale=ewa_lanczossharp
-cscale=ewa_lanczossharp
-dscale=mitchell
-correct-downscaling=yes
-linear-downscaling=yes
-sigmoid-upscaling=yes
-video-sync=display-resample
-interpolation=yes
-tscale=oversample
-target-prim=bt.709
-target-trc=srgb
-tone-mapping=bt.2390
-</file>
-
 <file path="config/niri/.config/niri/modules/01-input.kdl">
 input{
   keyboard{
@@ -3455,78 +3978,6 @@ output "eDP-1"{
   transform "normal"
   position x=0 y=0 
 }
-</file>
-
-<file path="config/niri/.config/niri/modules/03-layout.kdl">
-layout {
-  // Espaciado
-  gaps 8
-  // Centrado automático de las columnas
-  center-focused-column "never"
-  // Anchos definidos al pulsar mod + R
-  preset-column-widths {
-    proportion 0.33333
-    proportion 0.5
-    proportion 0.66667
-    proportion 1.0
-  }
-  default-column-width { proportion 1.0; }
-  focus-ring {
-    width 2
-  }
-  border {
-    off
-    width 2
-  }
-}
-</file>
-
-<file path="config/niri/.config/niri/modules/06-binds-system.kdl">
-binds {
-    // --- AUDIO (PipeWire / WirePlumber) ---
-    // "-l 1.0" evita que el volumen supere el 100% para no distorsionar los altavoces
-    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05+ -l 1.0"; }
-    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05-"; }
-    XF86AudioMute        allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
-    XF86AudioMicMute     allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
-
-    // --- BRILLO DE PANTALLA (backlight) ---
-    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+5%"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "5%-"; }
-
-    // --- MULTIMEDIA (MPRIS / playerctl) ---
-    XF86AudioPlay  allow-when-locked=true { spawn "playerctl" "play-pause"; }
-    XF86AudioPause allow-when-locked=true { spawn "playerctl" "play-pause"; }
-    XF86AudioStop  allow-when-locked=true { spawn "playerctl" "stop"; }
-    XF86AudioPrev  allow-when-locked=true { spawn "playerctl" "previous"; }
-    XF86AudioNext  allow-when-locked=true { spawn "playerctl" "next"; }
-
-    // --- CAPTURAS DE PANTALLA ---
-    Print      { screenshot; }
-    Ctrl+Print { screenshot-screen; }
-    Alt+Print  { screenshot-window; }
-
-    // --- ENERGÍA Y BLOQUEO DE PANTALLA ---
-    // Apaga el panel al instante (se enciende al mover el ratón o pulsar cualquier tecla)
-    Mod+Shift+P { power-off-monitors; }
-
-    // Salir de Niri (muestra confirmación para evitar cierres accidentales)
-    Mod+Shift+E     { quit; }
-    Ctrl+Alt+Delete { quit; }
-}
-</file>
-
-<file path="config/niri/.config/niri/config.kdl">
-// Configuración modular de Niri
-include "modules/01-input.kdl"
-include "modules/02-outputs.kdl"
-include "modules/03-layout.kdl"
-//include "modules/04-workspaces.kdl"
-include "modules/05-window-rules.kdl"
-include "modules/06-binds-system.kdl"
-include "modules/07-binds-user.kdl"
-include "modules/08-startup.kdl"
-include "colors.kdl"
 </file>
 
 <file path="config/nvim/.config/nvim/lua/configs/lazy.lua">
@@ -3623,7 +4074,7 @@ require "nvchad.autocmds"
 local M = {}
 
 M.base46 = {
-	theme = "onedark",
+	theme = "one_light",
 
 	-- hl_override = {
 	-- 	Comment = { italic = true },
@@ -3663,56 +4114,6 @@ require "nvchad.options"
 -- o.cursorlineopt ='both' -- to enable cursorline!
 </file>
 
-<file path="config/nvim/.config/nvim/lua/theme-sync.lua">
-local palette_file = vim.fn.expand("~/.local/state/matugen/nvchad-colors.lua")
-
-local function apply_matugen_theme()
-  if vim.fn.filereadable(palette_file) ~= 1 then
-    return
-  end
-
-  local ok_load, palette = pcall(dofile, palette_file)
-  if not ok_load or type(palette) ~= "table" then
-    return
-  end
-
-  vim.schedule(function()
-    local ok_cfg, nvconfig = pcall(require, "nvconfig")
-    local ok_b46, base46 = pcall(require, "base46")
-    if not ok_cfg or not ok_b46 then
-      return
-    end
-
-    local current = nvconfig.base46.theme
-    nvconfig.base46.changed_themes = nvconfig.base46.changed_themes or {}
-    nvconfig.base46.changed_themes[current] = palette
-    base46.load_all_highlights()
-  end)
-end
-
--- Aplica los colores al abrir Neovim
-apply_matugen_theme()
-
--- Vigila cambios en vivo cuando matugen regenera el archivo
-local watcher = vim.uv.new_fs_event()
-if watcher then
-  local function start_watch()
-    if vim.fn.filereadable(palette_file) == 1 then
-      watcher:start(palette_file, {}, function(err)
-        if not err then
-          watcher:stop()
-          apply_matugen_theme()
-          vim.defer_fn(start_watch, 150)
-        end
-      end)
-    else
-      vim.defer_fn(start_watch, 1000)
-    end
-  end
-  start_watch()
-end
-</file>
-
 <file path="config/nvim/.config/nvim/.stylua.toml">
 column_width = 120
 line_endings = "Unix"
@@ -3720,47 +4121,6 @@ indent_type = "Spaces"
 indent_width = 2
 quote_style = "AutoPreferDouble"
 call_parentheses = "None"
-</file>
-
-<file path="config/nvim/.config/nvim/init.lua">
-vim.g.base46_cache = vim.fn.stdpath "data" .. "/base46/"
-vim.g.mapleader = " "
-require("theme-sync")
-
--- bootstrap lazy and all plugins
-local lazypath = vim.fn.stdpath "data" .. "/lazy/lazy.nvim"
-
-if not vim.uv.fs_stat(lazypath) then
-  local repo = "https://github.com/folke/lazy.nvim.git"
-  vim.fn.system { "git", "clone", "--filter=blob:none", repo, "--branch=stable", lazypath }
-end
-
-vim.opt.rtp:prepend(lazypath)
-
-local lazy_config = require "configs.lazy"
-
--- load plugins
-require("lazy").setup({
-  {
-    "NvChad/NvChad",
-    lazy = false,
-    branch = "v2.5",
-    import = "nvchad.plugins",
-  },
-
-  { import = "plugins" },
-}, lazy_config)
-
--- load theme
-dofile(vim.g.base46_cache .. "defaults")
-dofile(vim.g.base46_cache .. "statusline")
-
-require "options"
-require "autocmds"
-
-vim.schedule(function()
-  require "mappings"
-end)
 </file>
 
 <file path="config/nvim/.config/nvim/lazy-lock.json">
@@ -4958,504 +5318,6 @@ singleton AppGlyphs 1.0 AppGlyphs.qml
 RibbonDock 1.0 RibbonDock.qml
 </file>
 
-<file path="config/quickshell/.config/quickshell/widgets/wallpaper/WallpaperPicker.qml">
-import QtQuick
-import QtQuick.Effects
-import Quickshell
-import Quickshell.Io
-import Quickshell.Wayland
-import "../../services"
-
-PanelWindow {
-    id: pickerWindow
-
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
-    }
-
-    color: "transparent"
-    visible: true
-    exclusionMode: ExclusionMode.Ignore
-    mask: isOpen ? null : emptyRegion
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "quickshell-wallpaper"
-    WlrLayershell.keyboardFocus: isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-
-    // ---------- Configuración ----------
-    readonly property string home: Quickshell.env("HOME")
-    readonly property string wallpaperDir: home + "/Pictures/Wallpapers"
-    readonly property string setScript: home + "/Projects/arch-niri/scripts/set-wallpaper"
-
-    // Dimensiones (la tarjeta central escala a 1.12x y sobresale visualmente)
-    readonly property real cardWidth: 260
-    readonly property real cardHeight: 156
-    readonly property real centerScale: 1.12
-    readonly property real sideScale: 0.85
-    readonly property real cardSpacing: 26
-    readonly property real targetWidth: (cardWidth * 3) + (cardSpacing * 2) + 56
-    readonly property real targetHeight: (cardHeight * centerScale) + 44
-    readonly property real orbSize: 22
-
-    // ---------- Estado ----------
-    property bool isOpen: false
-    property bool expanded: false
-    property var wallpapers: []
-    property int currentIndex: 0
-
-    // Evita que RibbonDock se active al abrir o cerrar el overlay
-    onIsOpenChanged: {
-        Niri.notifyLauncherState(isOpen);
-    }
-
-    Region { id: emptyRegion }
-
-    // Escanea la carpeta de wallpapers
-    Process {
-        id: scanProc
-        command: [
-            "bash", "-c",
-            "mkdir -p \"$1\" && find -L \"$1\" -maxdepth 2 -type f " +
-            "\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.avif' \\) " +
-            "| sort -V",
-            "bash", pickerWindow.wallpaperDir
-        ]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const lines = this.text.trim().split("\n").filter(l => l.length > 0);
-                pickerWindow.wallpapers = lines;
-
-                const cur = LockState.currentWallpaper;
-                const idx = lines.indexOf(cur);
-                if (idx >= 0) {
-                    pickerWindow.currentIndex = idx;
-                } else if (pickerWindow.currentIndex >= lines.length) {
-                    pickerWindow.currentIndex = 0;
-                }
-            }
-        }
-    }
-
-    // Proceso dedicado para aplicar el wallpaper (awww + symlink + matugen)
-    Process {
-        id: applyProc
-    }
-
-    function openPicker() {
-        if (pickerWindow.isOpen) return;
-        scanProc.running = true;
-        pickerWindow.expanded = false;
-        pickerWindow.isOpen = true;
-        openAnim.restart();
-        keyHandler.forceActiveFocus();
-    }
-
-    function closePicker() {
-        if (!pickerWindow.isOpen) return;
-        openAnim.stop();
-        closeAnim.restart();
-    }
-
-    function move(delta) {
-        const len = wallpapers.length;
-        if (len === 0) return;
-        currentIndex = (currentIndex + delta + len) % len;
-    }
-
-    function applySelected() {
-        if (wallpapers.length === 0) return;
-        const selected = wallpapers[currentIndex];
-        if (!selected) return;
-
-        LockState.currentWallpaper = selected;
-        applyProc.running = false;
-        applyProc.command = ["bash", pickerWindow.setScript, selected];
-        applyProc.running = true;
-        closePicker();
-    }
-
-    // IPC: qs ipc call wallpaper toggle
-    IpcHandler {
-        target: "wallpaper"
-        function toggle(): void {
-            if (!pickerWindow.isOpen) {
-                pickerWindow.openPicker();
-            } else {
-                pickerWindow.closePicker();
-            }
-        }
-    }
-
-    // ---------- Animación de Apertura (Estela difuminada -> círculo nítido -> expansión) ----------
-    SequentialAnimation {
-        id: openAnim
-
-        // Estado inicial: estela estirada y difuminada bajo el borde inferior
-        ScriptAction {
-            script: {
-                morphBox.width = 16;
-                morphBox.height = 54;
-                morphBox.radius = 8;
-                morphBox.motionBlur = 0.85;
-                morphBox.centerOffsetY = (pickerWindow.height / 2) + 40;
-                morphBox.boxOpacity = 0.0;
-                pickerWindow.expanded = false;
-            }
-        }
-
-        // Fase 1: Sube como una estela luminosa con motion blur
-        ParallelAnimation {
-            NumberAnimation {
-                target: morphBox
-                property: "centerOffsetY"
-                to: 0
-                duration: 210
-                easing.type: Easing.OutCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "boxOpacity"
-                to: 1.0
-                duration: 110
-                easing.type: Easing.OutQuad
-            }
-            // Se condensa en el círculo perfecto justo al frenar en el centro
-            NumberAnimation {
-                target: morphBox
-                property: "width"
-                to: pickerWindow.orbSize
-                duration: 210
-                easing.type: Easing.OutBack
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "height"
-                to: pickerWindow.orbSize
-                duration: 210
-                easing.type: Easing.OutBack
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "radius"
-                to: pickerWindow.orbSize / 2
-                duration: 210
-                easing.type: Easing.OutCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "motionBlur"
-                to: 0.0
-                duration: 200
-                easing.type: Easing.OutQuad
-            }
-        }
-
-        // Fase 2: Expansión al rectángulo de 3 wallpapers
-        ParallelAnimation {
-            NumberAnimation {
-                target: morphBox
-                property: "width"
-                to: pickerWindow.targetWidth
-                duration: 230
-                easing.type: Easing.OutExpo
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "height"
-                to: pickerWindow.targetHeight
-                duration: 230
-                easing.type: Easing.OutExpo
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "radius"
-                to: 18
-                duration: 210
-                easing.type: Easing.OutCubic
-            }
-        }
-
-        ScriptAction {
-            script: {
-                pickerWindow.expanded = true;
-                keyHandler.forceActiveFocus();
-            }
-        }
-    }
-
-    // ---------- Animación de Cierre (Círculo -> estela difuminada hacia abajo) ----------
-    SequentialAnimation {
-        id: closeAnim
-
-        ScriptAction {
-            script: pickerWindow.expanded = false
-        }
-
-        ParallelAnimation {
-            NumberAnimation {
-                target: morphBox
-                property: "width"
-                to: pickerWindow.orbSize
-                duration: 160
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "height"
-                to: pickerWindow.orbSize
-                duration: 160
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "radius"
-                to: pickerWindow.orbSize / 2
-                duration: 160
-                easing.type: Easing.InCubic
-            }
-        }
-
-        ParallelAnimation {
-            NumberAnimation {
-                target: morphBox
-                property: "centerOffsetY"
-                to: (pickerWindow.height / 2) + 40
-                duration: 190
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "width"
-                to: 16
-                duration: 190
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "height"
-                to: 54
-                duration: 190
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "radius"
-                to: 8
-                duration: 190
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "motionBlur"
-                to: 0.85
-                duration: 170
-                easing.type: Easing.InQuad
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "boxOpacity"
-                to: 0.0
-                duration: 180
-                easing.type: Easing.InQuad
-            }
-        }
-
-        ScriptAction {
-            script: {
-                morphBox.motionBlur = 0.0;
-                pickerWindow.isOpen = false;
-            }
-        }
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        enabled: pickerWindow.isOpen
-        onClicked: pickerWindow.closePicker()
-    }
-
-    // ---------- Contenedor Morphing ----------
-    Rectangle {
-        id: morphBox
-
-        property real centerOffsetY: 0
-        property real boxOpacity: 0
-        property real motionBlur: 0
-
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: centerOffsetY
-
-        width: pickerWindow.orbSize
-        height: pickerWindow.orbSize
-        radius: pickerWindow.orbSize / 2
-        opacity: boxOpacity
-        visible: pickerWindow.isOpen && boxOpacity > 0.01
-
-        color: pickerWindow.expanded ? Theme.bg : Theme.accent
-        border.width: 2
-        border.color: Theme.accent
-        clip: true
-
-        // Desenfoque de movimiento mientras la cápsula viaja
-        layer.enabled: motionBlur > 0.01
-        layer.effect: MultiEffect {
-            blurEnabled: true
-            blurMax: 28
-            blur: morphBox.motionBlur
-            autoPaddingEnabled: true
-        }
-
-        Behavior on color { ColorAnimation { duration: 160 } }
-
-        MouseArea {
-            anchors.fill: parent
-        }
-
-        Item {
-            id: keyHandler
-            anchors.fill: parent
-            focus: pickerWindow.isOpen
-
-            Keys.onLeftPressed: pickerWindow.move(-1)
-            Keys.onRightPressed: pickerWindow.move(1)
-            Keys.onPressed: event => {
-                if (event.key === Qt.Key_H) {
-                    pickerWindow.move(-1);
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_L) {
-                    pickerWindow.move(1);
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    pickerWindow.applySelected();
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Escape) {
-                    pickerWindow.closePicker();
-                    event.accepted = true;
-                }
-            }
-        }
-
-        // ---------- Cinta infinita centrada (solo imágenes) ----------
-        Row {
-            id: stripRow
-            anchors.centerIn: parent
-            spacing: pickerWindow.cardSpacing
-            visible: pickerWindow.expanded && pickerWindow.wallpapers.length > 0
-            opacity: pickerWindow.expanded ? 1.0 : 0.0
-
-            Behavior on opacity {
-                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-            }
-
-            Repeater {
-                model: [-1, 0, 1]
-
-                delegate: Item {
-                    id: slotItem
-                    required property int modelData
-
-                    readonly property int len: pickerWindow.wallpapers.length
-                    readonly property int wallIdx: len > 0
-                        ? (pickerWindow.currentIndex + modelData + len) % len
-                        : -1
-                    readonly property string wallPath: wallIdx >= 0 ? pickerWindow.wallpapers[wallIdx] : ""
-                    readonly property bool isCenter: modelData === 0
-
-                    width: pickerWindow.cardWidth
-                    height: pickerWindow.cardHeight
-                    z: isCenter ? 2 : 1
-
-                    Item {
-                        id: cardContainer
-                        anchors.centerIn: parent
-                        width: parent.width
-                        height: parent.height
-
-                        scale: slotItem.isCenter ? pickerWindow.centerScale : pickerWindow.sideScale
-                        opacity: slotItem.isCenter ? 1.0 : 0.50
-
-                        Behavior on scale {
-                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-                        }
-                        Behavior on opacity {
-                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-                        }
-
-                        // Fondo de la tarjeta
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 14
-                            color: Theme.card
-                        }
-
-                        // Imagen fuente oculta (se renderiza recortada por MultiEffect)
-                        Image {
-                            id: thumb
-                            anchors.fill: parent
-                            anchors.margins: 2
-                            visible: false
-                            source: slotItem.wallPath !== "" ? "file://" + slotItem.wallPath : ""
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            cache: true
-                            sourceSize.width: 640
-                            sourceSize.height: 384
-                        }
-
-                        // Máscara redondeada para recortar las esquinas de la imagen
-                        Rectangle {
-                            id: roundMask
-                            anchors.fill: thumb
-                            radius: 12
-                            visible: false
-                            layer.enabled: true
-                        }
-
-                        MultiEffect {
-                            anchors.fill: thumb
-                            source: thumb
-                            visible: thumb.status === Image.Ready
-                            maskEnabled: true
-                            maskSource: roundMask
-                            maskThresholdMin: 0.5
-                            maskSpreadAtMin: 1.0
-                        }
-
-                        // Borde exterior encima de la imagen ya recortada
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 14
-                            color: "transparent"
-                            border.width: slotItem.isCenter ? 2 : 1
-                            border.color: slotItem.isCenter ? Theme.accent : Theme.border
-
-                            Behavior on border.color {
-                                ColorAnimation { duration: 150 }
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (slotItem.isCenter) {
-                                    pickerWindow.applySelected();
-                                } else {
-                                    pickerWindow.move(slotItem.modelData);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-</file>
-
 <file path="config/yazi/.config/yazi/plugins/smart-enter.yazi/main.lua">
 --- @sync entry
 return {
@@ -5641,43 +5503,8 @@ bash "$SCRIPTS_DIR/auto-permission-add"
 echo "✓ Dotfiles y scripts actualizados correctamente."
 </file>
 
-<file path="scripts/set-wallpaper">
-#!/usr/bin/env bash
-set -euo pipefail
-
-WALL="${1:-}"
-if [ -z "$WALL" ] || [ ! -f "$WALL" ]; then
-    echo "Uso: set-wallpaper /ruta/a/imagen" >&2
-    exit 1
-fi
-
-ABS_WALL="$(realpath "$WALL")"
-STATE_DIR="$HOME/.local/state/quickshell"
-mkdir -p "$STATE_DIR"
-
-# 1. Actualiza enlace de estado para LockScreen y persistencia
-ln -sf "$ABS_WALL" "$STATE_DIR/current-wallpaper"
-
-# 2. Aplica wallpaper con awww (o swww como respaldo)
-if command -v awww >/dev/null 2>&1; then
-    if ! pgrep -x awww-daemon >/dev/null 2>&1; then
-        awww-daemon --format xrgb >/dev/null 2>&1 &
-        sleep 0.3
-    fi
-    awww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
-elif command -v swww >/dev/null 2>&1; then
-    if ! pgrep -x swww-daemon >/dev/null 2>&1; then
-        swww-daemon --format xrgb >/dev/null 2>&1 &
-        sleep 0.3
-    fi
-    swww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
-fi
-
-# 3. Extrae paleta dinámica con matugen (modo no interactivo)
-if command -v matugen >/dev/null 2>&1; then
-    mkdir -p "$HOME/.config/niri" "$HOME/.local/state/matugen"
-    matugen image "$ABS_WALL" --source-color-index 0
-fi
+<file path=".gitignore">
+config/niri/.config/niri/colors.kdl
 </file>
 
 <file path="config/bash/.bashrc">
@@ -5752,6 +5579,291 @@ function mpv() {
 export PATH="$HOME/.npm-global/bin:$PATH"
 </file>
 
+<file path="config/ghostty/.config/ghostty/config">
+# --- VENTANA Y MÁRGENES ---
+# Elimina la barra de título GTK
+window-decoration = false
+
+# Márgenes internos (en píxeles) para que el texto no quede pegado al borde de Niri
+window-padding-x = 5
+window-padding-y = 5
+
+# Centra el grid de caracteres si sobra espacio al redimensionar la ventana
+window-padding-balance = true
+
+# --- TIPOGRAFÍA ---
+
+# --- ESTILO Y COLORES ---
+# --- ESTILO Y COLORES ---
+config-file = ?~/.local/state/matugen/ghostty-theme
+
+# --- CURSOR Y COMPORTAMIENTO ---
+cursor-style = block
+cursor-style-blink = false
+
+# Oculta el puntero del ratón mientras escribes
+mouse-hide-while-typing = true
+
+# Evita confirmación al cerrar pestañas/ventanas si no hay procesos activos
+confirm-close-surface = false
+</file>
+
+<file path="config/matugen/.config/matugen/config.toml">
+[config]
+reload_apps = true
+
+[templates.quickshell]
+input_path = '~/.config/matugen/templates/quickshell-colors.json'
+output_path = '~/.local/state/quickshell/colors.json'
+
+[templates.niri]
+input_path = '~/.config/matugen/templates/niri-colors.kdl'
+output_path = '~/.local/state/matugen/colors.kdl'
+post_hook = 'ln -sf "$HOME/.local/state/matugen/colors.kdl" "$HOME/.config/niri/colors.kdl"'
+
+[templates.ghostty]
+input_path = '~/.config/matugen/templates/ghostty-theme'
+output_path = '~/.local/state/matugen/ghostty-theme'
+post_hook = 'pkill -USR2 -x ghostty || true'
+
+[templates.nvchad]
+input_path = '~/.config/matugen/templates/nvchad-colors.lua'
+output_path = '~/.local/state/matugen/nvchad-colors.lua'
+
+[templates.mpv]
+input_path = '~/.config/matugen/templates/mpv-colors.conf'
+output_path = '~/.local/state/matugen/mpv-colors.conf'
+
+[templates.btop]
+input_path = '~/.config/matugen/templates/btop.theme'
+output_path = '~/.local/state/matugen/btop.theme'
+post_hook = 'mkdir -p "$HOME/.config/btop/themes" && ln -sf "$HOME/.local/state/matugen/btop.theme" "$HOME/.config/btop/themes/matugen.theme" && pkill -USR2 btop || true'
+
+[templates.yazi]
+input_path = '~/.config/matugen/templates/yazi-theme.toml'
+output_path = '~/.local/state/matugen/yazi-theme.toml'
+post_hook = 'ln -sf "$HOME/.local/state/matugen/yazi-theme.toml" "$HOME/.config/yazi/theme.toml"'
+</file>
+
+<file path="config/mpv/.config/mpv/mpv.conf">
+include=~/.local/state/matugen/mpv-colors.conf
+# ~/.config/mpv/mpv.conf
+# mpv al máximo en Arch Linux (uosc + thumbfast como interfaz)
+
+# --- Base de render ---
+# NOTA: se eliminó "profile=gpu-hq" (obsoleto en mpv recientes); todo está explícito abajo.
+vo=gpu-next
+gpu-api=vulkan
+gpu-context=auto
+# Si Vulkan da problemas en tu GPU: gpu-api=opengl  (o vo=gpu)
+
+# --- Interfaz (uosc reemplaza al OSC por defecto) ---
+osc=no
+osd-bar=no
+border=no
+
+# --- Decodificación ---
+hwdec=auto-safe
+hwdec-codecs=all
+vd-lavc-dr=yes
+
+# --- Comportamiento general ---
+keep-open=yes
+save-position-on-quit=yes
+watch-later-directory=~/.cache/mpv/watch_later
+autofit-larger=90%x90%
+force-window=immediate
+cursor-autohide=1000
+osd-duration=1500
+osd-font-size=32
+terminal=yes
+icc-profile-auto=yes
+
+# --- Idiomas preferidos ---
+alang=spa,es,eng,en,jpn,ja
+slang=spa,es,eng,en
+
+# --- Caché ---
+cache=yes
+demuxer-max-bytes=1024M
+demuxer-max-back-bytes=256M
+cache-secs=120
+prefetch-playlist=yes
+
+# --- Vídeo: máxima calidad de escalado ---
+scale=ewa_lanczossharp
+cscale=ewa_lanczossharp
+dscale=mitchell
+scale-antiring=0.6
+cscale-antiring=0.6
+correct-downscaling=yes
+linear-downscaling=yes
+sigmoid-upscaling=yes
+dither-depth=auto
+dither=fruit
+temporal-dither=no
+blend-subtitles=yes
+
+# --- Movimiento suave (efecto "soap opera": pulsa z para desactivar) ---
+video-sync=display-resample
+interpolation=yes
+tscale=oversample
+
+# --- Color / HDR ---
+target-prim=auto
+target-trc=auto
+tone-mapping=auto
+hdr-compute-peak=auto
+# Monitor HDR real: descomenta
+# target-colorspace-hint=yes
+
+# --- Audio ---
+volume=100
+volume-max=150
+audio-pitch-correction=yes
+audio-normalize-downmix=yes
+audio-channels=auto-safe
+audio-file-auto=fuzzy
+# Receptor AV con passthrough:
+# audio-spdif=ac3,dts,dtshd,eac3,truehd
+
+# --- Subtítulos ---
+sub-auto=fuzzy
+sub-file-paths=~/Subtitles
+sub-font-size=48
+sub-color="#FFFFFF"
+sub-border-color="#000000"
+sub-border-size=2.0
+sub-shadow-offset=0.5
+sub-use-margins=yes
+sub-ass-force-margins=yes
+sub-ass-use-video-data=all
+demuxer-mkv-subtitle-preroll=yes
+
+# --- Capturas ---
+screenshot-directory=~/Pictures/mpv-screenshots
+screenshot-format=png
+screenshot-high-bit-depth=yes
+screenshot-template="%f-%n"
+
+# --- Streaming / yt-dlp ---
+ytdl-format=bestvideo+bestaudio/best
+# Limitar a 4K si va pesado:
+# ytdl-format=bestvideo[height<=?2160]+bestaudio/best
+
+# --- Perfiles automáticos por tipo de archivo ---
+[extension.gif]
+loop-file=inf
+profile-restore=copy
+
+[extension.png]
+loop-file=inf
+video-sync=audio
+interpolation=no
+
+[extension.jpg]
+loop-file=inf
+video-sync=audio
+interpolation=no
+
+[extension.webp]
+loop-file=inf
+video-sync=audio
+interpolation=no
+
+# --- Perfiles manuales (F1-F4) ---
+
+[high-quality]
+profile-desc=Calidad máxima
+hwdec=auto-safe
+hwdec-codecs=all
+scale=ewa_lanczossharp
+cscale=ewa_lanczossharp
+dscale=mitchell
+correct-downscaling=yes
+linear-downscaling=yes
+sigmoid-upscaling=yes
+video-sync=display-resample
+interpolation=yes
+tscale=oversample
+deband=no
+temporal-dither=no
+
+[fast]
+profile-desc=Rendimiento alto, calidad menor
+hwdec=auto-safe
+hwdec-codecs=all
+scale=bilinear
+cscale=bilinear
+dscale=bilinear
+correct-downscaling=no
+linear-downscaling=no
+sigmoid-upscaling=no
+video-sync=audio
+interpolation=no
+deband=no
+
+[anime]
+profile-desc=Calidad alta + deband para anime/animación
+hwdec=auto-safe
+hwdec-codecs=all
+scale=ewa_lanczossharp
+cscale=ewa_lanczossharp
+dscale=mitchell
+correct-downscaling=yes
+linear-downscaling=yes
+sigmoid-upscaling=yes
+video-sync=display-resample
+interpolation=yes
+tscale=oversample
+deband=yes
+deband-iterations=2
+deband-threshold=35
+deband-range=16
+deband-grain=5
+
+[hdr-to-sdr]
+profile-desc=Forzar tonemap a SDR si HDR se ve raro
+hwdec=auto-safe
+hwdec-codecs=all
+scale=ewa_lanczossharp
+cscale=ewa_lanczossharp
+dscale=mitchell
+correct-downscaling=yes
+linear-downscaling=yes
+sigmoid-upscaling=yes
+video-sync=display-resample
+interpolation=yes
+tscale=oversample
+target-prim=bt.709
+target-trc=srgb
+tone-mapping=bt.2390
+</file>
+
+<file path="config/niri/.config/niri/modules/03-layout.kdl">
+layout {
+  // Espaciado
+  gaps 8
+  // Centrado automático de las columnas
+  center-focused-column "never"
+  // Anchos definidos al pulsar mod + R
+  preset-column-widths {
+    proportion 0.33333
+    proportion 0.5
+    proportion 0.66667
+    proportion 1.0
+  }
+  default-column-width { proportion 1.0; }
+  focus-ring {
+    width 2
+  }
+  border {
+    off
+    width 2
+  }
+}
+</file>
+
 <file path="config/niri/.config/niri/modules/05-window-rules.kdl">
 // --- REGLAS GENERALES ---
 
@@ -5817,6 +5929,41 @@ window-rule {
     match app-id="^steam$"
     exclude title="^Steam$"
     open-floating true
+}
+</file>
+
+<file path="config/niri/.config/niri/modules/06-binds-system.kdl">
+binds {
+    // --- AUDIO (PipeWire / WirePlumber) ---
+    // "-l 1.0" evita que el volumen supere el 100% para no distorsionar los altavoces
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05+ -l 1.0"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05-"; }
+    XF86AudioMute        allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
+    XF86AudioMicMute     allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
+
+    // --- BRILLO DE PANTALLA (backlight) ---
+    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+5%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "5%-"; }
+
+    // --- MULTIMEDIA (MPRIS / playerctl) ---
+    XF86AudioPlay  allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioPause allow-when-locked=true { spawn "playerctl" "play-pause"; }
+    XF86AudioStop  allow-when-locked=true { spawn "playerctl" "stop"; }
+    XF86AudioPrev  allow-when-locked=true { spawn "playerctl" "previous"; }
+    XF86AudioNext  allow-when-locked=true { spawn "playerctl" "next"; }
+
+    // --- CAPTURAS DE PANTALLA ---
+    Print      { screenshot; }
+    Ctrl+Print { screenshot-screen; }
+    Alt+Print  { screenshot-window; }
+
+    // --- ENERGÍA Y BLOQUEO DE PANTALLA ---
+    // Apaga el panel al instante (se enciende al mover el ratón o pulsar cualquier tecla)
+    Mod+Shift+P { power-off-monitors; }
+
+    // Salir de Niri (muestra confirmación para evitar cierres accidentales)
+    Mod+Shift+E     { quit; }
+    Ctrl+Alt+Delete { quit; }
 }
 </file>
 
@@ -5934,23 +6081,17 @@ binds {
   }
 </file>
 
-<file path="config/niri/.config/niri/modules/08-startup.kdl">
-// --- 1. ENTORNO WAYLAND Y SYSTEMD ---
-spawn-sh-at-startup "dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP NIRI_SOCKET"
-
-// --- 2. AGENTE DE AUTENTICACIÓN (Polkit) ---
-spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
-
-// --- 3. INTERFAZ PRINCIPAL (Quickshell) ---
-spawn-at-startup "qs"
-
-// --- 4. WALLPAPER DINÁMICO (awww) ---
-spawn-at-startup "awww-daemon" "--format" "xrgb"
-spawn-sh-at-startup "[ -L \"$HOME/.local/state/quickshell/current-wallpaper\" ] && awww img \"$(readlink -f \"$HOME/.local/state/quickshell/current-wallpaper\")\" --transition-type none"
-
-// --- 5. ENERGÍA Y TEMPERATURA DE COLOR ---
-spawn-sh-at-startup "pkill -x swayidle; swayidle -w timeout 300 'qs ipc call lock lock >/dev/null 2>&1 &' timeout 330 'niri msg action power-off-monitors' resume 'niri msg action power-off-monitors' before-sleep 'qs ipc call lock lock >/dev/null 2>&1; sleep 0.4'"
-spawn-at-startup "wlsunset" "-l" "8.4" "-L" "-80.1" "-t" "4000" "-T" "6500"
+<file path="config/niri/.config/niri/config.kdl">
+// Configuración modular de Niri
+include "modules/01-input.kdl"
+include "modules/02-outputs.kdl"
+include "modules/03-layout.kdl"
+//include "modules/04-workspaces.kdl"
+include "modules/05-window-rules.kdl"
+include "modules/06-binds-system.kdl"
+include "modules/07-binds-user.kdl"
+include "modules/08-startup.kdl"
+include "colors.kdl"
 </file>
 
 <file path="config/nvim/.config/nvim/lua/configs/conform.lua">
@@ -5985,6 +6126,97 @@ local servers = {
 }
 
 vim.lsp.enable(servers)
+</file>
+
+<file path="config/nvim/.config/nvim/lua/theme-sync.lua">
+local palette_file = vim.fn.expand("~/.local/state/matugen/nvchad-colors.lua")
+
+local function apply_matugen_theme()
+  if vim.fn.filereadable(palette_file) ~= 1 then
+    return
+  end
+
+  local ok_load, palette = pcall(dofile, palette_file)
+  if not ok_load or type(palette) ~= "table" then
+    return
+  end
+
+  vim.schedule(function()
+    local ok_cfg, nvconfig = pcall(require, "nvconfig")
+    local ok_b46, base46 = pcall(require, "base46")
+    if not ok_cfg or not ok_b46 then
+      return
+    end
+
+    local current = nvconfig.base46.theme
+    nvconfig.base46.changed_themes = nvconfig.base46.changed_themes or {}
+    nvconfig.base46.changed_themes[current] = palette
+    base46.load_all_highlights()
+  end)
+end
+
+-- Aplica los colores al abrir Neovim
+apply_matugen_theme()
+
+-- Vigila cambios en vivo cuando matugen regenera el archivo
+local watcher = vim.uv.new_fs_event()
+if watcher then
+  local function start_watch()
+    if vim.fn.filereadable(palette_file) == 1 then
+      watcher:start(palette_file, {}, function(err)
+        if not err then
+          watcher:stop()
+          apply_matugen_theme()
+          vim.defer_fn(start_watch, 150)
+        end
+      end)
+    else
+      vim.defer_fn(start_watch, 1000)
+    end
+  end
+  start_watch()
+end
+</file>
+
+<file path="config/nvim/.config/nvim/init.lua">
+vim.g.base46_cache = vim.fn.stdpath "data" .. "/base46/"
+vim.g.mapleader = " "
+require("theme-sync")
+
+-- bootstrap lazy and all plugins
+local lazypath = vim.fn.stdpath "data" .. "/lazy/lazy.nvim"
+
+if not vim.uv.fs_stat(lazypath) then
+  local repo = "https://github.com/folke/lazy.nvim.git"
+  vim.fn.system { "git", "clone", "--filter=blob:none", repo, "--branch=stable", lazypath }
+end
+
+vim.opt.rtp:prepend(lazypath)
+
+local lazy_config = require "configs.lazy"
+
+-- load plugins
+require("lazy").setup({
+  {
+    "NvChad/NvChad",
+    lazy = false,
+    branch = "v2.5",
+    import = "nvchad.plugins",
+  },
+
+  { import = "plugins" },
+}, lazy_config)
+
+-- load theme
+dofile(vim.g.base46_cache .. "defaults")
+dofile(vim.g.base46_cache .. "statusline")
+
+require "options"
+require "autocmds"
+
+vim.schedule(function()
+  require "mappings"
+end)
 </file>
 
 <file path="config/quickshell/.config/quickshell/services/qmldir">
@@ -6785,7 +7017,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
+        color: (mouseArea.containsMouse || Niri.activeBarMenu === "wifi") ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -6813,7 +7045,7 @@ Item {
             if (mouse.button === Qt.RightButton) {
                 Network.toggleWifi();
             } else {
-                Network.openManager();
+                Niri.toggleBarMenu("wifi");
             }
         }
     }
@@ -7191,6 +7423,504 @@ PanelWindow {
 }
 </file>
 
+<file path="config/quickshell/.config/quickshell/widgets/wallpaper/WallpaperPicker.qml">
+import QtQuick
+import QtQuick.Effects
+import Quickshell
+import Quickshell.Io
+import Quickshell.Wayland
+import "../../services"
+
+PanelWindow {
+    id: pickerWindow
+
+    anchors {
+        top: true
+        bottom: true
+        left: true
+        right: true
+    }
+
+    color: "transparent"
+    visible: true
+    exclusionMode: ExclusionMode.Ignore
+    mask: isOpen ? null : emptyRegion
+
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "quickshell-wallpaper"
+    WlrLayershell.keyboardFocus: isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+
+    // ---------- Configuración ----------
+    readonly property string home: Quickshell.env("HOME")
+    readonly property string wallpaperDir: home + "/Pictures/Wallpapers"
+    readonly property string setScript: home + "/Projects/arch-niri/scripts/set-wallpaper"
+
+    // Dimensiones (la tarjeta central escala a 1.12x y sobresale visualmente)
+    readonly property real cardWidth: 260
+    readonly property real cardHeight: 156
+    readonly property real centerScale: 1.12
+    readonly property real sideScale: 0.85
+    readonly property real cardSpacing: 26
+    readonly property real targetWidth: (cardWidth * 3) + (cardSpacing * 2) + 56
+    readonly property real targetHeight: (cardHeight * centerScale) + 44
+    readonly property real orbSize: 22
+
+    // ---------- Estado ----------
+    property bool isOpen: false
+    property bool expanded: false
+    property var wallpapers: []
+    property int currentIndex: 0
+
+    // Evita que RibbonDock se active al abrir o cerrar el overlay
+    onIsOpenChanged: {
+        Niri.notifyLauncherState(isOpen);
+    }
+
+    Region { id: emptyRegion }
+
+    // Escanea la carpeta de wallpapers
+    Process {
+        id: scanProc
+        command: [
+            "bash", "-c",
+            "mkdir -p \"$1\" && find -L \"$1\" -maxdepth 2 -type f " +
+            "\\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' -o -iname '*.avif' \\) " +
+            "| sort -V",
+            "bash", pickerWindow.wallpaperDir
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const lines = this.text.trim().split("\n").filter(l => l.length > 0);
+                pickerWindow.wallpapers = lines;
+
+                const cur = LockState.currentWallpaper;
+                const idx = lines.indexOf(cur);
+                if (idx >= 0) {
+                    pickerWindow.currentIndex = idx;
+                } else if (pickerWindow.currentIndex >= lines.length) {
+                    pickerWindow.currentIndex = 0;
+                }
+            }
+        }
+    }
+
+    // Proceso dedicado para aplicar el wallpaper (awww + symlink + matugen)
+    Process {
+        id: applyProc
+    }
+
+    function openPicker() {
+        if (pickerWindow.isOpen) return;
+        scanProc.running = true;
+        pickerWindow.expanded = false;
+        pickerWindow.isOpen = true;
+        openAnim.restart();
+        keyHandler.forceActiveFocus();
+    }
+
+    function closePicker() {
+        if (!pickerWindow.isOpen) return;
+        openAnim.stop();
+        closeAnim.restart();
+    }
+
+    function move(delta) {
+        const len = wallpapers.length;
+        if (len === 0) return;
+        currentIndex = (currentIndex + delta + len) % len;
+    }
+
+    function applySelected() {
+        if (wallpapers.length === 0) return;
+        const selected = wallpapers[currentIndex];
+        if (!selected) return;
+
+        LockState.currentWallpaper = selected;
+        applyProc.running = false;
+        applyProc.command = ["bash", pickerWindow.setScript, selected];
+        applyProc.running = true;
+        closePicker();
+    }
+
+    // IPC: qs ipc call wallpaper toggle
+    IpcHandler {
+        target: "wallpaper"
+        function toggle(): void {
+            if (!pickerWindow.isOpen) {
+                pickerWindow.openPicker();
+            } else {
+                pickerWindow.closePicker();
+            }
+        }
+    }
+
+    // ---------- Animación de Apertura (Estela difuminada -> círculo nítido -> expansión) ----------
+    SequentialAnimation {
+        id: openAnim
+
+        // Estado inicial: estela estirada y difuminada bajo el borde inferior
+        ScriptAction {
+            script: {
+                morphBox.width = 16;
+                morphBox.height = 54;
+                morphBox.radius = 8;
+                morphBox.motionBlur = 0.85;
+                morphBox.centerOffsetY = (pickerWindow.height / 2) + 40;
+                morphBox.boxOpacity = 0.0;
+                pickerWindow.expanded = false;
+            }
+        }
+
+        // Fase 1: Sube como una estela luminosa con motion blur
+        ParallelAnimation {
+            NumberAnimation {
+                target: morphBox
+                property: "centerOffsetY"
+                to: 0
+                duration: 210
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "boxOpacity"
+                to: 1.0
+                duration: 110
+                easing.type: Easing.OutQuad
+            }
+            // Se condensa en el círculo perfecto justo al frenar en el centro
+            NumberAnimation {
+                target: morphBox
+                property: "width"
+                to: pickerWindow.orbSize
+                duration: 210
+                easing.type: Easing.OutBack
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "height"
+                to: pickerWindow.orbSize
+                duration: 210
+                easing.type: Easing.OutBack
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "radius"
+                to: pickerWindow.orbSize / 2
+                duration: 210
+                easing.type: Easing.OutCubic
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "motionBlur"
+                to: 0.0
+                duration: 200
+                easing.type: Easing.OutQuad
+            }
+        }
+
+        // Fase 2: Expansión al rectángulo de 3 wallpapers
+        ParallelAnimation {
+            NumberAnimation {
+                target: morphBox
+                property: "width"
+                to: pickerWindow.targetWidth
+                duration: 230
+                easing.type: Easing.OutExpo
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "height"
+                to: pickerWindow.targetHeight
+                duration: 230
+                easing.type: Easing.OutExpo
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "radius"
+                to: 18
+                duration: 210
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        ScriptAction {
+            script: {
+                pickerWindow.expanded = true;
+                keyHandler.forceActiveFocus();
+            }
+        }
+    }
+
+    // ---------- Animación de Cierre (Círculo -> estela difuminada hacia abajo) ----------
+    SequentialAnimation {
+        id: closeAnim
+
+        ScriptAction {
+            script: pickerWindow.expanded = false
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: morphBox
+                property: "width"
+                to: pickerWindow.orbSize
+                duration: 160
+                easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "height"
+                to: pickerWindow.orbSize
+                duration: 160
+                easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "radius"
+                to: pickerWindow.orbSize / 2
+                duration: 160
+                easing.type: Easing.InCubic
+            }
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: morphBox
+                property: "centerOffsetY"
+                to: (pickerWindow.height / 2) + 40
+                duration: 190
+                easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "width"
+                to: 16
+                duration: 190
+                easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "height"
+                to: 54
+                duration: 190
+                easing.type: Easing.InCubic
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "radius"
+                to: 8
+                duration: 190
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "motionBlur"
+                to: 0.85
+                duration: 170
+                easing.type: Easing.InQuad
+            }
+            NumberAnimation {
+                target: morphBox
+                property: "boxOpacity"
+                to: 0.0
+                duration: 180
+                easing.type: Easing.InQuad
+            }
+        }
+
+        ScriptAction {
+            script: {
+                morphBox.motionBlur = 0.0;
+                pickerWindow.isOpen = false;
+            }
+        }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        enabled: pickerWindow.isOpen
+        onClicked: pickerWindow.closePicker()
+    }
+
+    // ---------- Contenedor Morphing ----------
+    Rectangle {
+        id: morphBox
+
+        property real centerOffsetY: 0
+        property real boxOpacity: 0
+        property real motionBlur: 0
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.verticalCenterOffset: centerOffsetY
+
+        width: pickerWindow.orbSize
+        height: pickerWindow.orbSize
+        radius: pickerWindow.orbSize / 2
+        opacity: boxOpacity
+        visible: pickerWindow.isOpen && boxOpacity > 0.01
+
+        color: pickerWindow.expanded ? Theme.bg : Theme.accent
+        border.width: 2
+        border.color: Theme.accent
+        clip: true
+
+        // Desenfoque de movimiento mientras la cápsula viaja
+        layer.enabled: motionBlur > 0.01
+        layer.effect: MultiEffect {
+            blurEnabled: true
+            blurMax: 28
+            blur: morphBox.motionBlur
+            autoPaddingEnabled: true
+        }
+
+        Behavior on color { ColorAnimation { duration: 160 } }
+
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        Item {
+            id: keyHandler
+            anchors.fill: parent
+            focus: pickerWindow.isOpen
+
+            Keys.onLeftPressed: pickerWindow.move(-1)
+            Keys.onRightPressed: pickerWindow.move(1)
+            Keys.onPressed: event => {
+                if (event.key === Qt.Key_H) {
+                    pickerWindow.move(-1);
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_L) {
+                    pickerWindow.move(1);
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    pickerWindow.applySelected();
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Escape) {
+                    pickerWindow.closePicker();
+                    event.accepted = true;
+                }
+            }
+        }
+
+        // ---------- Cinta infinita centrada (solo imágenes) ----------
+        Row {
+            id: stripRow
+            anchors.centerIn: parent
+            spacing: pickerWindow.cardSpacing
+            visible: pickerWindow.expanded && pickerWindow.wallpapers.length > 0
+            opacity: pickerWindow.expanded ? 1.0 : 0.0
+
+            Behavior on opacity {
+                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            }
+
+            Repeater {
+                model: [-1, 0, 1]
+
+                delegate: Item {
+                    id: slotItem
+                    required property int modelData
+
+                    readonly property int len: pickerWindow.wallpapers.length
+                    readonly property int wallIdx: len > 0
+                        ? (pickerWindow.currentIndex + modelData + len) % len
+                        : -1
+                    readonly property string wallPath: wallIdx >= 0 ? pickerWindow.wallpapers[wallIdx] : ""
+                    readonly property bool isCenter: modelData === 0
+
+                    width: pickerWindow.cardWidth
+                    height: pickerWindow.cardHeight
+                    z: isCenter ? 2 : 1
+
+                    Item {
+                        id: cardContainer
+                        anchors.centerIn: parent
+                        width: parent.width
+                        height: parent.height
+
+                        scale: slotItem.isCenter ? pickerWindow.centerScale : pickerWindow.sideScale
+                        opacity: slotItem.isCenter ? 1.0 : 0.50
+
+                        Behavior on scale {
+                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                        }
+                        Behavior on opacity {
+                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                        }
+
+                        // Fondo de la tarjeta
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 14
+                            color: Theme.card
+                        }
+
+                        // Imagen fuente oculta (se renderiza recortada por MultiEffect)
+                        Image {
+                            id: thumb
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            visible: false
+                            source: slotItem.wallPath !== "" ? "file://" + slotItem.wallPath : ""
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: true
+                            sourceSize.width: 640
+                            sourceSize.height: 384
+                        }
+
+                        // Máscara redondeada para recortar las esquinas de la imagen
+                        Rectangle {
+                            id: roundMask
+                            anchors.fill: thumb
+                            radius: 12
+                            visible: false
+                            layer.enabled: true
+                        }
+
+                        MultiEffect {
+                            anchors.fill: thumb
+                            source: thumb
+                            visible: thumb.status === Image.Ready
+                            maskEnabled: true
+                            maskSource: roundMask
+                            maskThresholdMin: 0.5
+                            maskSpreadAtMin: 1.0
+                        }
+
+                        // Borde exterior encima de la imagen ya recortada
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 14
+                            color: "transparent"
+                            border.width: slotItem.isCenter ? 2 : 1
+                            border.color: slotItem.isCenter ? Theme.accent : Theme.border
+
+                            Behavior on border.color {
+                                ColorAnimation { duration: 150 }
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (slotItem.isCenter) {
+                                    pickerWindow.applySelected();
+                                } else {
+                                    pickerWindow.move(slotItem.modelData);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+</file>
+
 <file path="config/quickshell/.config/quickshell/widgets/workspaces/Workspaces.qml">
 import QtQuick
 import "../../services"
@@ -7275,6 +8005,72 @@ Row {
 }
 </file>
 
+<file path="scripts/set-wallpaper">
+#!/usr/bin/env bash
+set -euo pipefail
+
+WALL="${1:-}"
+if [ -z "$WALL" ] || [ ! -f "$WALL" ]; then
+    echo "Uso: set-wallpaper /ruta/a/imagen" >&2
+    exit 1
+fi
+
+ABS_WALL="$(realpath "$WALL")"
+STATE_DIR="$HOME/.local/state/quickshell"
+mkdir -p "$STATE_DIR"
+
+# 1. Actualiza enlace de estado para LockScreen y persistencia
+ln -sf "$ABS_WALL" "$STATE_DIR/current-wallpaper"
+
+# 2. Aplica wallpaper con awww (o swww como respaldo)
+if command -v awww >/dev/null 2>&1; then
+    if ! pgrep -x awww-daemon >/dev/null 2>&1; then
+        awww-daemon --format xrgb >/dev/null 2>&1 &
+        sleep 0.3
+    fi
+    awww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
+elif command -v swww >/dev/null 2>&1; then
+    if ! pgrep -x swww-daemon >/dev/null 2>&1; then
+        swww-daemon --format xrgb >/dev/null 2>&1 &
+        sleep 0.3
+    fi
+    swww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
+fi
+
+# 3. Extrae paleta dinámica con matugen (con soporte garantizado para WebP/AVIF)
+if command -v matugen >/dev/null 2>&1; then
+    mkdir -p "$HOME/.config/niri" "$HOME/.local/state/matugen"
+    if ! matugen image "$ABS_WALL" --source-color-index 0 2>/dev/null; then
+        TMP_PNG="/tmp/matugen-wallpaper-fallback.png"
+        if command -v dwebp >/dev/null 2>&1; then
+            dwebp "$ABS_WALL" -o "$TMP_PNG" >/dev/null 2>&1
+        elif command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -y -i "$ABS_WALL" -vframes 1 "$TMP_PNG" >/dev/null 2>&1
+        fi
+        [ -f "$TMP_PNG" ] && matugen image "$TMP_PNG" --source-color-index 0
+    fi
+fi
+</file>
+
+<file path="config/niri/.config/niri/modules/08-startup.kdl">
+// --- 1. ENTORNO WAYLAND Y SYSTEMD ---
+spawn-sh-at-startup "dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP NIRI_SOCKET"
+
+// --- 2. AGENTE DE AUTENTICACIÓN (Polkit) ---
+spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
+
+// --- 3. INTERFAZ PRINCIPAL (Quickshell) ---
+spawn-at-startup "qs"
+
+// --- 4. WALLPAPER DINÁMICO (awww) ---
+spawn-at-startup "awww-daemon" "--format" "xrgb"
+spawn-sh-at-startup "[ -L \"$HOME/.local/state/quickshell/current-wallpaper\" ] && awww img \"$(readlink -f \"$HOME/.local/state/quickshell/current-wallpaper\")\" --transition-type none"
+
+// --- 5. ENERGÍA Y TEMPERATURA DE COLOR ---
+spawn-sh-at-startup "pkill -x swayidle; swayidle -w timeout 300 'qs ipc call lock lock >/dev/null 2>&1 &' timeout 330 'niri msg action power-off-monitors' resume 'niri msg action power-off-monitors' before-sleep 'qs ipc call lock lock >/dev/null 2>&1; sleep 0.4'"
+spawn-at-startup "wlsunset" "-l" "8.4" "-L" "-80.1" "-t" "4000" "-T" "6500"
+</file>
+
 <file path="config/quickshell/.config/quickshell/services/Niri.qml">
 pragma Singleton
 import QtQuick
@@ -7305,6 +8101,25 @@ Singleton {
         interval: 350
         repeat: false
         onTriggered: root.suppressDock = false
+      }
+
+    property string activeBarMenu: "" // "" | "wifi" | "bluetooth" | "audio" | "battery"
+
+    function toggleBarMenu(name) {
+        if (root.activeBarMenu === name) {
+            root.activeBarMenu = "";
+            notifyLauncherState(false);
+        } else {
+            root.activeBarMenu = name;
+            notifyLauncherState(true);
+        }
+    }
+
+    function closeBarMenu() {
+        if (root.activeBarMenu !== "") {
+            root.activeBarMenu = "";
+            notifyLauncherState(false);
+        }
     }
 
     function notifyLauncherState(open) {
@@ -7540,9 +8355,11 @@ import "widgets/osd"
 import "widgets/launcher"
 import "widgets/lock"
 import "widgets/wallpaper"
+import "widgets/network"
 
 ShellRoot {
     Bar {}
+    //WifiMenu {}
     RibbonDock {}
     Osd {}
     Launcher {}

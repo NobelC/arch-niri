@@ -27,6 +27,29 @@ Singleton {
         interval: 350
         repeat: false
         onTriggered: root.suppressDock = false
+      }
+
+    property string activeBarMenu: "" // "" | "wifi" | "bluetooth" | "audio" | "battery"
+    property real activeBarDrawerX: 0
+    property real activeBarDrawerWidth: 0
+
+    function toggleBarMenu(name) {
+        if (root.activeBarMenu === name) {
+            root.activeBarMenu = "";
+            root.activeBarDrawerWidth = 0;
+            notifyLauncherState(false);
+        } else {
+            root.activeBarMenu = name;
+            notifyLauncherState(true);
+        }
+    }
+
+    function closeBarMenu() {
+        if (root.activeBarMenu !== "") {
+            root.activeBarMenu = "";
+            root.activeBarDrawerWidth = 0;
+            notifyLauncherState(false);
+        }
     }
 
     function notifyLauncherState(open) {

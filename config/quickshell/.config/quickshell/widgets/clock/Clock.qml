@@ -17,7 +17,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: mouseArea.containsMouse ? Theme.cardAlt : "transparent"
+        color: (mouseArea.containsMouse || Niri.activeBarMenu === "dashboard") ? Theme.cardAlt : "transparent"
 
         Behavior on color {
             ColorAnimation { duration: 150 }
@@ -40,5 +40,7 @@ Item {
         id: mouseArea
         anchors.fill: parent
         hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: Niri.toggleBarMenu("dashboard")
     }
 }
