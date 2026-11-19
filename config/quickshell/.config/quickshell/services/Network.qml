@@ -1,95 +1,50 @@
 pragma Singleton
 import QtQuick
 import Quickshell
-import Quickshell.Io
+import Quickshell.Networking
 
 Singleton {
     id: root
 
-    property string connectionType: "none" // "wifi" | "ethernet" | "none"
-    property string ssid: ""
-    property int signal: 0
-    property bool wifiEnabled: true
+    readonly property bool wifiEnabled: Networking.wifiEnabled !== false
 
-    Process {
-        id: checkNet
-        command: [
-            "bash", "-c",
-            "radio=$(nmcli radio wifi 2>/dev/null); " +
-            "active=$(nmcli -t -f TYPE,STATE,CONNECTION dev 2>/dev/null | awk -F: '$2==\"connected\" {print $1\":\"$3; exit}'); " +
-            "sig=$(nmcli -t -f ACTIVE,SIGNAL dev wifi 2>/dev/null | awk -F: '$1==\"yes\" {print $2; exit}'); " +
-            "echo \"RADIO:${radio:-disabled}\"; " +
-            "echo \"ACTIVE:${active:-none:}\"; " +
-            "echo \"SIGNAL:${sig:-0}\""
-        ]
-        stdout: SplitParser {
-            splitMarker: ""
-            onRead: data => {
-                const lines = data.trim().split("\n");
-                let rEnabled = true;
-                let cType = "none";
-                let cName = "";
-                let sigVal = 0;
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    if (line.startsWith("RADIO:")) {
-                        rEnabled = (line.slice(6).trim() === "enabled");
-                    } else if (line.startsWith("ACTIVE:")) {
-                        const rest = line.slice(7);
-                        const sep = rest.indexOf(":");
-                        if (sep !== -1) {
-                            const rawType = rest.slice(0, sep).trim();
-                            cName = rest.slice(sep + 1).trim();
-                            if (rawType === "802-11-wireless" || rawType === "wifi") {
-                                cType = "wifi";
-                            } else if (rawType === "802-3-ethernet" || rawType === "ethernet") {
-                                cType = "ethernet";
-                            } else {
-                                cType = "none";
-                            }
-                        }
-                    } else if (line.startsWith("SIGNAL:")) {
-                        sigVal = parseInt(line.slice(7).trim()) || 0;
-                    }
-                }
-
-                root.wifiEnabled = rEnabled;
-                root.connectionType = cType;
-                root.ssid = cName;
-                root.signal = sigVal;
-            }
+    readonly property var activeDevice: {
+        const devs = Networking.devices.values;
+        for (let i = 0; i < devs.length; i++) {
+            if (devs[i].connected) return devs[i];
         }
+        return null;
     }
 
-    Timer {
-        interval: 4000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!checkNet.running) checkNet.running = true;
+    readonly property string connectionType: {
+        if (!activeDevice) return "none";
+        if (activeDevice.type === DeviceType.Wifi) return "wifi";
+        return "ethernet";
+    }
+
+    readonly property var activeWifiNet: {
+        if (connectionType !== "wifi" || !activeDevice) return null;
+        const nets = activeDevice.networks.values;
+        for (let i = 0; i < nets.length; i++) {
+            if (nets[i].connected) return nets[i];
         }
+        return null;
     }
 
-    function refresh() {
-        if (!checkNet.running) checkNet.running = true;
-    }
+    readonly property string ssid: activeWifiNet ? activeWifiNet.name : ""
+    readonly property int signal: activeWifiNet ? Math.round(activeWifiNet.signalStrength * 100) : 0
+
+    function refresh() {}
 
     function toggleWifi() {
-        const target = root.wifiEnabled ? "off" : "on";
-        Quickshell.execDetached(["nmcli", "radio", "wifi", target]);
-        refreshTimer.restart();
+        if (Networking.wifiEnabled !== undefined) {
+            Networking.wifiEnabled = !Networking.wifiEnabled;
+        } else {
+            Quickshell.execDetached(["nmcli", "radio", "wifi", wifiEnabled ? "off" : "on"]);
+        }
     }
 
     function openManager() {
-        // Abre nmtui como popup flotante que se cierra solo al perder el foco
         Quickshell.execDetached(["ghostty", "--class=tui.popup", "-e", "nmtui"]);
-    }
-
-    Timer {
-        id: refreshTimer
-        interval: 800
-        onTriggered: root.refresh()
     }
 }

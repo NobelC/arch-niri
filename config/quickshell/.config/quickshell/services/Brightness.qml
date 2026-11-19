@@ -6,47 +6,53 @@ import Quickshell.Io
 Singleton {
     id: root
 
+    property string deviceDir: ""
+    property int maxBrightness: 100
     property int brightness: 0
     property bool initialized: false
 
     signal osdTriggered()
 
     Process {
-        id: checkBrightness
+        id: detectDevice
+        running: true
         command: [
             "bash", "-c",
-            "cur=$(brightnessctl get 2>/dev/null || echo 0); " +
-            "max=$(brightnessctl max 2>/dev/null || echo 100); " +
-            "echo $(( cur * 100 / (max > 0 ? max : 1) ))"
+            "d=$(ls -d /sys/class/backlight/* 2>/dev/null | head -n1); " +
+            "if [ -n \"$d\" ]; then echo \"$d\"; cat \"$d/max_brightness\" 2>/dev/null || echo 100; fi"
         ]
         stdout: StdioCollector {
             onStreamFinished: {
-                const val = parseInt(this.text.trim());
-                if (!isNaN(val)) {
-                    if (root.initialized && val !== root.brightness) {
-                        root.brightness = val;
-                        root.osdTriggered();
-                    } else {
-                        root.brightness = val;
-                        root.initialized = true;
-                    }
+                const lines = this.text.trim().split("\n");
+                if (lines.length >= 2 && lines[0] !== "") {
+                    root.maxBrightness = Math.max(1, parseInt(lines[1]) || 100);
+                    root.deviceDir = lines[0];
                 }
             }
         }
     }
 
-    // Sondeo ligero cada 300ms para detectar pulsaciones físicas de teclas de brillo al instante
-    Timer {
-        interval: 300
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!checkBrightness.running) checkBrightness.running = true;
+    FileView {
+        id: curFile
+        path: root.deviceDir !== "" ? (root.deviceDir + "/brightness") : ""
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            const raw = parseInt(this.text().trim());
+            if (!isNaN(raw)) {
+                const pct = Math.round((raw * 100) / root.maxBrightness);
+                if (root.initialized && pct !== root.brightness) {
+                    root.brightness = pct;
+                    root.osdTriggered();
+                } else {
+                    root.brightness = pct;
+                    root.initialized = true;
+                }
+            }
         }
     }
 
     function refresh() {
-        if (!checkBrightness.running) checkBrightness.running = true;
+        if (root.deviceDir !== "") curFile.reload();
     }
 }

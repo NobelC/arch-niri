@@ -15,7 +15,7 @@ Singleton {
     property int cycleCount: 0
 
     property bool hasPowerProfiles: false
-    property string activeProfile: "balanced" // "power-saver" | "balanced" | "performance"
+    property string activeProfile: "balanced"
 
     readonly property bool charging: status === "Charging"
     readonly property bool full: status === "Full" || (status === "Not charging" && capacity >= 95)
@@ -84,7 +84,7 @@ Singleton {
     }
 
     Timer {
-        interval: 5000
+        interval: Niri.activeBarMenu === "battery" ? 3000 : 15000
         running: true
         repeat: true
         triggeredOnStart: true

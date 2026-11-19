@@ -1,88 +1,64 @@
 pragma Singleton
 import QtQuick
 import Quickshell
-import Quickshell.Io
+import Quickshell.Services.Pipewire
 
 Singleton {
     id: root
 
-    property int volume: 0
-    property bool muted: false
+    readonly property var sink: Pipewire.defaultAudioSink
+    property int volume: sink && sink.audio ? Math.round(sink.audio.volume * 100) : 0
+    property bool muted: sink && sink.audio ? sink.audio.muted : false
     property bool initialized: false
 
     signal osdTriggered()
 
-    Process {
-        id: checkAudio
-        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const trimmed = this.text.trim();
-                const match = trimmed.match(/Volume:\s*([0-9.]+)/);
-                let newVol = root.volume;
-                if (match) {
-                    newVol = Math.round(parseFloat(match[1]) * 100);
-                }
-                const newMuted = trimmed.includes("[MUTED]");
-
-                if (root.initialized && (newVol !== root.volume || newMuted !== root.muted)) {
-                    root.volume = newVol;
-                    root.muted = newMuted;
-                    root.osdTriggered();
-                } else {
-                    root.volume = newVol;
-                    root.muted = newMuted;
-                    root.initialized = true;
-                }
-            }
-        }
+    PwObjectTracker {
+        objects: [Pipewire.defaultAudioSink]
     }
+
+    onVolumeChanged: {
+        if (initialized) osdTriggered();
+    }
+
+    onMutedChanged: {
+        if (initialized) osdTriggered();
+    }
+
+    Component.onCompleted: initTimer.start()
 
     Timer {
-        interval: 300
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!checkAudio.running) checkAudio.running = true;
-        }
+        id: initTimer
+        interval: 400
+        onTriggered: root.initialized = true
     }
 
-    function refresh() {
-        if (!checkAudio.running) checkAudio.running = true;
-    }
+    function refresh() {}
 
     function toggleMute() {
-        Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
-        refreshTimer.restart();
+        if (sink && sink.audio) {
+            sink.audio.muted = !sink.audio.muted;
+        } else {
+            Quickshell.execDetached(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
+        }
     }
 
     function changeVolume(deltaPercent) {
-        const sign = deltaPercent >= 0 ? "+" : "-";
-        const absVal = Math.abs(deltaPercent);
-        Quickshell.execDetached([
-            "wpctl", "set-volume", "-l", "1.0",
-            "@DEFAULT_AUDIO_SINK@", absVal + "%" + sign
-        ]);
-        refreshTimer.restart();
+        if (sink && sink.audio) {
+            sink.audio.muted = false;
+            sink.audio.volume = Math.max(0, Math.min(1, sink.audio.volume + (deltaPercent / 100.0)));
+        } else {
+            const sign = deltaPercent >= 0 ? "+" : "-";
+            Quickshell.execDetached(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", Math.abs(deltaPercent) + "%" + sign]);
+        }
     }
 
     function openMixer() {
         Quickshell.execDetached([
             "bash", "-c",
-            "if command -v wiremix >/dev/null; then " +
-            "  ghostty --class=tui.popup -e wiremix; " +
-            "elif command -v pulsemixer >/dev/null; then " +
-            "  ghostty --class=tui.popup -e pulsemixer; " +
-            "else " +
-            "  ghostty --class=tui.popup -e alsamixer; " +
-            "fi"
+            "if command -v wiremix >/dev/null; then ghostty --class=tui.popup -e wiremix; " +
+            "elif command -v pulsemixer >/dev/null; then ghostty --class=tui.popup -e pulsemixer; " +
+            "else ghostty --class=tui.popup -e alsamixer; fi"
         ]);
-    }
-
-    Timer {
-        id: refreshTimer
-        interval: 80
-        onTriggered: root.refresh()
     }
 }

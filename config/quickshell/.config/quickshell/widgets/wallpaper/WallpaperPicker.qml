@@ -16,7 +16,7 @@ PanelWindow {
     }
 
     color: "transparent"
-    visible: true
+    visible: isOpen
     exclusionMode: ExclusionMode.Ignore
     mask: isOpen ? null : emptyRegion
 
@@ -24,12 +24,10 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-wallpaper"
     WlrLayershell.keyboardFocus: isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    // ---------- Configuración ----------
     readonly property string home: Quickshell.env("HOME")
     readonly property string wallpaperDir: home + "/Pictures/Wallpapers"
     readonly property string setScript: home + "/Projects/arch-niri/scripts/set-wallpaper"
 
-    // Dimensiones (la tarjeta central escala a 1.12x y sobresale visualmente)
     readonly property real cardWidth: 260
     readonly property real cardHeight: 156
     readonly property real centerScale: 1.12
@@ -39,20 +37,17 @@ PanelWindow {
     readonly property real targetHeight: (cardHeight * centerScale) + 44
     readonly property real orbSize: 22
 
-    // ---------- Estado ----------
     property bool isOpen: false
     property bool expanded: false
     property var wallpapers: []
     property int currentIndex: 0
 
-    // Evita que RibbonDock se active al abrir o cerrar el overlay
     onIsOpenChanged: {
         Niri.notifyLauncherState(isOpen);
     }
 
     Region { id: emptyRegion }
 
-    // Escanea la carpeta de wallpapers
     Process {
         id: scanProc
         command: [
@@ -79,7 +74,6 @@ PanelWindow {
         }
     }
 
-    // Proceso dedicado para aplicar el wallpaper (awww + symlink + matugen)
     Process {
         id: applyProc
     }
@@ -118,7 +112,6 @@ PanelWindow {
         closePicker();
     }
 
-    // IPC: qs ipc call wallpaper toggle
     IpcHandler {
         target: "wallpaper"
         function toggle(): void {
@@ -130,7 +123,6 @@ PanelWindow {
         }
     }
 
-    // ---------- Animación de Apertura (Estela difuminada -> círculo nítido -> expansión) ----------
     SequentialAnimation {
         id: openAnim
 
@@ -147,72 +139,18 @@ PanelWindow {
         }
 
         ParallelAnimation {
-            NumberAnimation {
-                target: morphBox
-                property: "centerOffsetY"
-                to: 0
-                duration: 210
-                easing.type: Easing.OutCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "boxOpacity"
-                to: 1.0
-                duration: 110
-                easing.type: Easing.OutQuad
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "width"
-                to: pickerWindow.orbSize
-                duration: 210
-                easing.type: Easing.OutBack
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "height"
-                to: pickerWindow.orbSize
-                duration: 210
-                easing.type: Easing.OutBack
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "radius"
-                to: pickerWindow.orbSize / 2
-                duration: 210
-                easing.type: Easing.OutCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "motionBlur"
-                to: 0.0
-                duration: 200
-                easing.type: Easing.OutQuad
-            }
+            NumberAnimation { target: morphBox; property: "centerOffsetY"; to: 0; duration: 210; easing.type: Easing.OutCubic }
+            NumberAnimation { target: morphBox; property: "boxOpacity"; to: 1.0; duration: 110; easing.type: Easing.OutQuad }
+            NumberAnimation { target: morphBox; property: "width"; to: pickerWindow.orbSize; duration: 210; easing.type: Easing.OutBack }
+            NumberAnimation { target: morphBox; property: "height"; to: pickerWindow.orbSize; duration: 210; easing.type: Easing.OutBack }
+            NumberAnimation { target: morphBox; property: "radius"; to: pickerWindow.orbSize / 2; duration: 210; easing.type: Easing.OutCubic }
+            NumberAnimation { target: morphBox; property: "motionBlur"; to: 0.0; duration: 200; easing.type: Easing.OutQuad }
         }
 
         ParallelAnimation {
-            NumberAnimation {
-                target: morphBox
-                property: "width"
-                to: pickerWindow.targetWidth
-                duration: 230
-                easing.type: Easing.OutExpo
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "height"
-                to: pickerWindow.targetHeight
-                duration: 230
-                easing.type: Easing.OutExpo
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "radius"
-                to: 18
-                duration: 210
-                easing.type: Easing.OutCubic
-            }
+            NumberAnimation { target: morphBox; property: "width"; to: pickerWindow.targetWidth; duration: 230; easing.type: Easing.OutExpo }
+            NumberAnimation { target: morphBox; property: "height"; to: pickerWindow.targetHeight; duration: 230; easing.type: Easing.OutExpo }
+            NumberAnimation { target: morphBox; property: "radius"; to: 18; duration: 210; easing.type: Easing.OutCubic }
         }
 
         ScriptAction {
@@ -223,7 +161,6 @@ PanelWindow {
         }
     }
 
-    // ---------- Animación de Cierre (Círculo -> estela difuminada hacia abajo) ----------
     SequentialAnimation {
         id: closeAnim
 
@@ -232,77 +169,25 @@ PanelWindow {
         }
 
         ParallelAnimation {
-            NumberAnimation {
-                target: morphBox
-                property: "width"
-                to: pickerWindow.orbSize
-                duration: 160
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "height"
-                to: pickerWindow.orbSize
-                duration: 160
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "radius"
-                to: pickerWindow.orbSize / 2
-                duration: 160
-                easing.type: Easing.InCubic
-            }
+            NumberAnimation { target: morphBox; property: "width"; to: pickerWindow.orbSize; duration: 160; easing.type: Easing.InCubic }
+            NumberAnimation { target: morphBox; property: "height"; to: pickerWindow.orbSize; duration: 160; easing.type: Easing.InCubic }
+            NumberAnimation { target: morphBox; property: "radius"; to: pickerWindow.orbSize / 2; duration: 160; easing.type: Easing.InCubic }
         }
 
         ParallelAnimation {
-            NumberAnimation {
-                target: morphBox
-                property: "centerOffsetY"
-                to: (pickerWindow.height / 2) + 40
-                duration: 190
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "width"
-                to: 16
-                duration: 190
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "height"
-                to: 54
-                duration: 190
-                easing.type: Easing.InCubic
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "radius"
-                to: 8
-                duration: 190
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "motionBlur"
-                to: 0.85
-                duration: 170
-                easing.type: Easing.InQuad
-            }
-            NumberAnimation {
-                target: morphBox
-                property: "boxOpacity"
-                to: 0.0
-                duration: 180
-                easing.type: Easing.InQuad
-            }
+            NumberAnimation { target: morphBox; property: "centerOffsetY"; to: (pickerWindow.height / 2) + 40; duration: 190; easing.type: Easing.InCubic }
+            NumberAnimation { target: morphBox; property: "width"; to: 16; duration: 190; easing.type: Easing.InCubic }
+            NumberAnimation { target: morphBox; property: "height"; to: 54; duration: 190; easing.type: Easing.InCubic }
+            NumberAnimation { target: morphBox; property: "radius"; to: 8; duration: 190 }
+            NumberAnimation { target: morphBox; property: "motionBlur"; to: 0.85; duration: 170; easing.type: Easing.InQuad }
+            NumberAnimation { target: morphBox; property: "boxOpacity"; to: 0.0; duration: 180; easing.type: Easing.InQuad }
         }
 
         ScriptAction {
             script: {
                 morphBox.motionBlur = 0.0;
                 pickerWindow.isOpen = false;
+                pickerWindow.wallpapers = [];
             }
         }
     }
@@ -313,7 +198,6 @@ PanelWindow {
         onClicked: pickerWindow.closePicker()
     }
 
-    // ---------- Contenedor Morphing ----------
     Rectangle {
         id: morphBox
 
@@ -374,7 +258,6 @@ PanelWindow {
             }
         }
 
-        // ---------- Carrusel infinito con desplazamiento continuo ----------
         PathView {
             id: carouselView
             anchors.fill: parent
@@ -386,7 +269,6 @@ PanelWindow {
             currentIndex: pickerWindow.currentIndex
             onCurrentIndexChanged: pickerWindow.currentIndex = currentIndex
 
-            // 5 elementos visibles en el recorrido (3 en pantalla + 2 entrando/saliendo suavemente por los bordes)
             pathItemCount: Math.min(5, Math.max(1, pickerWindow.wallpapers.length))
             preferredHighlightBegin: 0.5
             preferredHighlightEnd: 0.5
@@ -403,7 +285,6 @@ PanelWindow {
                 NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
             }
 
-            // Soporte para rueda del ratón / scroll horizontal del touchpad
             WheelHandler {
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: event => {
@@ -423,34 +304,22 @@ PanelWindow {
                 PathAttribute { name: "cardOpacity"; value: 0.0 }
                 PathAttribute { name: "cardZ"; value: 0 }
 
-                PathLine {
-                    x: (carouselView.width / 2) - carouselView.stepX
-                    y: carouselView.height / 2
-                }
+                PathLine { x: (carouselView.width / 2) - carouselView.stepX; y: carouselView.height / 2 }
                 PathAttribute { name: "cardScale"; value: pickerWindow.sideScale }
                 PathAttribute { name: "cardOpacity"; value: 0.55 }
                 PathAttribute { name: "cardZ"; value: 1 }
 
-                PathLine {
-                    x: carouselView.width / 2
-                    y: carouselView.height / 2
-                }
+                PathLine { x: carouselView.width / 2; y: carouselView.height / 2 }
                 PathAttribute { name: "cardScale"; value: pickerWindow.centerScale }
                 PathAttribute { name: "cardOpacity"; value: 1.0 }
                 PathAttribute { name: "cardZ"; value: 3 }
 
-                PathLine {
-                    x: (carouselView.width / 2) + carouselView.stepX
-                    y: carouselView.height / 2
-                }
+                PathLine { x: (carouselView.width / 2) + carouselView.stepX; y: carouselView.height / 2 }
                 PathAttribute { name: "cardScale"; value: pickerWindow.sideScale }
                 PathAttribute { name: "cardOpacity"; value: 0.55 }
                 PathAttribute { name: "cardZ"; value: 1 }
 
-                PathLine {
-                    x: (carouselView.width / 2) + carouselView.spanX
-                    y: carouselView.height / 2
-                }
+                PathLine { x: (carouselView.width / 2) + carouselView.spanX; y: carouselView.height / 2 }
                 PathAttribute { name: "cardScale"; value: 0.72 }
                 PathAttribute { name: "cardOpacity"; value: 0.0 }
                 PathAttribute { name: "cardZ"; value: 0 }
@@ -485,9 +354,9 @@ PanelWindow {
                     source: cardDelegate.modelData !== "" ? "file://" + cardDelegate.modelData : ""
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
-                    cache: true
-                    sourceSize.width: 640
-                    sourceSize.height: 384
+                    cache: false
+                    sourceSize.width: 520
+                    sourceSize.height: 312
                 }
 
                 Rectangle {

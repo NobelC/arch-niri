@@ -16,7 +16,7 @@ PanelWindow {
     }
 
     color: "transparent"
-    visible: true
+    visible: isOpen || dockContainer.opacity > 0.01
     exclusionMode: ExclusionMode.Ignore
     mask: isOpen ? null : emptyRegion
 

@@ -29,7 +29,7 @@ PanelWindow {
     }
 
     color: "transparent"
-    visible: true
+    visible: isOpen || drawerContainer.height > 0.5
     exclusionMode: ExclusionMode.Ignore
     mask: isOpen ? null : emptyRegion
 

@@ -30,7 +30,7 @@ Singleton {
         onTriggered: root.suppressDock = false
     }
 
-    property string activeBarMenu: "" // "" | "wifi" | "bluetooth" | "audio" | "battery" | "dashboard" | "media"
+    property string activeBarMenu: ""
     property real activeBarDrawerX: 0
     property real activeBarDrawerWidth: 0
 
@@ -59,7 +59,6 @@ Singleton {
             dockCooldownTimer.stop();
             root.suppressDock = true;
         } else {
-            // Mantiene el bloqueo 350 ms tras cerrar para ignorar eventos residuales
             root.suppressDock = true;
             dockCooldownTimer.restart();
         }
@@ -100,6 +99,12 @@ Singleton {
             onStreamFinished: {
                 try {
                     const all = JSON.parse(this.text);
+                    for (let i = 0; i < all.length; i++) {
+                        if (all[i].app_id === "tui.popup" && !all[i].is_focused) {
+                            Quickshell.execDetached(["niri", "msg", "action", "close-window", "--id", all[i].id.toString()]);
+                        }
+                    }
+
                     const inWs = all.filter(w => w.workspace_id === root.activeWorkspaceId);
                     inWs.sort((a, b) => {
                         const posA = a.layout && a.layout.pos_in_scrolling_layout ? a.layout.pos_in_scrolling_layout : [0, 0];
@@ -130,14 +135,6 @@ Singleton {
     }
 
     Process {
-        id: closeUnfocusedPopups
-        command: [
-            "bash", "-c",
-            "niri msg -j windows | jq -r '.[] | select(.app_id == \"tui.popup\" and .is_focused == false) | .id' | xargs -r -n1 niri msg action close-window --id"
-        ]
-    }
-
-    Process {
         id: eventStream
         command: ["niri", "msg", "--json", "event-stream"]
         running: true
@@ -148,9 +145,7 @@ Singleton {
                         const ev = JSON.parse(line);
                         if (ev.OverviewOpenedOrClosed !== undefined) {
                             root.overviewOpen = Boolean(ev.OverviewOpenedOrClosed.is_open);
-                            if (root.overviewOpen) {
-                                root.closeBarMenu();
-                            }
+                            if (root.overviewOpen) root.closeBarMenu();
                         }
                     } catch (e) {}
                 } else if (line.includes("KeyboardLayoutsChanged")) {
@@ -169,14 +164,8 @@ Singleton {
                 } else if (line.includes("WorkspaceActivated") || line.includes("WorkspacesChanged")) {
                     if (!fetchWs.running) fetchWs.running = true;
                     root.triggerRibbonActivity();
-                    if (!closeUnfocusedPopups.running) {
-                        closeUnfocusedPopups.running = true;
-                    }
                 } else if (line.includes("WindowFocusChanged")) {
                     if (!fetchWin.running) fetchWin.running = true;
-                    if (!closeUnfocusedPopups.running) {
-                        closeUnfocusedPopups.running = true;
-                    }
                     try {
                         const ev = JSON.parse(line);
                         if (ev.WindowFocusChanged && ev.WindowFocusChanged.id !== null) {
