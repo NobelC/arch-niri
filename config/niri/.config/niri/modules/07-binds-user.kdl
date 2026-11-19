@@ -6,7 +6,7 @@ binds {
     // --- APLICACIONES PRINCIPALES ---
     Mod+Return hotkey-overlay-title="Open terminal" { spawn "ghostty"; }
     Mod+Alt+B hotkey-overlay-title="OpenBrowser" { spawn "firefox"; }
-    Mod+F { spawn "ghostty" "-e" "yazi"; }
+    Mod+F { spawn "ghostty" "-e" "zsh" "-ic" "y; exec zsh"; }
     Mod+W { spawn "ghostty" "-e" "btop";}
 
    // --- QUICKSHELL --
