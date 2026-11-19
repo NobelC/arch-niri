@@ -6,7 +6,6 @@ import "../services"
 import "./arch"
 import "./workspaces"
 import "./clock"
-import "./colortemp"
 import "./battery"
 import "./network"
 import "./bluetooth"
@@ -107,14 +106,13 @@ PanelWindow {
             anchors.centerIn: parent
         }
 
-        // Módulos derechos: Temperatura de color + Batería + Red + Bluetooth + Audio
+        // Módulos derechos: Batería + Red + Bluetooth + Audio
         RowLayout {
             anchors.right: parent.right
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
             spacing: 4
 
-            ColorTemp {}
             Battery {}
             Network {}
             Bluetooth {}

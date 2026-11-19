@@ -7,10 +7,13 @@ spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
 // --- 3. INTERFAZ PRINCIPAL (Quickshell) ---
 spawn-at-startup "qs"
 
-// --- 4. WALLPAPER DINÁMICO (awww en escritorio + swaybg en Overview) ---
+// --- 4. TEMPERATURA DE COLOR AUTOMÁTICA (wlsunset) ---
+spawn-sh-at-startup "pkill -x wlsunset; wlsunset -t 4000 -T 6500 -l 8.4 -L -80.1"
+
+// --- 5. WALLPAPER DINÁMICO (awww en escritorio + swaybg en Overview) ---
 spawn-at-startup "awww-daemon" "--format" "xrgb"
 spawn-sh-at-startup "[ -L \"$HOME/.local/state/quickshell/current-wallpaper\" ] && awww img \"$(readlink -f \"$HOME/.local/state/quickshell/current-wallpaper\")\" --transition-type none"
 spawn-sh-at-startup "[ -f \"$HOME/.local/state/quickshell/overview-wallpaper.jpg\" ] && swaybg -i \"$HOME/.local/state/quickshell/overview-wallpaper.jpg\" -m fill"
 
-// --- 5. ENERGÍA Y BLOQUEO POR INACTIVIDAD ---
+// --- 6. ENERGÍA Y BLOQUEO POR INACTIVIDAD ---
 spawn-sh-at-startup "pkill -x swayidle; swayidle -w timeout 300 'qs ipc call lock lock >/dev/null 2>&1 &' timeout 330 'niri msg action power-off-monitors' resume 'niri msg action power-off-monitors' before-sleep 'qs ipc call lock lock >/dev/null 2>&1; sleep 0.4'"

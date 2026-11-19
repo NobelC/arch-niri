@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DOTFILES_DIR="$HOME/Projects/arch-niri"
+APPS_DIR="$HOME/Applications"
+DESKTOP_DIR="$HOME/.local/share/applications"
+ICONS_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+STATE_FILE="$DOTFILES_DIR/packages/appimages.tsv"
+
+mkdir -p "$APPS_DIR" "$DESKTOP_DIR" "$ICONS_DIR" "$(dirname "$STATE_FILE")"
+touch "$STATE_FILE"
+
+usage() {
+  cat <<'EOF'
+Uso:
+  appimage add <ruta/archivo.AppImage> [nombre_personalizado]
+  appimage update <slug> <ruta/nuevo.AppImage>
+  appimage remove <slug>
+  appimage list
+
+Ejemplos:
+  appimage add ~/Downloads/Obsidian-1.7.7.AppImage
+  appimage update obsidian ~/Downloads/Obsidian-1.8.0.AppImage
+  appimage remove obsidian
+EOF
+}
+
+slugify() {
+  echo "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g'
+}
+
+install_payload() {
+  local src="$1"
+  local slug="$2"
+  local clean_title="$3"
+  local dest="$APPS_DIR/$slug.AppImage"
+  local desktop_file="$DESKTOP_DIR/appimage-$slug.desktop"
+
+  cp -f "$src" "$dest"
+  chmod +x "$dest"
+
+  # Limpia iconos previos de este slug antes de extraer el nuevo
+  rm -f "$ICONS_DIR/appimage-$slug".*
+
+  local tmp_dir
+  tmp_dir="$(mktemp -d)"
+  trap 'rm -rf "$tmp_dir"' RETURN
+
+  (
+    cd "$tmp_dir"
+    "$dest" --appimage-extract "*.desktop" >/dev/null 2>&1 || true
+    "$dest" --appimage-extract ".DirIcon" >/dev/null 2>&1 || true
+    "$dest" --appimage-extract "*.png" >/dev/null 2>&1 || true
+    "$dest" --appimage-extract "*.svg" >/dev/null 2>&1 || true
+  )
+
+  local extracted_icon
+  extracted_icon="$(find -L "$tmp_dir/squashfs-root" -maxdepth 3 -type f \( -iname "*.png" -o -iname "*.svg" \) 2>/dev/null | head -n 1 || true)"
+  local icon_target="application-x-executable"
+  if [[ -n "$extracted_icon" ]]; then
+    local ext="${extracted_icon##*.}"
+    cp -f "$extracted_icon" "$ICONS_DIR/appimage-$slug.$ext"
+    icon_target="$ICONS_DIR/appimage-$slug.$ext"
+  fi
+
+  local extracted_desktop
+  extracted_desktop="$(find "$tmp_dir/squashfs-root" -maxdepth 2 -type f -name "*.desktop" 2>/dev/null | head -n 1 || true)"
+
+  if [[ -n "$extracted_desktop" ]]; then
+    cp -f "$extracted_desktop" "$desktop_file"
+    sed -i -E "s|^Name=.*|Name=$clean_title|" "$desktop_file"
+    sed -i -E "s|^Exec=.*|Exec=\"$dest\" %U|" "$desktop_file"
+    sed -i -E "s|^Icon=.*|Icon=$icon_target|" "$desktop_file"
+    if grep -q '^StartupWMClass=' "$desktop_file"; then
+      sed -i -E "s|^StartupWMClass=.*|StartupWMClass=$slug|" "$desktop_file"
+    else
+      echo "StartupWMClass=$slug" >> "$desktop_file"
+    fi
+  else
+    cat > "$desktop_file" <<EOF
+[Desktop Entry]
+Type=Application
+Name=$clean_title
+Exec="$dest" %U
+Icon=$icon_target
+Categories=Utility;
+StartupWMClass=$slug
+EOF
+  fi
+
+  update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+
+  grep -v -E "^${slug}"$'\t' "$STATE_FILE" > "$STATE_FILE.tmp" || true
+  mv "$STATE_FILE.tmp" "$STATE_FILE"
+  printf "%s\t%s\t%s\n" "$slug" "$clean_title" "$dest" >> "$STATE_FILE"
+}
+
+subcmd="${1:-}"
+case "$subcmd" in
+  add)
+    [[ $# -lt 2 ]] && { usage; exit 1; }
+    src="$(realpath "$2")"
+    [[ -f "$src" ]] || { echo "✗ Archivo no encontrado: $src" >&2; exit 1; }
+
+    base_name="${3:-$(basename "$src" .AppImage)}"
+    clean_title="$(echo "$base_name" | sed -E 's/[-_][0-9]+\.[0-9]+.*$//; s/[-_](x86_64|amd64|linux).*$//I')"
+    slug="$(slugify "$clean_title")"
+
+    install_payload "$src" "$slug" "$clean_title"
+    echo "✓ [$clean_title] ($slug) Integrada en el Launcher -> $APPS_DIR/$slug.AppImage"
+    ;;
+
+  update)
+    [[ $# -lt 3 ]] && { usage; exit 1; }
+    slug="$(slugify "$2")"
+    src="$(realpath "$3")"
+    [[ -f "$src" ]] || { echo "✗ Archivo no encontrado: $src" >&2; exit 1; }
+
+    # Recupera el título registrado previamente en appimages.tsv (o lo deduce si no existía)
+    existing_title="$(awk -F'\t' -v s="$slug" '$1 == s {print $2; exit}' "$STATE_FILE")"
+    if [[ -z "$existing_title" ]]; then
+      echo "⚠ '$slug' no estaba en appimages.tsv; registrando como nueva entrada..."
+      base_name="$(basename "$src" .AppImage)"
+      existing_title="$(echo "$base_name" | sed -E 's/[-_][0-9]+\.[0-9]+.*$//; s/[-_](x86_64|amd64|linux).*$//I')"
+    fi
+
+    install_payload "$src" "$slug" "$existing_title"
+    echo "✓ [$existing_title] ($slug) Actualizada correctamente -> $APPS_DIR/$slug.AppImage"
+    ;;
+
+  remove)
+    [[ $# -lt 2 ]] && { usage; exit 1; }
+    slug="$(slugify "$2")"
+    rm -f "$APPS_DIR/$slug.AppImage" \
+          "$DESKTOP_DIR/appimage-$slug.desktop" \
+          "$ICONS_DIR/appimage-$slug".*
+    grep -v -E "^${slug}"$'\t' "$STATE_FILE" > "$STATE_FILE.tmp" || true
+    mv "$STATE_FILE.tmp" "$STATE_FILE"
+    update-desktop-database "$DESKTOP_DIR" 2>/dev/null || true
+    echo "✓ AppImage '$slug' eliminada."
+    ;;
+
+  list)
+    column -t -s $'\t' "$STATE_FILE" 2>/dev/null || cat "$STATE_FILE"
+    ;;
+
+  *)
+    usage
+    exit 1
+    ;;
+esac

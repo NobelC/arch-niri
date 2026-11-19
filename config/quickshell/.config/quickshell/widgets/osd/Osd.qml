@@ -23,7 +23,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-osd"
 
-    property string mode: "audio" // "audio" | "brightness" | "capslock" | "layout" | "colortemp"
+    property string mode: "audio" // "audio" | "brightness" | "capslock" | "layout"
     property bool isShown: false
 
     readonly property bool isBarMode: mode === "audio" || mode === "brightness"
@@ -31,9 +31,6 @@ PanelWindow {
     readonly property bool isMuted: mode === "audio" && Audio.muted
 
     function osdIcon() {
-        if (mode === "colortemp") {
-            return ColorTemp.icon;
-        }
         if (mode === "brightness") {
             if (Brightness.brightness < 35) return "󰃞";
             if (Brightness.brightness < 70) return "󰃟";
@@ -46,9 +43,6 @@ PanelWindow {
     }
 
     function osdAccentColor() {
-        if (mode === "colortemp") {
-            return ColorTemp.iconColor;
-        }
         if (mode === "layout") {
             return Niri.keyboardLayoutCode === "ES" ? Theme.highlight : Theme.accentSoft;
         }
@@ -61,9 +55,6 @@ PanelWindow {
     }
 
     function osdLabelText() {
-        if (mode === "colortemp") {
-            return ColorTemp.label;
-        }
         if (mode === "layout") {
             return Niri.keyboardLayoutCode === "ES" ? "SPANISH (LATAM)" : "ENGLISH (US)";
         }
@@ -105,11 +96,6 @@ PanelWindow {
         function onKeyboardLayoutOsdTriggered() { osdWindow.showOsd("layout"); }
     }
 
-    Connections {
-        target: ColorTemp
-        function onOsdTriggered() { osdWindow.showOsd("colortemp"); }
-    }
-
     Rectangle {
         id: card
         anchors.fill: parent
@@ -139,7 +125,7 @@ PanelWindow {
             spacing: 12
 
             Text {
-                visible: osdWindow.isBarMode || osdWindow.mode === "colortemp"
+                visible: osdWindow.isBarMode
                 anchors.verticalCenter: parent.verticalCenter
                 text: osdWindow.osdIcon()
                 color: osdWindow.osdAccentColor()

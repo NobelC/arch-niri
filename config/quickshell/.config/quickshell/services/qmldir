@@ -8,4 +8,3 @@ singleton CapsLock 1.0 CapsLock.qml
 singleton LockState 1.0 LockState.qml
 singleton Theme 1.0 Theme.qml
 singleton SystemStats 1.0 SystemStats.qml
-singleton ColorTemp 1.0 ColorTemp.qml

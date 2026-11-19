@@ -59,17 +59,6 @@ Item {
 
             Behavior on color { ColorAnimation { duration: 150 } }
         }
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Battery.capacity + "%"
-            color: Battery.capacity <= 15 && !Battery.charging ? Theme.warn : Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-            font.bold: true
-
-            Behavior on color { ColorAnimation { duration: 150 } }
-        }
     }
 
     MouseArea {
