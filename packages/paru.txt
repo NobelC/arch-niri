@@ -3,6 +3,7 @@ elecwhat-bin
 libtiff5
 localsend-bin
 matugen-bin
+neo-login-git
 pake-cli
 paru-bin
 paru-bin-debug

@@ -81,6 +81,33 @@ if [[ ${#PARU_PKGS[@]} -gt 0 ]]; then
   run_as_user paru -S --needed --noconfirm "${PARU_PKGS[@]}"
 fi
 
+NEO_LOGIN_REPO="https://github.com/Darsh-A/neologin-greetd"
+
+install_neo_login() {
+  echo "-> Instalando y configurando greetd + neo-login..."
+  pacman -S --needed --noconfirm greetd cage noto-fonts-cjk
+
+  if [[ ! -d /usr/share/neo-login ]]; then
+    local tmp_neo="/tmp/neo-login-$REAL_USER"
+    rm -rf "$tmp_neo"
+    run_as_user git clone "${NEO_LOGIN_REPO}.git" "$tmp_neo"
+    (
+      cd "$tmp_neo"
+      sed -i -E "s|https://github\.com/YOURUSER/[^\"' )]+|$NEO_LOGIN_REPO|g" PKGBUILD
+      sed -i 's|source=("git+\$url.git")|source=("neo-login::git+$url.git")|' PKGBUILD
+      run_as_user makepkg -si --noconfirm
+    )
+    rm -rf "$tmp_neo"
+  fi
+
+  mkdir -p /etc/greetd /etc/neo-login
+  cp -f "$DOTFILES_DIR/system/greetd/config.toml" /etc/greetd/config.toml
+  cp -f "$DOTFILES_DIR/system/neo-login/config.json" /etc/neo-login/config.json
+
+  systemctl disable ly.service 2>/dev/null || systemctl disable ly@tty2.service 2>/dev/null || true
+  systemctl enable greetd.service
+}
+
 # 5. Ejecuta auto-stow (enlaza dotfiles + valida y enlaza scripts)
 echo "-> [4/5] Enlazando dotfiles y scripts con auto-stow..."
 run_as_user bash "$SCRIPTS_DIR/auto-stow"
@@ -92,6 +119,8 @@ run_as_user bash "$SCRIPTS_DIR/webapp" sync
 # 7. Instala el hook de pacman para mantener pacman.txt y paru.txt siempre al día
 install_pacman_hook
 run_as_user bash "$SCRIPTS_DIR/sync-packages"
+
+install_neo_login
 
 # 8. Habilita servicios base del sistema
 systemctl enable --now NetworkManager bluetooth 2>/dev/null || true

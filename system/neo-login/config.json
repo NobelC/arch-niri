@@ -1,0 +1,13 @@
+{
+  "user": "auto",
+  "defaultSession": "niri",
+  "inverted": true,
+  "showHost": true,
+  "maxAttempts": 3,
+  "lockoutSeconds": 5,
+  "sessionDirs": ["/usr/share/wayland-sessions"],
+  "animations": {
+    "success": true,
+    "alarm": true
+  }
+}

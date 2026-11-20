@@ -9,6 +9,7 @@ bluetui
 brightnessctl
 btop
 btrfs-progs
+cage
 dockerfile-language-server
 efibootmgr
 eza
@@ -19,6 +20,7 @@ ghostty
 git
 github-cli
 gopls
+greetd
 hunspell-en_us
 hunspell-es_any
 imagemagick
@@ -41,6 +43,7 @@ neovim
 networkmanager
 niri
 noise-suppression-for-voice
+noto-fonts-cjk
 npm
 obsidian
 openssh
