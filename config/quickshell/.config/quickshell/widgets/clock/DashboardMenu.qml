@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 import "../../services"
 import "../"
 
@@ -14,12 +15,36 @@ BarDrawer {
     Item {
         id: root
         width: parent.width
-        implicitHeight: 300
+        implicitHeight: 318
 
         readonly property real gap: 12
         readonly property real colA: 150
         readonly property real colB: 290
         readonly property real colC: width - colA - colB - gap * 2
+
+        readonly property string lidModePath: Quickshell.env("HOME") + "/.local/state/quickshell/lid-mode"
+        property string lidMode: "auto"
+
+        FileView {
+            id: lidModeFile
+            path: root.lidModePath
+            watchChanges: true
+            onFileChanged: reload()
+            onLoaded: {
+                const m = this.text().trim();
+                if (m === "auto" || m === "awake" || m === "suspend")
+                    root.lidMode = m;
+            }
+        }
+
+        function setLidMode(mode) {
+            root.lidMode = mode;
+            Quickshell.execDetached([
+                "bash", "-c",
+                "mkdir -p \"$HOME/.local/state/quickshell\" && printf '%s\\n' \"$1\" > \"$HOME/.local/state/quickshell/lid-mode\"",
+                "bash", mode
+            ]);
+        }
 
         SystemClock {
             id: clock
@@ -363,7 +388,7 @@ BarDrawer {
             }
         }
 
-        // ================= Columna C: información del sistema =================
+        // ================= Columna C: información del sistema + Lid Mode =================
         Rectangle {
             x: root.colA + root.colB + root.gap * 2
             y: 0
@@ -375,7 +400,7 @@ BarDrawer {
             ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 16
-                spacing: 10
+                spacing: 9
 
                 RowLayout {
                     Layout.fillWidth: true
@@ -385,7 +410,7 @@ BarDrawer {
                         text: "\uf303"
                         color: Theme.accent
                         font.family: Theme.fontFamily
-                        font.pixelSize: 34
+                        font.pixelSize: 32
                     }
                     ColumnLayout {
                         Layout.fillWidth: true
@@ -421,7 +446,7 @@ BarDrawer {
                     Layout.fillWidth: true
                     columns: 2
                     columnSpacing: 12
-                    rowSpacing: 12
+                    rowSpacing: 10
 
                     InfoTile {
                         Layout.fillWidth: true
@@ -477,13 +502,60 @@ BarDrawer {
                     color: Theme.cardAlt
                 }
 
-                Text {
+                // Selector de gestión de tapa (Auto / Awake / Suspend)
+                RowLayout {
                     Layout.fillWidth: true
-                    text: SystemStats.cpuModel !== "" ? SystemStats.cpuModel : "--"
-                    elide: Text.ElideRight
-                    color: Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
+                    spacing: 5
+
+                    Repeater {
+                        model: [
+                            { id: "auto",    label: "Auto",    glyph: "󰌢" },
+                            { id: "awake",   label: "Awake",   glyph: "󰅶" },
+                            { id: "suspend", label: "Suspend", glyph: "󰒲" }
+                        ]
+
+                        delegate: Rectangle {
+                            id: lidBtn
+                            required property var modelData
+                            readonly property bool selected: root.lidMode === modelData.id
+
+                            Layout.fillWidth: true
+                            implicitHeight: 28
+                            radius: 8
+                            color: selected ? Theme.accent : (lidHover.containsMouse ? Theme.border : Theme.cardAlt)
+
+                            Behavior on color { ColorAnimation { duration: 140 } }
+
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 4
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: lidBtn.modelData.glyph
+                                    color: lidBtn.selected ? Theme.bg : Theme.accentSoft
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: lidBtn.modelData.label
+                                    color: lidBtn.selected ? Theme.bg : Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.bold: lidBtn.selected
+                                }
+                            }
+
+                            MouseArea {
+                                id: lidHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.setLidMode(lidBtn.modelData.id)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -494,6 +566,7 @@ BarDrawer {
                 if (Niri.activeBarMenu === "dashboard") {
                     cal.reset();
                     SystemStats.refresh();
+                    lidModeFile.reload();
                 }
             }
         }

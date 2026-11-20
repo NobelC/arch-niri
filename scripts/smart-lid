@@ -1,0 +1,125 @@
+#!/bin/bash
+set -euo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
+MODE_FILE="$STATE_DIR/lid-mode"
+INTERNAL_OUTPUT="eDP-1"
+
+mkdir -p "$STATE_DIR"
+[[ -f "$MODE_FILE" ]] || echo "auto" > "$MODE_FILE"
+
+get_mode() {
+  local m
+  m="$(tr -d '[:space:]' < "$MODE_FILE" 2>/dev/null || echo "auto")"
+  case "$m" in
+    auto|awake|suspend) echo "$m" ;;
+    *) echo "auto" ;;
+  esac
+}
+
+is_lid_closed() {
+  grep -qi "closed" /proc/acpi/button/lid/*/state 2>/dev/null
+}
+
+has_external_monitor() {
+  niri msg --json outputs 2>/dev/null \
+    | jq -e --arg int "$INTERNAL_OUTPUT" 'keys | map(select(. != $int)) | length > 0' >/dev/null 2>&1
+}
+
+is_recording_or_music() {
+  # 1. Música activa en Spotify o SimpMusic (insensible a mayúsculas)
+  if command -v playerctl >/dev/null 2>&1; then
+    local p
+    while IFS= read -r p; do
+      [[ -z "$p" ]] && continue
+      if [[ "${p,,}" == *spotify* || "${p,,}" == *simpmusic* ]]; then
+        if [[ "$(playerctl -p "$p" status 2>/dev/null || true)" == "Playing" ]]; then
+          return 0
+        fi
+      fi
+    done < <(playerctl -l 2>/dev/null || true)
+  fi
+
+  # 2. Grabación de pantalla o audio activa
+  if pgrep -x "obs|wf-recorder|wl-screenrec|gpu-screen-recorder|pw-record" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  return 1
+}
+
+lock_and_suspend() {
+  qs ipc call lock lock >/dev/null 2>&1 || true
+  sleep 0.35
+  systemctl suspend
+}
+
+handle_lid_close() {
+  local mode
+  mode="$(get_mode)"
+
+  case "$mode" in
+    suspend)
+      lock_and_suspend
+      ;;
+    awake)
+      if ! has_external_monitor; then
+        qs ipc call lock lock >/dev/null 2>&1 || true
+      fi
+      niri msg output "$INTERNAL_OUTPUT" off >/dev/null 2>&1 || true
+      ;;
+    auto)
+      if has_external_monitor; then
+        # Modo Clamshell: sin bloquear para seguir trabajando en el monitor externo
+        niri msg output "$INTERNAL_OUTPUT" off >/dev/null 2>&1 || true
+      elif is_recording_or_music; then
+        # Música/grabación activa: bloquea la sesión y apaga solo el panel
+        qs ipc call lock lock >/dev/null 2>&1 || true
+        niri msg output "$INTERNAL_OUTPUT" off >/dev/null 2>&1 || true
+      else
+        lock_and_suspend
+      fi
+      ;;
+  esac
+}
+handle_lid_open() {
+  niri msg output "$INTERNAL_OUTPUT" on >/dev/null 2>&1 || true
+}
+
+handle_drm_event() {
+  sleep 0.8
+  if is_lid_closed; then
+    local mode
+    mode="$(get_mode)"
+    if [[ "$mode" == "auto" ]] && ! has_external_monitor && ! is_recording_or_music; then
+      lock_and_suspend
+    fi
+  fi
+}
+
+trap 'kill 0 2>/dev/null || true' EXIT
+
+# Bloquea la acción por defecto de systemd-logind al cerrar la tapa
+systemd-inhibit --what=handle-lid-switch --who="smart-lid" --why="Smart Clamshell Manager" --mode=block sleep infinity >/dev/null 2>&1 &
+
+# Listener 1: Eventos de tapa vía D-Bus
+gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1 2>/dev/null | \
+while IFS= read -r line; do
+  if [[ "$line" == *"LidClosed"* ]]; then
+    if [[ "$line" == *"true"* ]]; then
+      handle_lid_close
+    elif [[ "$line" == *"false"* ]]; then
+      handle_lid_open
+    fi
+  fi
+done &
+
+# Listener 2: Hotplug / desconexión de monitores HDMI/DP vía udev
+udevadm monitor --udev --subsystem-match=drm 2>/dev/null | \
+while IFS= read -r line; do
+  if [[ "$line" == *"change"* && "$line" == *"card"* ]]; then
+    handle_drm_event &
+  fi
+done &
+
+wait
