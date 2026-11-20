@@ -13,7 +13,7 @@ PanelWindow {
         bottom: 15
     }
 
-    implicitWidth: Math.max(190, contentRow.implicitWidth + 36)
+    implicitWidth: Math.min(340, Math.max(190, contentRow.implicitWidth + 36))
     implicitHeight: 42
     color: "transparent"
     visible: true
@@ -23,14 +23,18 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-osd"
 
-    property string mode: "audio" // "audio" | "brightness" | "capslock" | "layout"
+    property string mode: "audio" // "audio" | "audio-device" | "brightness" | "capslock" | "layout"
     property bool isShown: false
+    property string deviceSwitchName: ""
+    property string deviceSwitchIcon: "󰓃"
 
     readonly property bool isBarMode: mode === "audio" || mode === "brightness"
+    readonly property bool isDeviceMode: mode === "audio-device"
     readonly property int currentValue: mode === "audio" ? Audio.volume : Brightness.brightness
     readonly property bool isMuted: mode === "audio" && Audio.muted
 
     function osdIcon() {
+        if (mode === "audio-device") return deviceSwitchIcon;
         if (mode === "brightness") {
             if (Brightness.brightness < 35) return "󰃞";
             if (Brightness.brightness < 70) return "󰃟";
@@ -43,6 +47,7 @@ PanelWindow {
     }
 
     function osdAccentColor() {
+        if (mode === "audio-device") return Theme.accent;
         if (mode === "layout") {
             return Niri.keyboardLayoutCode === "ES" ? Theme.highlight : Theme.accentSoft;
         }
@@ -55,6 +60,7 @@ PanelWindow {
     }
 
     function osdLabelText() {
+        if (mode === "audio-device") return deviceSwitchName;
         if (mode === "layout") {
             return Niri.keyboardLayoutCode === "ES" ? "SPANISH (LATAM)" : "ENGLISH (US)";
         }
@@ -64,9 +70,10 @@ PanelWindow {
         return osdWindow.isMuted ? "Mute" : (osdWindow.currentValue + "%");
     }
 
-    function showOsd(newMode) {
+    function showOsd(newMode, durationMs) {
         osdWindow.mode = newMode;
         osdWindow.isShown = true;
+        hideTimer.interval = durationMs || 1400;
         hideTimer.restart();
     }
 
@@ -78,22 +85,29 @@ PanelWindow {
 
     Connections {
         target: Audio
-        function onOsdTriggered() { osdWindow.showOsd("audio"); }
+        function onOsdTriggered() {
+            osdWindow.showOsd("audio", 1400);
+        }
+        function onSinkSwitched(deviceName, deviceIcon) {
+            osdWindow.deviceSwitchName = deviceName;
+            osdWindow.deviceSwitchIcon = deviceIcon;
+            osdWindow.showOsd("audio-device", 1900);
+        }
     }
 
     Connections {
         target: Brightness
-        function onOsdTriggered() { osdWindow.showOsd("brightness"); }
+        function onOsdTriggered() { osdWindow.showOsd("brightness", 1400); }
     }
 
     Connections {
         target: CapsLock
-        function onOsdTriggered() { osdWindow.showOsd("capslock"); }
+        function onOsdTriggered() { osdWindow.showOsd("capslock", 1400); }
     }
 
     Connections {
         target: Niri
-        function onKeyboardLayoutOsdTriggered() { osdWindow.showOsd("layout"); }
+        function onKeyboardLayoutOsdTriggered() { osdWindow.showOsd("layout", 1400); }
     }
 
     Rectangle {
@@ -122,10 +136,10 @@ PanelWindow {
         Row {
             id: contentRow
             anchors.centerIn: parent
-            spacing: 12
+            spacing: 10
 
             Text {
-                visible: osdWindow.isBarMode
+                visible: osdWindow.isBarMode || osdWindow.isDeviceMode
                 anchors.verticalCenter: parent.verticalCenter
                 text: osdWindow.osdIcon()
                 color: osdWindow.osdAccentColor()
@@ -162,14 +176,15 @@ PanelWindow {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                width: osdWindow.isBarMode ? 34 : implicitWidth
+                width: osdWindow.isBarMode ? 34 : Math.min(implicitWidth, 260)
                 horizontalAlignment: osdWindow.isBarMode ? Text.AlignRight : Text.AlignHCenter
+                elide: Text.ElideRight
                 text: osdWindow.osdLabelText()
-                color: osdWindow.isBarMode ? Theme.text : osdWindow.osdAccentColor()
+                color: (osdWindow.isBarMode || osdWindow.isDeviceMode) ? Theme.text : osdWindow.osdAccentColor()
                 font.family: Theme.fontFamily
                 font.pixelSize: osdWindow.isBarMode ? 11 : 12
                 font.bold: true
-                font.letterSpacing: osdWindow.isBarMode ? 0 : 0.8
+                font.letterSpacing: (osdWindow.isBarMode || osdWindow.isDeviceMode) ? 0 : 0.8
             }
         }
     }

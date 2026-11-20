@@ -22,10 +22,13 @@ gopls
 hunspell-en_us
 hunspell-es_any
 imagemagick
+intel-media-driver
 intel-ucode
 jq
 keepassxc
+less
 libayatana-appindicator
+libva-utils
 limine
 linux
 linux-firmware
@@ -37,7 +40,9 @@ nano
 neovim
 networkmanager
 niri
+noise-suppression-for-voice
 npm
+obsidian
 openssh
 pipewire
 pipewire-pulse
@@ -60,6 +65,7 @@ ttf-jetbrains-mono-nerd
 unzip
 vulkan-intel
 webkit2gtk-4.1
+wiremix
 wireplumber
 wl-clipboard
 wlsunset

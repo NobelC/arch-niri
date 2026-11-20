@@ -8,18 +8,18 @@ import "../"
 BarDrawer {
     id: drawer
     menuName: "audio"
-    panelWidth: 340
+    panelWidth: 350
     rightOffset: 6
     contentHeight: root.implicitHeight
 
-    // Vincula todos los nodos PipeWire necesarios para leer volumen, mute y descripciones en tiempo real
     PwObjectTracker {
         objects: [
             Pipewire.defaultAudioSink,
             Pipewire.defaultAudioSource,
-            ...root.outputDevices,
+            ...root.physicalOutputs,
+            ...root.virtualBuses,
             ...root.inputDevices,
-            ...root.appStreams
+            ...root.rawAppStreams
         ]
     }
 
@@ -28,6 +28,7 @@ BarDrawer {
         width: parent.width
         spacing: 10
 
+        readonly property real maxScrollHeight: 420
         readonly property var sink: Pipewire.defaultAudioSink
         readonly property var source: Pipewire.defaultAudioSource
 
@@ -39,11 +40,21 @@ BarDrawer {
 
         readonly property var allNodes: Pipewire.nodes.values
 
-        readonly property var outputDevices: {
+        readonly property var physicalOutputs: {
             const out = [];
             for (let i = 0; i < allNodes.length; i++) {
                 const n = allNodes[i];
-                if (n && n.audio && n.isSink && !n.isStream)
+                if (n && n.audio && n.isSink && !n.isStream && !Audio.isInternalNode(n) && !Audio.isVirtualBus(n))
+                    out.push(n);
+            }
+            return out;
+        }
+
+        readonly property var virtualBuses: {
+            const out = [];
+            for (let i = 0; i < allNodes.length; i++) {
+                const n = allNodes[i];
+                if (n && n.audio && n.isSink && !n.isStream && Audio.isVirtualBus(n))
                     out.push(n);
             }
             return out;
@@ -53,34 +64,39 @@ BarDrawer {
             const out = [];
             for (let i = 0; i < allNodes.length; i++) {
                 const n = allNodes[i];
-                if (n && n.audio && !n.isSink && !n.isStream)
+                if (n && n.audio && !n.isSink && !n.isStream && !Audio.isInternalNode(n))
                     out.push(n);
             }
             return out;
         }
 
-        readonly property var appStreams: {
+        readonly property var rawAppStreams: {
             const out = [];
             for (let i = 0; i < allNodes.length; i++) {
                 const n = allNodes[i];
-                if (n && n.audio && n.isSink && n.isStream)
+                if (n && n.audio && n.isSink && n.isStream && !Audio.isInternalNode(n))
                     out.push(n);
             }
             return out;
         }
 
-        function nodeLabel(node, fallback) {
-            if (!node) return fallback;
-            if (node.nickname && node.nickname.trim() !== "") return node.nickname;
-            if (node.description && node.description.trim() !== "") return node.description;
-            if (node.name && node.name.trim() !== "") return node.name;
-            return fallback;
-        }
-
-        function appName(node) {
-            if (!node) return "Application";
-            const props = node.properties || {};
-            return props["application.name"] || node.nickname || node.description || node.name || "Application";
+        // Agrupa streams duplicados de una misma aplicación en una sola fila
+        readonly property var groupedApps: {
+            const map = {};
+            const list = [];
+            for (let i = 0; i < rawAppStreams.length; i++) {
+                const n = rawAppStreams[i];
+                const props = n.properties || {};
+                const name = props["application.name"] || n.nickname || n.description || n.name || "Application";
+                const key = name.toLowerCase().trim();
+                if (!map[key]) {
+                    map[key] = { key: key, name: name, nodes: [n], primary: n };
+                    list.push(map[key]);
+                } else {
+                    map[key].nodes.push(n);
+                }
+            }
+            return list;
         }
 
         function sinkIcon() {
@@ -160,7 +176,7 @@ BarDrawer {
             }
         }
 
-        // ---------- Cabecera integrada ----------
+        // ---------- Cabecera fija ----------
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
@@ -193,7 +209,7 @@ BarDrawer {
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: root.nodeLabel(root.sink, "No output device")
+                    text: Audio.nodeLabel(root.sink, "No output device")
                     color: Theme.sub
                     font.family: Theme.fontFamily
                     font.pixelSize: 11
@@ -201,7 +217,6 @@ BarDrawer {
                 }
             }
 
-            // Botón respaldo técnico (wiremix)
             Rectangle {
                 width: 26
                 height: 26
@@ -229,7 +244,7 @@ BarDrawer {
             }
         }
 
-        // ---------- Control Maestro (Salida + Micrófono) ----------
+        // ---------- Control Maestro fijo (Salida + Micrófono) ----------
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: masterCol.implicitHeight + 22
@@ -244,7 +259,6 @@ BarDrawer {
                 anchors.margins: 11
                 spacing: 10
 
-                // Salida principal
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 10
@@ -300,7 +314,6 @@ BarDrawer {
                     }
                 }
 
-                // Micrófono (Entrada principal)
                 RowLayout {
                     visible: root.source !== null
                     Layout.fillWidth: true
@@ -356,195 +369,291 @@ BarDrawer {
             }
         }
 
-        // ---------- Dispositivos de Salida ----------
-        Text {
-            visible: root.outputDevices.length > 0
-            text: "Output devices"
-            color: Theme.sub
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-        }
-
-        ColumnLayout {
-            visible: root.outputDevices.length > 0
+        // ---------- Área desplazable con altura acotada ----------
+        Flickable {
+            id: scrollArea
             Layout.fillWidth: true
-            spacing: 3
+            Layout.preferredHeight: Math.min(scrollCol.implicitHeight, root.maxScrollHeight)
+            contentWidth: width
+            contentHeight: scrollCol.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
 
-            Repeater {
-                model: root.outputDevices
+            ColumnLayout {
+                id: scrollCol
+                width: scrollArea.width
+                spacing: 8
 
-                delegate: Rectangle {
-                    id: outDevRow
-                    required property var modelData
-                    readonly property bool isDefault: root.sink && modelData.id === root.sink.id
-
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    radius: 9
-                    color: isDefault ? Theme.cardAlt : (outHover.containsMouse ? Theme.card : "transparent")
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 10
-                        spacing: 8
-
-                        Text {
-                            text: outDevRow.isDefault ? "" : ""
-                            color: outDevRow.isDefault ? Theme.accent : Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                        }
-
-                        Text {
-                            Layout.fillWidth: true
-                            text: root.nodeLabel(outDevRow.modelData, "Output")
-                            color: outDevRow.isDefault ? Theme.text : Theme.sub
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            font.bold: outDevRow.isDefault
-                            elide: Text.ElideRight
-                        }
-                    }
-
-                    MouseArea {
-                        id: outHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: Pipewire.preferredDefaultAudioSink = outDevRow.modelData
-                    }
+                // Salidas físicas
+                Text {
+                    visible: root.physicalOutputs.length > 0
+                    text: "Output devices"
+                    color: Theme.sub
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
                 }
-            }
-        }
 
-        // ---------- Dispositivos de Entrada ----------
-        Text {
-            visible: root.inputDevices.length > 1
-            text: "Input devices"
-            color: Theme.sub
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-        }
-
-        ColumnLayout {
-            visible: root.inputDevices.length > 1
-            Layout.fillWidth: true
-            spacing: 3
-
-            Repeater {
-                model: root.inputDevices
-
-                delegate: Rectangle {
-                    id: inDevRow
-                    required property var modelData
-                    readonly property bool isDefault: root.source && modelData.id === root.source.id
-
+                ColumnLayout {
+                    visible: root.physicalOutputs.length > 0
                     Layout.fillWidth: true
-                    implicitHeight: 34
-                    radius: 9
-                    color: isDefault ? Theme.cardAlt : (inHover.containsMouse ? Theme.card : "transparent")
+                    spacing: 3
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 10
-                        spacing: 8
+                    Repeater {
+                        model: root.physicalOutputs
 
-                        Text {
-                            text: inDevRow.isDefault ? "" : ""
-                            color: inDevRow.isDefault ? Theme.highlight : Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                        }
+                        delegate: Rectangle {
+                            id: outDevRow
+                            required property var modelData
+                            readonly property bool isDefault: root.sink && modelData.id === root.sink.id
 
-                        Text {
                             Layout.fillWidth: true
-                            text: root.nodeLabel(inDevRow.modelData, "Input")
-                            color: inDevRow.isDefault ? Theme.text : Theme.sub
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            font.bold: inDevRow.isDefault
-                            elide: Text.ElideRight
-                        }
-                    }
+                            implicitHeight: 34
+                            radius: 9
+                            color: isDefault ? Theme.cardAlt : (outHover.containsMouse ? Theme.card : "transparent")
 
-                    MouseArea {
-                        id: inHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: Pipewire.preferredDefaultAudioSource = inDevRow.modelData
-                    }
-                }
-            }
-        }
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
 
-        // ---------- Volumen por Aplicación (Streams activos) ----------
-        Text {
-            visible: root.appStreams.length > 0
-            text: "Applications"
-            color: Theme.sub
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-        }
+                                Text {
+                                    text: Audio.deviceIcon(outDevRow.modelData)
+                                    color: outDevRow.isDefault ? Theme.accent : Theme.muted
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 13
+                                }
 
-        ColumnLayout {
-            visible: root.appStreams.length > 0
-            Layout.fillWidth: true
-            spacing: 6
-
-            Repeater {
-                model: root.appStreams
-
-                delegate: Rectangle {
-                    id: appRow
-                    required property var modelData
-                    readonly property bool appMuted: modelData.audio ? modelData.audio.muted : false
-                    readonly property real appVol: modelData.audio ? modelData.audio.volume : 0
-
-                    Layout.fillWidth: true
-                    implicitHeight: appCol.implicitHeight + 16
-                    radius: 10
-                    color: Theme.card
-
-                    ColumnLayout {
-                        id: appCol
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 8
-                        spacing: 4
-
-                        RowLayout {
-                            Layout.fillWidth: true
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: root.appName(appRow.modelData)
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 11
-                                font.bold: true
-                                elide: Text.ElideRight
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Audio.nodeLabel(outDevRow.modelData, "Output")
+                                    color: outDevRow.isDefault ? Theme.text : Theme.sub
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.bold: outDevRow.isDefault
+                                    elide: Text.ElideRight
+                                }
                             }
 
-                            Text {
-                                text: appRow.appMuted ? "Mute" : Math.round(appRow.appVol * 100) + "%"
-                                color: appRow.appMuted ? Theme.warn : Theme.muted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 10
+                            MouseArea {
+                                id: outHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Pipewire.preferredDefaultAudioSink = outDevRow.modelData
                             }
                         }
+                    }
+                }
 
-                        VolumeSlider {
-                            value: appRow.appVol
-                            muted: appRow.appMuted
-                            fillColor: Theme.accent
-                            onMoved: v => {
-                                if (appRow.modelData.audio) {
-                                    appRow.modelData.audio.muted = false;
-                                    appRow.modelData.audio.volume = v;
+                // Buses virtuales (Stream-Share / Music-Bus)
+                Text {
+                    visible: root.virtualBuses.length > 0
+                    text: "Virtual buses"
+                    color: Theme.sub
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                }
+
+                ColumnLayout {
+                    visible: root.virtualBuses.length > 0
+                    Layout.fillWidth: true
+                    spacing: 3
+
+                    Repeater {
+                        model: root.virtualBuses
+
+                        delegate: Rectangle {
+                            id: busRow
+                            required property var modelData
+                            readonly property bool isDefault: root.sink && modelData.id === root.sink.id
+
+                            Layout.fillWidth: true
+                            implicitHeight: 32
+                            radius: 9
+                            color: isDefault ? Theme.cardAlt : (busHover.containsMouse ? Theme.card : "transparent")
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
+
+                                Text {
+                                    text: "󰐹"
+                                    color: busRow.isDefault ? Theme.highlight : Theme.muted
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 13
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Audio.nodeLabel(busRow.modelData, "Virtual Bus")
+                                    color: busRow.isDefault ? Theme.text : Theme.sub
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.bold: busRow.isDefault
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            MouseArea {
+                                id: busHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Pipewire.preferredDefaultAudioSink = busRow.modelData
+                            }
+                        }
+                    }
+                }
+
+                // Entradas (Micrófonos + RNNoise)
+                Text {
+                    visible: root.inputDevices.length > 1
+                    text: "Input devices"
+                    color: Theme.sub
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                }
+
+                ColumnLayout {
+                    visible: root.inputDevices.length > 1
+                    Layout.fillWidth: true
+                    spacing: 3
+
+                    Repeater {
+                        model: root.inputDevices
+
+                        delegate: Rectangle {
+                            id: inDevRow
+                            required property var modelData
+                            readonly property bool isDefault: root.source && modelData.id === root.source.id
+
+                            Layout.fillWidth: true
+                            implicitHeight: 34
+                            radius: 9
+                            color: isDefault ? Theme.cardAlt : (inHover.containsMouse ? Theme.card : "transparent")
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
+
+                                Text {
+                                    text: inDevRow.isDefault ? "" : ""
+                                    color: inDevRow.isDefault ? Theme.highlight : Theme.muted
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 13
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Audio.nodeLabel(inDevRow.modelData, "Input")
+                                    color: inDevRow.isDefault ? Theme.text : Theme.sub
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.bold: inDevRow.isDefault
+                                    elide: Text.ElideRight
+                                }
+                            }
+
+                            MouseArea {
+                                id: inHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Pipewire.preferredDefaultAudioSource = inDevRow.modelData
+                            }
+                        }
+                    }
+                }
+
+                // Aplicaciones (sin duplicados)
+                Text {
+                    visible: root.groupedApps.length > 0
+                    text: "Applications"
+                    color: Theme.sub
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                }
+
+                ColumnLayout {
+                    visible: root.groupedApps.length > 0
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Repeater {
+                        model: root.groupedApps
+
+                        delegate: Rectangle {
+                            id: appRow
+                            required property var modelData
+                            readonly property var primary: modelData.primary
+                            readonly property bool appMuted: primary && primary.audio ? primary.audio.muted : false
+                            readonly property real appVol: primary && primary.audio ? primary.audio.volume : 0
+
+                            Layout.fillWidth: true
+                            implicitHeight: appCol.implicitHeight + 16
+                            radius: 10
+                            color: Theme.card
+
+                            ColumnLayout {
+                                id: appCol
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: 8
+                                spacing: 4
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: appRow.modelData.name
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        text: appRow.appMuted ? "Mute" : Math.round(appRow.appVol * 100) + "%"
+                                        color: appRow.appMuted ? Theme.warn : Theme.muted
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                const nextMuted = !appRow.appMuted;
+                                                for (let i = 0; i < appRow.modelData.nodes.length; i++) {
+                                                    const n = appRow.modelData.nodes[i];
+                                                    if (n && n.audio) n.audio.muted = nextMuted;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                VolumeSlider {
+                                    value: appRow.appVol
+                                    muted: appRow.appMuted
+                                    fillColor: Theme.accent
+                                    onMoved: v => {
+                                        for (let i = 0; i < appRow.modelData.nodes.length; i++) {
+                                            const n = appRow.modelData.nodes[i];
+                                            if (n && n.audio) {
+                                                n.audio.muted = false;
+                                                n.audio.volume = v;
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
