@@ -1,39 +1,50 @@
-// --- REGLAS GENERALES ---
+// --- 0. REGLAS GENERALES ---
 
-// Aplica esquinas redondeadas, fuerza el modo columna (sin fullscreen ni flotante por defecto) y usa el 100% de ancho
+// Esquinas redondeadas, modo columna (sin fullscreen ni flotante por defecto) y 100% de ancho
 window-rule {
     geometry-corner-radius 10
     clip-to-geometry true
-    open-floating false
     open-fullscreen false
     default-column-width { proportion 1.0; }
 }
 
-// --- REGLAS ESPECÍFICAS ---
+// --- 1. DIÁLOGOS DEL SISTEMA Y SEGURIDAD ---
 
-// Abre utilidades de audio, red y Bluetooth como ventanas flotantes
+// Agente Polkit: flotante y oculto al compartir pantalla
 window-rule {
-    match app-id=r#"^(pavucontrol|nm-connection-editor|blueman-manager)$"#
+    match app-id=r#"^polkit-gnome-authentication-agent-1$"#
     open-floating true
-}
-
-// Mantiene flotantes las ventanas Picture-in-Picture del navegador
-window-rule {
-    match title="^Picture-in-Picture$"
-    open-floating true
-}
-
-// Oculta KeePassXC al compartir pantalla o grabar video
-window-rule {
-    match app-id=r#"^org\.keepassxc\.KeePassXC$"#
     block-out-from "screen-capture"
 }
 
+// Portales de archivos (GTK / GNOME / freedesktop)
 window-rule {
-    match app-id=r#"^mpv$"#
-    open-fullscreen true
+    match app-id=r#"^(xdg-desktop-portal|org\.freedesktop\.impl\.portal\.desktop)\.(gtk|gnome)$"#
+    open-floating true
+    default-column-width { proportion 0.60; }
+    default-window-height { proportion 0.70; }
 }
 
+// Diálogos de abrir/guardar/añadir archivos de cualquier app (Firefox, Vesktop, Electron, etc.)
+window-rule {
+    match title=r#"(?i)^(open|abrir|save|guardar|select|seleccionar|choose|elegir|file upload|subir|añadir|export|import).*"#
+    open-floating true
+    default-column-width { proportion 0.60; }
+    default-window-height { proportion 0.70; }
+}
+
+// KeePassXC: flotante a tamaño medio y blindado contra captura de pantalla
+window-rule {
+    match app-id=r#"^(org\.keepassxc\.KeePassXC|keepassxc)$"#
+    open-floating true
+    default-column-width { proportion 0.55; }
+    default-window-height { proportion 0.65; }
+    block-out-from "screen-capture"
+}
+
+// --- 2. UTILIDADES RÁPIDAS Y DIÁLOGOS DE NAVEGADOR ---
+
+// TUIs lanzadas en ventana emergente (wiremix, bluetui, nmtui)
 window-rule {
     match app-id=r#"^tui\.(float|popup)$"#
     open-floating true
@@ -41,25 +52,53 @@ window-rule {
     default-window-height { proportion 0.60; }
 }
 
+// LocalSend: ventana flotante compacta para transferencias rápidas
 window-rule {
-    match app-id="^(wps|wpp|et|wpspdf)$"
-    open-maximized true
+    match app-id=r#"^(org\.localsend\.localsend_app|localsend)$"#
+    open-floating true
+    default-column-width { proportion 0.45; }
+    default-window-height { proportion 0.60; }
 }
 
+// Picture-in-Picture del navegador
 window-rule {
-    match app-id="^(wps|wpp|et|wpspdf|wpsoffice)$" title=".*(License|Agreement|Settings|Options|Save|Open).*"
+    match title=r#"^Picture-in-Picture$"#
     open-floating true
 }
 
-// Ventana principal de Steam en mosaico / maximizada
+// Ventanas auxiliares de Firefox / Zen (Extensiones, Biblioteca, Guardar, Acerca de)
 window-rule {
-    match app-id="^steam$" title="^Steam$"
+    match app-id=r#"^(firefox|zen|zen-alpha|app\.zen_browser\.zen)$"# title=r#"^(Extension:|Library|About|Save As|Opening ).*"#
+    open-floating true
+}
+
+// --- 4. MULTIMEDIA, OFIMÁTICA Y JUEGOS ---
+
+// mpv siempre en pantalla completa
+window-rule {
+    match app-id=r#"^mpv$"#
+    open-fullscreen true
+}
+
+// WPS Office maximizado, con sus diálogos flotantes
+window-rule {
+    match app-id=r#"^(wps|wpp|et|wpspdf)$"#
     open-maximized true
 }
 
-// Ventanas emergentes de Steam (Amigos, Chat, Ofertas/Anuncios, Ajustes) flotantes
 window-rule {
-    match app-id="^steam$"
-    exclude title="^Steam$"
+    match app-id=r#"^(wps|wpp|et|wpspdf|wpsoffice)$"# title=r#".*(License|Agreement|Settings|Options|Save|Open).*"#
+    open-floating true
+}
+
+// Ventana principal de Steam maximizada; ventanas emergentes flotantes
+window-rule {
+    match app-id=r#"^steam$"# title=r#"^Steam$"#
+    open-maximized true
+}
+
+window-rule {
+    match app-id=r#"^steam$"#
+    exclude title=r#"^Steam$"#
     open-floating true
 }

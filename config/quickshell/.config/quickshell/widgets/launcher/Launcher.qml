@@ -87,21 +87,26 @@ PanelWindow {
         const query = searchText.trim().toLowerCase();
         const counts = launcherWindow.usageCounts;
 
+        const seenNames = {};
         const visible = all.filter(app => {
             if (!app || app.noDisplay) return false;
-            if (query === "") return true;
 
-            const name = (app.name || "").toLowerCase();
-            const generic = (app.genericName || "").toLowerCase();
-            const comment = (app.comment || "").toLowerCase();
-            const execStr = (app.execString || "").toLowerCase();
+            const name = (app.name || "").toLowerCase().trim();
+            if (name !== "" && seenNames[name]) return false;
 
-            return name.includes(query) ||
-                   generic.includes(query) ||
-                   comment.includes(query) ||
-                   execStr.includes(query);
+            if (query !== "") {
+                const generic = (app.genericName || "").toLowerCase();
+                const comment = (app.comment || "").toLowerCase();
+                const execStr = (app.execString || "").toLowerCase();
+                if (!name.includes(query) && !generic.includes(query) &&
+                    !comment.includes(query) && !execStr.includes(query)) {
+                    return false;
+                }
+            }
+
+            if (name !== "") seenNames[name] = true;
+            return true;
         });
-
         visible.sort((a, b) => {
             const nameA = (a.name || "").toLowerCase();
             const nameB = (b.name || "").toLowerCase();

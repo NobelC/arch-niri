@@ -15,6 +15,10 @@ else
   mapfile -t PACKAGES < <(find "$CONFIG_DIR" -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | sort)
 fi
 
+# Asegura archivos dinámicos incluidos por Niri
+mkdir -p "$CONFIG_DIR/niri/.config/niri"
+[[ -f "$CONFIG_DIR/niri/.config/niri/privacy-rules.kdl" ]] || echo "// Reglas dinámicas de Modo Privacidad (inactivo)" > "$CONFIG_DIR/niri/.config/niri/privacy-rules.kdl"
+
 echo "-> Enlazando paquetes desde config/: ${PACKAGES[*]}"
 stow -R -v -d "$CONFIG_DIR" -t "$HOME" "${PACKAGES[@]}"
 

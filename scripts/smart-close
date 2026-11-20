@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+win_json="$(niri msg --json focused-window 2>/dev/null || true)"
+app_id="$(jq -r '.app_id // ""' <<< "$win_json" 2>/dev/null || true)"
+pid="$(jq -r '.pid // ""' <<< "$win_json" 2>/dev/null || true)"
+
+case "${app_id,,}" in
+  *elecwhat*|*simpmusic*)
+    niri msg action close-window >/dev/null 2>&1 || true
+    if [[ -n "$pid" && "$pid" != "null" ]]; then
+      kill "$pid" 2>/dev/null || true
+    fi
+    ;;
+  *)
+    niri msg action close-window
+    ;;
+esac
