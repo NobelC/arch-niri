@@ -11,6 +11,7 @@ import "widgets/audio"
 import "widgets/battery"
 import "widgets/media"
 import "widgets/clock"
+import "widgets/notifications"
 
 ShellRoot {
     Bar {}
@@ -25,4 +26,6 @@ ShellRoot {
     Launcher {}
     LockScreen {}
     WallpaperPicker {}
+    NotificationPopups {}
+    NotificationMenu {}
 }

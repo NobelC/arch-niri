@@ -20,3 +20,4 @@ spawn-sh-at-startup "pkill -x swayidle; swayidle -w timeout 300 'qs ipc call loc
 
 // --- 7. GESTIÓN CONTEXTUAL DE TAPA (Smart Clamshell) ---
 spawn-sh-at-startup "pkill -x smart-lid; smart-lid"
+spawn-sh-at-startup "\"$HOME/.local/bin/smart-idle\""

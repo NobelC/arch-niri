@@ -30,6 +30,7 @@ jq
 keepassxc
 less
 libayatana-appindicator
+libnotify
 libva-utils
 limine
 linux
@@ -62,7 +63,6 @@ steam
 stow
 swaybg
 swayidle
-swaylock
 tree-sitter-cli
 ttf-jetbrains-mono-nerd
 unzip
