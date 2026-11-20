@@ -55,7 +55,7 @@ PanelWindow {
         }
 
         function onRibbonActivity() {
-            if (Niri.launcherOpen || Niri.suppressDock || Niri.overviewOpen) {
+            if (Niri.launcherOpen || Niri.suppressDock || Niri.overviewOpen || Privacy.active) {
                 dockWindow.isShown = false;
                 return;
             }
@@ -73,6 +73,16 @@ PanelWindow {
                 dockWindow.isShown = false;
             }
         }
+      }
+
+    Connections {
+      target: Privacy
+      function onActiveChanged() {
+        if (Privacy.active) {
+            hideTimer.stop();
+            dockWindow.isShown = false;
+        }
+      }
     }
 
     Connections {
@@ -184,13 +194,13 @@ PanelWindow {
             }
         }
 
-        MouseArea {
-            id: hoverArea
-            anchors.fill: parent
-            enabled: dockWindow.isShown && !Niri.launcherOpen && !Niri.suppressDock && !Niri.overviewOpen
-            hoverEnabled: true
-            acceptedButtons: Qt.NoButton
-            onExited: hideTimer.restart()
-        }
+      MouseArea {
+        id: hoverArea
+        anchors.fill: parent
+        enabled: dockWindow.isShown && !Niri.launcherOpen && !Niri.suppressDock && !Niri.overviewOpen && !Privacy.active
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
+        onExited: hideTimer.restart()
+      }    
     }
 }

@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
+STATE_FILE="$STATE_DIR/privacy-mode"
+MIC_STATE_FILE="$STATE_DIR/privacy-prev-mic-muted"
+NIRI_PRIVACY_KDL="$HOME/.config/niri/privacy-rules.kdl"
+
+mkdir -p "$STATE_DIR" "$(dirname "$NIRI_PRIVACY_KDL")"
+[[ -f "$STATE_FILE" ]] || echo "0" > "$STATE_FILE"
+[[ -f "$NIRI_PRIVACY_KDL" ]] || echo "// Reglas dinámicas de Modo Privacidad (inactivo)" > "$NIRI_PRIVACY_KDL"
+
+is_active() {
+  [[ "$(tr -d '[:space:]' < "$STATE_FILE" 2>/dev/null || echo 0)" == "1" ]]
+}
+
+mute_all_mics() {
+  if command -v wpctl >/dev/null 2>&1; then
+    if wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | grep -q "MUTED"; then
+      echo "1" > "$MIC_STATE_FILE"
+    else
+      echo "0" > "$MIC_STATE_FILE"
+    fi
+    wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 1 2>/dev/null || true
+
+    # Silencia cualquier otra fuente de entrada activa en PipeWire
+    if command -v pactl >/dev/null 2>&1; then
+      while IFS= read -r src; do
+        [[ -n "$src" ]] && pactl set-source-mute "$src" 1 2>/dev/null || true
+      done < <(pactl list short sources 2>/dev/null | awk '!/\.monitor/ {print $1}')
+    fi
+  fi
+}
+
+restore_mic() {
+  if command -v wpctl >/dev/null 2>&1; then
+    local prev="1"
+    [[ -f "$MIC_STATE_FILE" ]] && prev="$(tr -d '[:space:]' < "$MIC_STATE_FILE" 2>/dev/null || echo 1)"
+    if [[ "$prev" == "0" ]]; then
+      wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0 2>/dev/null || true
+    fi
+  fi
+}
+
+set_dnd() {
+  local enable="$1"
+  if command -v makoctl >/dev/null 2>&1; then
+    if [[ "$enable" == "1" ]]; then
+      makoctl mode -a do-not-disturb >/dev/null 2>&1 || true
+    else
+      makoctl mode -r do-not-disturb >/dev/null 2>&1 || true
+    fi
+  elif command -v dunstctl >/dev/null 2>&1; then
+    dunstctl set-paused "$( [[ "$enable" == "1" ]] && echo true || echo false )" >/dev/null 2>&1 || true
+  elif command -v swaync-client >/dev/null 2>&1; then
+    swaync-client --dnd-"$( [[ "$enable" == "1" ]] && echo on || echo off )" >/dev/null 2>&1 || true
+  fi
+}
+
+write_niri_rules() {
+  local enable="$1"
+  if [[ "$enable" == "1" ]]; then
+    cat > "$NIRI_PRIVACY_KDL" <<'EOF'
+// Modo Privacidad ACTIVO: oculta mensajería, correo y apps personales al compartir pantalla
+window-rule {
+    match app-id=r#"(?i)(keepass|elecwhat|whatsapp|discord|vesktop|telegram|thunderbird|gmail|outlook|proton|obsidian)"#
+    block-out-from "screen-capture"
+}
+window-rule {
+    match title=r#"(?i)(WhatsApp|Discord|Telegram|Gmail|Outlook|Proton Mail|KeePassXC)"#
+    block-out-from "screen-capture"
+}
+EOF
+  else
+    echo "// Reglas dinámicas de Modo Privacidad (inactivo)" > "$NIRI_PRIVACY_KDL"
+  fi
+}
+
+enable_privacy() {
+  write_niri_rules 1
+  mute_all_mics
+  set_dnd 1
+  echo "1" > "$STATE_FILE"
+}
+
+disable_privacy() {
+  write_niri_rules 0
+  restore_mic
+  set_dnd 0
+  echo "0" > "$STATE_FILE"
+}
+
+case "${1:-toggle}" in
+  on)     enable_privacy ;;
+  off)    disable_privacy ;;
+  toggle) if is_active; then disable_privacy; else enable_privacy; fi ;;
+  status) is_active && echo "on" || echo "off" ;;
+  *)
+    echo "Uso: privacy-mode [toggle|on|off|status]" >&2
+    exit 1
+    ;;
+esac

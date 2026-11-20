@@ -53,6 +53,9 @@ PanelWindow {
         }
         if (mode === "capslock") {
             return CapsLock.active ? Theme.accent : Theme.sub;
+          }
+        if (mode === "privacy") {
+          return Privacy.active ? Theme.warn : Theme.accentSoft;
         }
         if (mode === "brightness") return Theme.highlight;
         if (Audio.muted) return Theme.warn;
@@ -66,6 +69,9 @@ PanelWindow {
         }
         if (mode === "capslock") {
             return CapsLock.active ? "CAPS LOCK ON" : "CAPS LOCK OFF";
+          }
+        if (mode === "privacy") {
+          return Privacy.active ? "PRIVACY MODE ON" : "PRIVACY MODE OFF";
         }
         return osdWindow.isMuted ? "Mute" : (osdWindow.currentValue + "%");
     }
@@ -93,6 +99,11 @@ PanelWindow {
             osdWindow.deviceSwitchIcon = deviceIcon;
             osdWindow.showOsd("audio-device", 1900);
         }
+    }
+    
+    Connections {
+      target: Privacy
+      function onOsdTriggered() { osdWindow.showOsd("privacy", 1700); }
     }
 
     Connections {

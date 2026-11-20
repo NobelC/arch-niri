@@ -16,6 +16,7 @@ binds {
     Mod+M hotkey-overlay-title="Reproductor multimedia" { spawn "qs" "ipc" "call" "media" "toggle"; }
     // Ejemplo para lanzar una función de Bash interactiva en Ghostty (como tu selector de proyectos):
     // Mod+Alt+P hotkey-overlay-title="Selector de proyectos" { spawn "ghostty" "-e" "bash" "-ic" "pp; exec bash"; }
+    Mod+P hotkey-overlay-title="Modo Privacidad / Presentación" { spawn "qs" "ipc" "call" "privacy" "toggle"; }
 
     // --- GESTIÓN BÁSICA DE VENTANAS Y COLUMNAS ---
     Mod+Q repeat=false { close-window; }
