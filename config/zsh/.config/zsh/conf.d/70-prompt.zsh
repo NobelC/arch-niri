@@ -1,10 +1,10 @@
-# ── 70-prompt ─────────────────────────────────────────────────────────────────
-#  ┌─ usuario@equipo │ ~/carpeta │  rama ⇡1 +2 !3 ?1 │ venv
-#  └─ ❯                                              ✘ 127  󰔟 12s  14:32
+# ── 70-prompt (Neo-Brutalista Industrial) ─────────────────────────────────────
+#  ┏━  usuario@equipo  // ~/carpeta //  rama +2 !3 ?1 // [venv]
+#  ┗━ ❯                                         ERR 127  [ 12s ] [ 14:32 ]
 #
-# - Los colores son índices de la paleta ANSI del terminal: cambian solos con el tema de Aether.
+# - Los colores son índices de la paleta ANSI del terminal: cambian solos con el tema.
 # - Git: UNA sola llamada (`git status --porcelain=v2 --branch`) por prompt.
-#     ⇡/⇣ commits por enviar/recibir · = conflictos · + preparados (staged) · ! modificados · ? sin seguimiento · ✔ limpio
+#     ⇡/⇣ commits por enviar/recibir · = conflictos · + preparados · ! modificados · ? sin seguimiento · ✔ limpio
 # - El prompt se construye como texto fijo (sin PROMPT_SUBST): un nombre de rama con `$(...)` no puede ejecutar nada.
 # - Ajustes (ponlos en ~/.config/zsh/local.zsh):
 #     PROMPT_GIT=0              desactiva la info de git (repos enormes)
@@ -54,10 +54,10 @@ _prompt_git() {
   [[ $branch == '(detached)' ]] && branch="${oid[1,7]}"
   _p_esc "$branch"; branch=$REPLY
 
-  local g=" %F{$PROMPT_C_SEP}│%f %F{$PROMPT_C_GIT}"$''" ${branch}%f"
+  local g=" %F{$PROMPT_C_SEP}//%f %F{$PROMPT_C_GIT}%B"$''" ${branch}%b%f"
   (( ahead ))     && g+=" %F{2}⇡${ahead}%f"
   (( behind ))    && g+=" %F{1}⇣${behind}%f"
-  (( conflicts )) && g+=" %F{1}=${conflicts}%f"
+  (( conflicts )) && g+=" %F{1}%B=${conflicts}%b%f"
   (( staged ))    && g+=" %F{2}+${staged}%f"
   (( changed ))   && g+=" %F{3}!${changed}%f"
   (( untracked )) && g+=" %F{6}?${untracked}%f"
@@ -84,20 +84,20 @@ _prompt_precmd() {
   # Segmentos opcionales
   local extra=
   local venv=${VIRTUAL_ENV:t}; [[ -z $venv ]] && venv=$CONDA_DEFAULT_ENV
-  if [[ -n $venv ]]; then _p_esc "$venv"; extra+=" %F{$PROMPT_C_SEP}│%f %F{3}${REPLY}%f"; fi
-  [[ -n $SSH_CONNECTION ]] && extra+=" %F{$PROMPT_C_SEP}│%f %F{1}ssh%f"
+  if [[ -n $venv ]]; then _p_esc "$venv"; extra+=" %F{$PROMPT_C_SEP}//%f %F{3}[${REPLY}]%f"; fi
+  [[ -n $SSH_CONNECTION ]] && extra+=" %F{$PROMPT_C_SEP}//%f %F{1}%B%S SSH %s%b%f"
 
   local arrow user
   if (( _p_rc == 0 )); then arrow="%F{$PROMPT_C_USER}"; else arrow='%F{1}'; fi
-  user="%(!.%F{1}.%F{$PROMPT_C_USER})%n%F{$PROMPT_C_SEP}@%F{$PROMPT_C_HOST}%m%f"
+  user="%(!.%F{1}.%F{$PROMPT_C_USER})%B%S %n@%m %s%b%f"
 
-  PROMPT="%F{$PROMPT_C_SEP}┌─%f ${user} %F{$PROMPT_C_SEP}│%f %F{$PROMPT_C_DIR}%(5~|%-1~/…/%3~|%~)%f${_p_git}${extra}"$'\n'"%F{$PROMPT_C_SEP}└─%f ${arrow}%(!.#.❯)%f "
+  PROMPT="%F{$PROMPT_C_SEP}┏━%f ${user} %F{$PROMPT_C_SEP}//%f %B%F{$PROMPT_C_DIR}%(5~|%-1~/…/%3~|%~)%f%b${_p_git}${extra}"$'\n'"%F{$PROMPT_C_SEP}┗━%f ${arrow}%B%(!.#.❯)%b%f "
 
   # Derecha (en la línea de ❯): error · duración · trabajos en segundo plano · hora
   local r=
-  (( _p_rc != 0 )) && r+="%F{1}✘ ${_p_rc}%f  "
-  [[ -n $_p_dur ]] && r+="%F{3}"$''" ${_p_dur}%f  "
-  r+="%(1j.%F{6}✦%j%f  .)%F{$PROMPT_C_SEP}%T%f"
+  (( _p_rc != 0 )) && r+="%F{1}%B%S ERR ${_p_rc} %s%b%f "
+  [[ -n $_p_dur ]] && r+="%F{3}[ ${_p_dur} ]%f "
+  r+="%(1j.%F{6}[ BG:%j ]%f .)%F{$PROMPT_C_SEP}[ %T ]%f"
   RPROMPT=$r
 
   # Línea en blanco entre prompts (no antes del primero)
@@ -105,7 +105,7 @@ _prompt_precmd() {
   _p_seen=1
 }
 
-PROMPT2="%F{$PROMPT_C_SEP}  ∙%f "
+PROMPT2="%F{$PROMPT_C_SEP}┃ %f"
 ZLE_RPROMPT_INDENT=0
 setopt TRANSIENT_RPROMPT            # la hora/duración desaparecen del historial de pantalla
 

@@ -7,7 +7,9 @@ neo-login-git
 pake-cli
 paru-bin
 paru-bin-debug
+phinger-cursors
 ttf-ms-win11-auto
 vesktop-bin
 wps-office
 wps-office-mime
+xcursor-hackneyed-dark

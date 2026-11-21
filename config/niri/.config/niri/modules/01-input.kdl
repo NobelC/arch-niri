@@ -23,3 +23,14 @@ input{
     accel-speed 0.2
   }
 }
+
+cursor {
+    xcursor-theme "Hackneyed-Dark"
+    xcursor-size 24
+    hide-when-typing
+}
+
+environment {
+    XCURSOR_THEME "Hackneyed-Dark"
+    XCURSOR_SIZE "24"
+}
