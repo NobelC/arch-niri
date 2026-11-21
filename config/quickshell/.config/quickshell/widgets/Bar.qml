@@ -12,7 +12,8 @@ import "./bluetooth"
 import "./audio"
 import "./privacy"
 import "./notifications"
-
+import "./nightlight"
+import "./displays"
 
 PanelWindow {
     id: barWindow
@@ -116,6 +117,8 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 4
 
+            DisplayIcon {}
+            NightLight {}
             NotificationIcon {}
             Privacy {}
             Battery {}

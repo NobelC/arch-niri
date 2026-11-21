@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
+STATE_FILE="$STATE_DIR/night-light"
+
+# Coordenadas para modo automático (horario solar)
+LAT="8.5"
+LON="-80.2"
+DEFAULT_TEMP=4000
+
+mkdir -p "$STATE_DIR"
+[[ -f "$STATE_FILE" ]] || echo "auto:$DEFAULT_TEMP" > "$STATE_FILE"
+
+read_state() {
+  local raw mode temp
+  raw="$(tr -d '[:space:]' < "$STATE_FILE" 2>/dev/null || echo "auto:$DEFAULT_TEMP")"
+  mode="${raw%%:*}"
+  temp="${raw##*:}"
+  [[ "$mode" =~ ^(on|off|auto)$ ]] || mode="auto"
+  [[ "$temp" =~ ^[0-9]+$ ]] || temp="$DEFAULT_TEMP"
+  (( temp < 3000 )) && temp=3000
+  (( temp > 6000 )) && temp=6000
+  echo "$mode $temp"
+}
+
+apply_state() {
+  local mode="$1"
+  local temp="$2"
+
+  echo "${mode}:${temp}" > "$STATE_FILE"
+  pkill -x wlsunset 2>/dev/null || true
+
+  case "$mode" in
+    on)
+      # wlsunset exige T > t; temp+1 fuerza temperatura fija inmediata
+      setsid -f wlsunset -t "$temp" -T "$((temp + 1))" >/dev/null 2>&1
+      ;;
+    auto)
+      setsid -f wlsunset -l "$LAT" -L "$LON" -t "$temp" -T 6500 >/dev/null 2>&1
+      ;;
+    off)
+      ;;
+  esac
+}
+
+read -r cur_mode cur_temp < <(read_state)
+
+case "${1:-toggle}" in
+  toggle)
+    if [[ "$cur_mode" == "off" ]]; then
+      apply_state "on" "$cur_temp"
+    else
+      apply_state "off" "$cur_temp"
+    fi
+    ;;
+  on)
+    apply_state "on" "${2:-$cur_temp}"
+    ;;
+  off)
+    apply_state "off" "$cur_temp"
+    ;;
+  auto)
+    apply_state "auto" "$cur_temp"
+    ;;
+  temp)
+    new_temp="${2:-$cur_temp}"
+    (( new_temp < 3000 )) && new_temp=3000
+    (( new_temp > 6000 )) && new_temp=6000
+    apply_state "on" "$new_temp"
+    ;;
+  step)
+    delta="${2:-250}"
+    new_temp=$(( cur_temp + delta ))
+    (( new_temp < 3000 )) && new_temp=3000
+    (( new_temp > 6000 )) && new_temp=6000
+    apply_state "on" "$new_temp"
+    ;;
+  apply)
+    apply_state "$cur_mode" "$cur_temp"
+    ;;
+  status)
+    echo "${cur_mode}:${cur_temp}"
+    ;;
+  *)
+    echo "Uso: night-light [toggle|on|off|auto|temp <K>|step <±K>|apply|status]" >&2
+    exit 1
+    ;;
+esac

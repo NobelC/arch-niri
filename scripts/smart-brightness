@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+INTERNAL="eDP-1"
+ACTION="${1:-up}"
+STEP="${2:-5}"
+
+focused="$(niri msg --json focused-output 2>/dev/null | jq -r '.name // ""' || true)"
+
+if [[ -z "$focused" || "$focused" == "$INTERNAL" ]]; then
+  if [[ "$ACTION" == "up" ]]; then
+    brightnessctl --class=backlight set "+${STEP}%" >/dev/null 2>&1
+  else
+    brightnessctl --class=backlight set "${STEP}%-" >/dev/null 2>&1
+  fi
+else
+  # Monitor externo vía DDC/CI (evita colisiones si se pulsa rápido)
+  LOCK="/tmp/ddcutil-lock-$UID"
+  exec 9>"$LOCK"
+  flock -n 9 || exit 0
+
+  if [[ "$ACTION" == "up" ]]; then
+    ddcutil setvcp 10 + "$STEP" --noverify >/dev/null 2>&1 || true
+  else
+    ddcutil setvcp 10 - "$STEP" --noverify >/dev/null 2>&1 || true
+  fi
+fi

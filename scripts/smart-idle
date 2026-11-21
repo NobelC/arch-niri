@@ -1,125 +1,157 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
-MODE_FILE="$STATE_DIR/lid-mode"
-INTERNAL_OUTPUT="eDP-1"
+LID_MODE_FILE="$STATE_DIR/lid-mode"
+DIM_FLAG="/tmp/smart-idle-dimmed-$UID"
 
-mkdir -p "$STATE_DIR"
-[[ -f "$MODE_FILE" ]] || echo "auto" > "$MODE_FILE"
+# --- Tiempos en segundos ---
+# Batería: 2m atenuar -> 3m apagar pantalla -> 4m bloquear -> 10m suspender
+BAT_DIM=120
+BAT_DPMS=180
+BAT_LOCK=240
+BAT_SUSPEND=600
 
-get_mode() {
-  local m
-  m="$(tr -d '[:space:]' < "$MODE_FILE" 2>/dev/null || echo "auto")"
-  case "$m" in
-    auto|awake|suspend) echo "$m" ;;
-    *) echo "auto" ;;
-  esac
+# Corriente (AC): 5m atenuar -> 8m apagar pantalla -> 10m bloquear (sin suspensión automática)
+AC_DIM=300
+AC_DPMS=480
+AC_LOCK=600
+
+is_awake_mode() {
+  [[ -f "$LID_MODE_FILE" ]] && [[ "$(tr -d '[:space:]' < "$LID_MODE_FILE" 2>/dev/null)" == "awake" ]]
 }
 
-is_lid_closed() {
-  grep -qi "closed" /proc/acpi/button/lid/*/state 2>/dev/null
+on_battery() {
+  local bat
+  for bat in /sys/class/power_supply/BAT*/status; do
+    [[ -f "$bat" ]] || continue
+    if grep -qi "Discharging" "$bat" 2>/dev/null; then
+      return 0
+    fi
+  done
+  return 1
 }
 
-has_external_monitor() {
-  niri msg --json outputs 2>/dev/null \
-    | jq -e --arg int "$INTERNAL_OUTPUT" 'keys | map(select(. != $int)) | length > 0' >/dev/null 2>&1
-}
-
-is_recording_or_music() {
-  # 1. Música activa en Spotify o SimpMusic (insensible a mayúsculas)
-  if command -v playerctl >/dev/null 2>&1; then
-    local p
-    while IFS= read -r p; do
-      [[ -z "$p" ]] && continue
-      if [[ "${p,,}" == *spotify* || "${p,,}" == *simpmusic* ]]; then
-        if [[ "$(playerctl -p "$p" status 2>/dev/null || true)" == "Playing" ]]; then
-          return 0
-        fi
-      fi
-    done < <(playerctl -l 2>/dev/null || true)
+is_inhibited() {
+  # 1. Modo "Awake" activo desde DashboardMenu
+  if is_awake_mode; then
+    return 0
   fi
 
-  # 2. Grabación de pantalla o audio activa
-  if pgrep -x "obs|wf-recorder|wl-screenrec|gpu-screen-recorder|pw-record" >/dev/null 2>&1; then
+  # 2. Reproducción multimedia activa (MPRIS: navegador, mpv, Spotify, SimpMusic)
+  if command -v playerctl >/dev/null 2>&1; then
+    if playerctl -a status 2>/dev/null | grep -qx "Playing"; then
+      return 0
+    fi
+  fi
+
+  # 3. Grabaciones, llamadas o compilaciones pesadas en curso
+  if pgrep -x "obs|wf-recorder|wl-screenrec|gpu-screen-recorder|pw-record|makepkg|cargo|rustc|cc1plus|clang|ninja" >/dev/null 2>&1; then
     return 0
   fi
 
   return 1
 }
 
-lock_and_suspend() {
+do_dim() {
+  is_inhibited && exit 0
+  if [[ ! -f "$DIM_FLAG" ]] && command -v brightnessctl >/dev/null 2>&1; then
+    brightnessctl -s >/dev/null 2>&1 || true
+    brightnessctl set 10% >/dev/null 2>&1 || true
+    touch "$DIM_FLAG"
+  fi
+}
+
+do_undim() {
+  if [[ -f "$DIM_FLAG" ]] && command -v brightnessctl >/dev/null 2>&1; then
+    brightnessctl -r >/dev/null 2>&1 || true
+    rm -f "$DIM_FLAG"
+  fi
+}
+
+do_dpms_off() {
+  is_inhibited && exit 0
+  niri msg action power-off-monitors >/dev/null 2>&1 || true
+}
+
+do_dpms_on() {
+  niri msg action power-on-monitors >/dev/null 2>&1 || true
+  do_undim
+}
+
+do_lock() {
+  is_inhibited && exit 0
+  qs ipc call lock lock >/dev/null 2>&1 || true
+}
+
+do_suspend() {
+  is_inhibited && exit 0
+  on_battery || exit 0
   qs ipc call lock lock >/dev/null 2>&1 || true
   sleep 0.35
   systemctl suspend
 }
 
-handle_lid_close() {
-  local mode
-  mode="$(get_mode)"
+start_swayidle() {
+  pkill -x swayidle 2>/dev/null || true
 
-  case "$mode" in
-    suspend)
-      lock_and_suspend
-      ;;
-    awake)
-      if ! has_external_monitor; then
-        qs ipc call lock lock >/dev/null 2>&1 || true
+  if on_battery; then
+    swayidle -w \
+      timeout "$BAT_DIM"     "$0 dim" \
+        resume               "$0 undim" \
+      timeout "$BAT_DPMS"    "$0 dpms-off" \
+        resume               "$0 dpms-on" \
+      timeout "$BAT_LOCK"    "$0 lock" \
+      timeout "$BAT_SUSPEND" "$0 suspend" \
+      before-sleep           "qs ipc call lock lock" \
+      after-resume           "$0 dpms-on" &
+  else
+    swayidle -w \
+      timeout "$AC_DIM"      "$0 dim" \
+        resume               "$0 undim" \
+      timeout "$AC_DPMS"     "$0 dpms-off" \
+        resume               "$0 dpms-on" \
+      timeout "$AC_LOCK"     "$0 lock" \
+      before-sleep           "qs ipc call lock lock" \
+      after-resume           "$0 dpms-on" &
+  fi
+}
+
+run_daemon() {
+  trap 'pkill -x swayidle 2>/dev/null || true; kill 0 2>/dev/null || true' EXIT
+
+  local current_state new_state
+  current_state="$(on_battery && echo "bat" || echo "ac")"
+  start_swayidle
+
+  # Recarga swayidle automáticamente al conectar o desconectar el cargador
+  udevadm monitor --udev --subsystem-match=power_supply 2>/dev/null | \
+  while IFS= read -r line; do
+    if [[ "$line" == *"change"* ]]; then
+      new_state="$(on_battery && echo "bat" || echo "ac")"
+      if [[ "$new_state" != "$current_state" ]]; then
+        current_state="$new_state"
+        start_swayidle
       fi
-      niri msg output "$INTERNAL_OUTPUT" off >/dev/null 2>&1 || true
-      ;;
-    auto)
-      if has_external_monitor; then
-        # Modo Clamshell: sin bloquear para seguir trabajando en el monitor externo
-        niri msg output "$INTERNAL_OUTPUT" off >/dev/null 2>&1 || true
-      elif is_recording_or_music; then
-        # Música/grabación activa: bloquea la sesión y apaga solo el panel
-        qs ipc call lock lock >/dev/null 2>&1 || true
-        niri msg output "$INTERNAL_OUTPUT" off >/dev/null 2>&1 || true
-      else
-        lock_and_suspend
-      fi
-      ;;
-  esac
-}
-handle_lid_open() {
-  niri msg output "$INTERNAL_OUTPUT" on >/dev/null 2>&1 || true
-}
-
-handle_drm_event() {
-  sleep 0.8
-  if is_lid_closed; then
-    local mode
-    mode="$(get_mode)"
-    if [[ "$mode" == "auto" ]] && ! has_external_monitor && ! is_recording_or_music; then
-      lock_and_suspend
     fi
-  fi
+  done
 }
 
-trap 'kill 0 2>/dev/null || true' EXIT
-
-# Bloquea la acción por defecto de systemd-logind al cerrar la tapa
-systemd-inhibit --what=handle-lid-switch --who="smart-lid" --why="Smart Clamshell Manager" --mode=block sleep infinity >/dev/null 2>&1 &
-
-# Listener 1: Eventos de tapa vía D-Bus
-gdbus monitor --system --dest org.freedesktop.login1 --object-path /org/freedesktop/login1 2>/dev/null | \
-while IFS= read -r line; do
-  if [[ "$line" == *"LidClosed"* ]]; then
-    if [[ "$line" == *"true"* ]]; then
-      handle_lid_close
-    elif [[ "$line" == *"false"* ]]; then
-      handle_lid_open
-    fi
-  fi
-done &
-
-# Listener 2: Hotplug / desconexión de monitores HDMI/DP vía udev
-udevadm monitor --udev --subsystem-match=drm 2>/dev/null | \
-while IFS= read -r line; do
-  if [[ "$line" == *"change"* && "$line" == *"card"* ]]; then
-    handle_drm_event &
-  fi
-done &
-
-wait
+case "${1:-daemon}" in
+  daemon)   run_daemon ;;
+  dim)      do_dim ;;
+  undim)    do_undim ;;
+  dpms-off) do_dpms_off ;;
+  dpms-on)  do_dpms_on ;;
+  lock)     do_lock ;;
+  suspend)  do_suspend ;;
+  status)
+    echo "perfil:   $(on_battery && echo "batería (2m/3m/4m/10m)" || echo "corriente AC (5m/8m/10m/sin-suspensión)")"
+    echo "inhibido: $(is_inhibited && echo sí || echo no)"
+    echo "swayidle: $(pgrep -x swayidle >/dev/null && echo activo || echo detenido)"
+    ;;
+  *)
+    echo "Uso: smart-idle [daemon|dim|undim|dpms-off|dpms-on|lock|suspend|status]" >&2
+    exit 1
+    ;;
+esac

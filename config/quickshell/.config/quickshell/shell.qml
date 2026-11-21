@@ -12,6 +12,7 @@ import "widgets/battery"
 import "widgets/media"
 import "widgets/clock"
 import "widgets/notifications"
+import "widgets/displays"
 
 ShellRoot {
     Bar {}
@@ -28,4 +29,5 @@ ShellRoot {
     WallpaperPicker {}
     NotificationPopups {}
     NotificationMenu {}
+    DisplayMenu {}
 }

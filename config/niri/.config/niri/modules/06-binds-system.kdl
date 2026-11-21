@@ -7,9 +7,8 @@ binds {
     XF86AudioMicMute     allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
 
     // --- BRILLO DE PANTALLA (backlight) ---
-    XF86MonBrightnessUp   allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+5%"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "5%-"; }
-
+    XF86MonBrightnessUp   allow-when-locked=true { spawn-sh "\"$HOME/.local/bin/smart-brightness\" up 5"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "\"$HOME/.local/bin/smart-brightness\" down 5"; }
     // --- MULTIMEDIA (MPRIS / playerctl) ---
     XF86AudioPlay  allow-when-locked=true { spawn "playerctl" "play-pause"; }
     XF86AudioPause allow-when-locked=true { spawn "playerctl" "play-pause"; }

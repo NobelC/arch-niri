@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+INTERNAL="eDP-1"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
+MODE_FILE="$STATE_DIR/display-mode"
+mkdir -p "$STATE_DIR"
+[[ -f "$MODE_FILE" ]] || echo "extend" > "$MODE_FILE"
+
+outputs_json() {
+  niri msg --json outputs 2>/dev/null || echo '{}'
+}
+
+notify_display() {
+  local title="$1"
+  local body="$2"
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send -a "Displays" "$title" "$body" >/dev/null 2>&1 || true
+  fi
+}
+
+# Devuelve la mejor resolución@Hz disponible para un output
+best_mode_for() {
+  local out="$1"
+  outputs_json | jq -r --arg o "$out" '
+    .[$o].modes // []
+    | sort_by([.width * .height, .refresh_rate])
+    | last
+    | if . then "\(.width)x\(.height)@\( (.refresh_rate / 1000) )" else "" end
+  '
+}
+
+apply_best_mode() {
+  local out="$1"
+  local best
+  best="$(best_mode_for "$out")"
+  if [[ -n "$best" ]]; then
+    niri msg output "$out" mode "$best" >/dev/null 2>&1 || true
+  fi
+}
+
+list_displays() {
+  local cur_mode
+  cur_mode="$(tr -d '[:space:]' < "$MODE_FILE" 2>/dev/null || echo "extend")"
+
+  outputs_json | jq -c --arg mode "$cur_mode" --arg int "$INTERNAL" '
+    to_entries
+    | map({
+        name: .key,
+        model: ((.value.make // "") + " " + (.value.model // "") | gsub("^\\s+|\\s+$"; "")),
+        isInternal: (.key == $int),
+        enabled: (.value.logical != null),
+        width: (.value.logical.width // 0),
+        height: (.value.logical.height // 0),
+        x: (.value.logical.x // 0),
+        y: (.value.logical.y // 0),
+        transform: (.value.logical.transform // "Normal"),
+        isPrimary: ((.value.logical.x // -1) == 0 and (.value.logical.y // -1) == 0),
+        maxMode: (
+          (.value.modes // [] | sort_by([.width * .height, .refresh_rate]) | last)
+          | if . then "\(.width)x\(.height)@\( (.refresh_rate / 1000 | floor) )Hz" else "" end
+        )
+      })
+    | { mode: $mode, count: length, outputs: . }
+  '
+}
+
+set_primary() {
+  local target="$1"
+  local x_cursor=0
+
+  niri msg output "$target" on >/dev/null 2>&1 || true
+  apply_best_mode "$target"
+  niri msg output "$target" position set 0 0 >/dev/null 2>&1 || true
+
+  # Obtiene el ancho lógico del principal para colocar los demás a su derecha
+  sleep 0.15
+  x_cursor="$(outputs_json | jq -r --arg o "$target" '.[$o].logical.width // 1920')"
+
+  while IFS= read -r out; do
+    [[ -z "$out" || "$out" == "$target" ]] && continue
+    niri msg output "$out" position set "$x_cursor" 0 >/dev/null 2>&1 || true
+    local w
+    w="$(outputs_json | jq -r --arg o "$out" '.[$o].logical.width // 1920')"
+    x_cursor=$(( x_cursor + w ))
+  done < <(outputs_json | jq -r 'to_entries[] | select(.value.logical != null) | .key')
+}
+
+set_mode() {
+  local mode="$1"
+  pkill -x wl-mirror 2>/dev/null || true
+
+  mapfile -t all_outs < <(outputs_json | jq -r 'keys[]')
+  mapfile -t ext_outs < <(outputs_json | jq -r --arg int "$INTERNAL" 'keys[] | select(. != $int)')
+
+  # Si solo hay una pantalla, siempre es principal y modo extend
+  if [[ ${#all_outs[@]} -le 1 ]]; then
+    echo "extend" > "$MODE_FILE"
+    [[ ${#all_outs[@]} -eq 1 ]] && set_primary "${all_outs[0]}"
+    exit 0
+  fi
+
+  case "$mode" in
+    extend)
+      echo "extend" > "$MODE_FILE"
+      for o in "${all_outs[@]}"; do
+        niri msg output "$o" on >/dev/null 2>&1 || true
+        apply_best_mode "$o"
+      done
+      set_primary "$INTERNAL"
+      ;;
+    clamshell)
+      echo "clamshell" > "$MODE_FILE"
+      for o in "${ext_outs[@]}"; do
+        niri msg output "$o" on >/dev/null 2>&1 || true
+        apply_best_mode "$o"
+      done
+      niri msg output "$INTERNAL" off >/dev/null 2>&1 || true
+      set_primary "${ext_outs[0]}"
+      ;;
+    mirror)
+      echo "mirror" > "$MODE_FILE"
+      for o in "${all_outs[@]}"; do
+        niri msg output "$o" on >/dev/null 2>&1 || true
+        apply_best_mode "$o"
+      done
+      set_primary "$INTERNAL"
+      setsid -f wl-mirror --fullscreen-output "${ext_outs[0]}" "$INTERNAL" >/dev/null 2>&1
+      ;;
+  esac
+}
+
+set_rotate() {
+  local out="$1"
+  local rot="$2" # normal | 90 | 270
+  niri msg output "$out" transform "$rot" >/dev/null 2>&1 || true
+}
+
+auto_apply() {
+  local notify="${1:-0}"
+  sleep 0.8
+  local cur_mode
+  cur_mode="$(tr -d '[:space:]' < "$MODE_FILE" 2>/dev/null || echo "extend")"
+
+  mapfile -t ext_outs < <(outputs_json | jq -r --arg int "$INTERNAL" 'keys[] | select(. != $int)')
+
+  # Si se desconectaron todos los monitores externos, asegura que eDP-1 vuelva a encenderse
+  if [[ ${#ext_outs[@]} -eq 0 ]]; then
+    pkill -x wl-mirror 2>/dev/null || true
+    echo "extend" > "$MODE_FILE"
+    niri msg output "$INTERNAL" on >/dev/null 2>&1 || true
+    set_primary "$INTERNAL"
+    [[ "$notify" == "1" ]] && notify_display "Monitor desconectado" "Pantalla interna ($INTERNAL) activa"
+    return 0
+  fi
+
+  # Aplica resolución y Hz máximos a cada monitor externo detectado
+  local summary=""
+  local mode_str
+  for o in "${ext_outs[@]}"; do
+    niri msg output "$o" on >/dev/null 2>&1 || true
+    apply_best_mode "$o"
+    mode_str="$(best_mode_for "$o")"
+    summary+="${o}${mode_str:+ · ${mode_str}Hz}\n"
+  done
+
+  # Reacomoda posiciones según el modo activo
+  case "$cur_mode" in
+    clamshell)
+      niri msg output "$INTERNAL" off >/dev/null 2>&1 || true
+      set_primary "${ext_outs[0]}"
+      ;;
+    mirror)
+      set_primary "$INTERNAL"
+      pkill -x wl-mirror 2>/dev/null || true
+      setsid -f wl-mirror --fullscreen-output "${ext_outs[0]}" "$INTERNAL" >/dev/null 2>&1
+      ;;
+    *)
+      set_primary "$INTERNAL"
+      ;;
+  esac
+
+  if [[ "$notify" == "1" ]]; then
+    notify_display "Monitor conectado (${cur_mode})" "$(printf '%b' "$summary" | sed '/^$/d')"
+  fi
+}
+
+watch_drm() {
+  trap 'kill 0 2>/dev/null || true' EXIT
+  local last_sig=""
+  local new_sig=""
+
+  # Aplica al iniciar sesión sin enviar notificación
+  last_sig="$(outputs_json | jq -r 'keys | sort | join(",")')"
+  auto_apply 0
+
+  udevadm monitor --udev --subsystem-match=drm 2>/dev/null | \
+  while IFS= read -r line; do
+    if [[ "$line" == *"change"* && "$line" == *"card"* ]]; then
+      new_sig="$(outputs_json | jq -r 'keys | sort | join(",")')"
+      if [[ "$new_sig" != "$last_sig" ]]; then
+        last_sig="$new_sig"
+        auto_apply 1 &
+      fi
+    fi
+  done
+}
+
+case "${1:-list}" in
+  list)      list_displays ;;
+  mode)      set_mode "${2:-extend}" ;;
+  primary)   set_primary "$2" ;;
+  rotate)    set_rotate "$2" "${3:-normal}" ;;
+  optimize)  apply_best_mode "$2" ;;
+  auto)      auto_apply "${2:-0}" ;;
+  watch)     watch_drm ;;
+  *)
+    echo "Uso: display-manager [list|mode <extend|mirror|clamshell>|primary <out>|rotate <out> <normal|90|270>|optimize <out>|auto [0|1]|watch]" >&2
+    exit 1
+    ;;
+esac

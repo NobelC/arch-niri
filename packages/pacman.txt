@@ -10,8 +10,11 @@ brightnessctl
 btop
 btrfs-progs
 cage
+ddcutil
 dockerfile-language-server
+dosfstools
 efibootmgr
+exfatprogs
 eza
 fd
 firefox
@@ -20,6 +23,7 @@ ghostty
 git
 github-cli
 gopls
+gparted
 greetd
 hunspell-en_us
 hunspell-es_any
@@ -39,6 +43,7 @@ lua-language-server
 ly
 mesa
 mpv
+mtools
 nano
 neovim
 networkmanager
@@ -46,11 +51,13 @@ niri
 noise-suppression-for-voice
 noto-fonts-cjk
 npm
+ntfs-3g
 obsidian
 openssh
 pipewire
 pipewire-pulse
 playerctl
+polkit-gnome
 power-profiles-daemon
 pyright
 qt6-imageformats
@@ -71,9 +78,11 @@ webkit2gtk-4.1
 wiremix
 wireplumber
 wl-clipboard
+wl-mirror
 wlsunset
 xdg-desktop-portal-gnome
 xdg-desktop-portal-gtk
+xorg-xhost
 xwayland-satellite
 yazi
 yt-dlp

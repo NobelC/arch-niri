@@ -9,6 +9,8 @@ spawn-at-startup "qs"
 
 // --- 4. TEMPERATURA DE COLOR AUTOMÁTICA (wlsunset) ---
 spawn-sh-at-startup "pkill -x wlsunset; wlsunset -t 4000 -T 6500 -l 8.4 -L -80.1"
+spawn-sh-at-startup "\"$HOME/.local/bin/night-light\" apply"
+
 
 // --- 5. WALLPAPER DINÁMICO (awww en escritorio + swaybg en Overview) ---
 spawn-at-startup "awww-daemon" "--format" "xrgb"
@@ -21,3 +23,6 @@ spawn-sh-at-startup "pkill -x swayidle; swayidle -w timeout 300 'qs ipc call loc
 // --- 7. GESTIÓN CONTEXTUAL DE TAPA (Smart Clamshell) ---
 spawn-sh-at-startup "pkill -x smart-lid; smart-lid"
 spawn-sh-at-startup "\"$HOME/.local/bin/smart-idle\""
+spawn-sh-at-startup "\"$HOME/.local/bin/display-manager\" watch"
+
+spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
