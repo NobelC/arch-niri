@@ -1,7 +1,7 @@
 import Quickshell
 import Quickshell.Services.UPower
 import QtQuick
-import QtQuick.Effects
+import QtQuick.Layouts
 import "../../services"
 
 Item {
@@ -9,17 +9,27 @@ Item {
 
     required property string screenName
 
-    // ---------- Tipografía ----------
-    readonly property string displayFont: Theme.displayFont
-    readonly property string iconFont: Theme.fontFamily
+    // ---------- Tokens locales con respaldo seguro ----------
+    readonly property int uiRadius: Theme.radius !== undefined ? Theme.radius : 0
+    readonly property int uiBorder: Theme.borderWidth !== undefined ? Theme.borderWidth : 2
+    readonly property int uiShadow: Theme.shadowOffset !== undefined ? Theme.shadowOffset : 6
+    readonly property string uiCjkFont: Theme.cjkFont !== undefined ? Theme.cjkFont : "Noto Sans CJK JP"
+    readonly property color uiGridColor: Theme.gridColor !== undefined
+        ? Theme.gridColor
+        : Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
 
-    // ---------- Ajustes de la caja ----------
+    // ---------- Ajustes de la caja de contraseña ----------
     property int capacity: 18
-    property int cellW: 24
-    property int boxPadding: 26
-    property int boxHeight: 68
+    property int cellW: 26
+    property int boxHeight: 58
     readonly property int typed: LockState.buffer.length
     readonly property string wallpaper: LockState.currentWallpaper
+    readonly property bool isError: LockState.status === "error"
+    readonly property color activeStroke: isError ? Theme.warn : (root.typed > 0 || LockState.busy ? Theme.accent : Theme.text)
+
+    readonly property var jpDays: ["日", "月", "火", "水", "木", "金", "土"]
+    readonly property var enDays: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+    readonly property var enMonths: ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
 
     property var lit: []
     onTypedChanged: {
@@ -60,7 +70,13 @@ Item {
         }
     }
 
-    // ---------- Fondo: wallpaper difuminado ----------
+    // ---------- Reloj del sistema ----------
+    SystemClock {
+        id: clock
+        precision: SystemClock.Seconds
+    }
+
+    // ---------- Fondo: base sólida + wallpaper tenue + cuadrícula técnica ----------
     Rectangle {
         anchors.fill: parent
         color: Theme.bg
@@ -69,36 +85,69 @@ Item {
     Image {
         id: wall
         anchors.fill: parent
-        visible: false
         source: root.wallpaper !== "" ? "file://" + root.wallpaper : ""
         fillMode: Image.PreserveAspectCrop
         asynchronous: false
         cache: true
-        sourceSize.width: 960
-        sourceSize.height: 540
+        opacity: status === Image.Ready ? 0.22 : 0.0
     }
 
-    MultiEffect {
-        anchors.fill: parent
-        source: wall
-        visible: wall.status === Image.Ready
-        autoPaddingEnabled: false
-        blurEnabled: true
-        blurMax: 64
-        blur: 1.0
-        saturation: -0.1
-        brightness: Theme.dark ? -0.08 : 0.04
-    }
-
-    // Velo oscuro para garantizar contraste con cualquier wallpaper
     Rectangle {
         anchors.fill: parent
         color: Theme.bg
-        opacity: wall.status === Image.Ready ? 0.45 : 1.0
-        Behavior on color { ColorAnimation { duration: 250 } }
+        opacity: wall.status === Image.Ready ? 0.62 : 0.0
     }
 
-    // ---------- Contenido ----------
+    Canvas {
+        id: gridCanvas
+        anchors.fill: parent
+        antialiasing: false
+
+        Connections {
+            target: Theme
+            function onTextChanged() { gridCanvas.requestPaint(); }
+            function onBgChanged() { gridCanvas.requestPaint(); }
+            function onAccentChanged() { gridCanvas.requestPaint(); }
+        }
+
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+
+        onPaint: {
+            const ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+
+            const step = 40;
+            const major = 160;
+
+            ctx.strokeStyle = root.uiGridColor.toString();
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let x = 0; x <= width; x += step) {
+                ctx.moveTo(x + 0.5, 0);
+                ctx.lineTo(x + 0.5, height);
+            }
+            for (let y = 0; y <= height; y += step) {
+                ctx.moveTo(0, y + 0.5);
+                ctx.lineTo(width, y + 0.5);
+            }
+            ctx.stroke();
+
+            ctx.strokeStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.28).toString();
+            ctx.beginPath();
+            for (let x = major; x < width; x += major) {
+                for (let y = major; y < height; y += major) {
+                    ctx.moveTo(x - 4, y + 0.5);
+                    ctx.lineTo(x + 5, y + 0.5);
+                    ctx.moveTo(x + 0.5, y - 4);
+                    ctx.lineTo(x + 0.5, y + 5);
+                }
+            }
+            ctx.stroke();
+        }
+    }
+
+    // ---------- Contenido principal ----------
     Item {
         id: content
         anchors.fill: parent
@@ -110,206 +159,632 @@ Item {
             property: "opacity"
             from: 0
             to: 1
-            duration: 350
+            duration: 220
             easing.type: Easing.OutCubic
         }
 
-        SystemClock {
-            id: clock
-            precision: SystemClock.Minutes
+        // Marcas de encuadre en las 4 esquinas
+        Repeater {
+            model: [
+                { right: false, bottom: false },
+                { right: true,  bottom: false },
+                { right: false, bottom: true  },
+                { right: true,  bottom: true  }
+            ]
+
+            delegate: Item {
+                required property var modelData
+                width: 22
+                height: 22
+                x: modelData.right ? (content.width - width - 22) : 22
+                y: modelData.bottom ? (content.height - height - 22) : 22
+
+                Rectangle {
+                    width: parent.width
+                    height: root.uiBorder
+                    color: Theme.border
+                    y: parent.modelData.bottom ? (parent.height - height) : 0
+                }
+                Rectangle {
+                    width: root.uiBorder
+                    height: parent.height
+                    color: Theme.border
+                    x: parent.modelData.right ? (parent.width - width) : 0
+                }
+            }
         }
 
-        Column {
-            anchors.centerIn: parent
-            spacing: 14
+        // ---------- Metadatos superiores ----------
+        Row {
+            anchors.top: parent.top
+            anchors.left: parent.left
+            anchors.topMargin: 32
+            anchors.leftMargin: 38
+            spacing: 10
 
-            // Bienvenida
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "WELCOME, " + LockState.displayName.toUpperCase()
-                color: Theme.accentSoft
-                font.family: root.displayFont
-                font.weight: Font.Normal
-                font.pixelSize: 26
-                font.letterSpacing: 6
-            }
-
-            // Reloj
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: Qt.formatDateTime(clock.date, "HH:mm")
-                color: Theme.text
-                font.family: root.displayFont
-                font.weight: Font.Normal
-                font.pixelSize: 190
-                font.letterSpacing: 4
-                lineHeight: 0.9
-            }
-
-            // Fecha
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: {
-                    const s = Qt.locale("en_US").toString(clock.date, "dddd, MMMM d");
-                    return s.toUpperCase();
-                }
-                color: Theme.sub
-                font.family: root.displayFont
-                font.weight: Font.Normal
-                font.pixelSize: 20
-                font.letterSpacing: 5
-            }
-
-            Item {
-                width: 1
-                height: 18
-            }
-
-            // ---------- Caja rectangular de celdas aleatorias ----------
             Rectangle {
-                id: box
-                anchors.horizontalCenter: parent.horizontalCenter
-                width: root.capacity * root.cellW + root.boxPadding * 2
-                height: root.boxHeight
-                radius: 14
-                color: Theme.card
-                opacity: 0.92
-                border.width: 2
-                border.color: LockState.status === "error"
-                    ? Theme.warn
-                    : (root.typed > 0 || LockState.busy ? Theme.accent : Theme.accentSoft)
+                implicitWidth: sysBadge.implicitWidth + 14
+                implicitHeight: 22
+                radius: root.uiRadius
+                color: Theme.text
 
-                Behavior on border.color {
-                    ColorAnimation { duration: 160 }
-                }
-
-                SequentialAnimation {
-                    id: shake
-                    NumberAnimation { target: box; property: "anchors.horizontalCenterOffset"; to: -14; duration: 50 }
-                    NumberAnimation { target: box; property: "anchors.horizontalCenterOffset"; to: 14; duration: 70 }
-                    NumberAnimation { target: box; property: "anchors.horizontalCenterOffset"; to: -8; duration: 60 }
-                    NumberAnimation { target: box; property: "anchors.horizontalCenterOffset"; to: 0; duration: 60 }
-                }
-
-                Connections {
-                    target: LockState
-                    function onFailed() {
-                        shake.restart();
-                    }
-                }
-
-                Row {
+                Text {
+                    id: sysBadge
                     anchors.centerIn: parent
+                    text: "SYS // ARCH-NIRI"
+                    color: Theme.bg
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    font.bold: true
+                    font.letterSpacing: 1.5
+                }
+            }
 
-                    Repeater {
-                        model: root.capacity
+            Rectangle {
+                implicitWidth: outBadge.implicitWidth + 14
+                implicitHeight: 22
+                radius: root.uiRadius
+                color: Theme.card
+                border.width: root.uiBorder
+                border.color: Theme.border
 
-                        Item {
-                            id: slot
-                            required property int index
-                            width: root.cellW
-                            height: root.boxHeight
-                            readonly property bool filled: root.lit.indexOf(slot.index) >= 0
+                Text {
+                    id: outBadge
+                    anchors.centerIn: parent
+                    text: (root.screenName !== "" ? root.screenName : "OUT-0").toUpperCase()
+                    color: Theme.sub
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    font.letterSpacing: 1.2
+                }
+            }
+        }
 
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 6
-                                height: 6
-                                radius: 3
-                                color: Theme.muted
-                                opacity: slot.filled ? 0 : 0.4
+        Row {
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 32
+            anchors.rightMargin: 38
+            spacing: 8
+
+            Rectangle {
+                width: 8
+                height: 8
+                anchors.verticalCenter: parent.verticalCenter
+                radius: root.uiRadius
+                color: root.isError ? Theme.warn : (LockState.busy ? Theme.highlight : Theme.accent)
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.isError
+                    ? "警告 // ACCESS DENIED"
+                    : (LockState.busy ? "認証処理中 // AUTH" : "端末待機中 // STANDBY")
+                color: root.isError ? Theme.warn : Theme.sub
+                font.family: root.uiCjkFont
+                font.pixelSize: 12
+                font.bold: true
+                font.letterSpacing: 1.5
+            }
+        }
+
+        // ---------- Tarjeta Central Neo-Brutalista ----------
+        Item {
+            id: cardWrapper
+            anchors.centerIn: parent
+            width: 600
+            height: mainCard.implicitHeight
+
+            SequentialAnimation {
+                id: shake
+                NumberAnimation { target: cardWrapper; property: "anchors.horizontalCenterOffset"; to: -14; duration: 45 }
+                NumberAnimation { target: cardWrapper; property: "anchors.horizontalCenterOffset"; to: 14; duration: 60 }
+                NumberAnimation { target: cardWrapper; property: "anchors.horizontalCenterOffset"; to: -8; duration: 50 }
+                NumberAnimation { target: cardWrapper; property: "anchors.horizontalCenterOffset"; to: 8; duration: 50 }
+                NumberAnimation { target: cardWrapper; property: "anchors.horizontalCenterOffset"; to: 0; duration: 45 }
+            }
+
+            Connections {
+                target: LockState
+                function onFailed() {
+                    shake.restart();
+                }
+            }
+
+            // Sombra sólida desplazada (Hard Offset Shadow)
+            Rectangle {
+                x: root.uiShadow
+                y: root.uiShadow
+                width: mainCard.width
+                height: mainCard.height
+                radius: root.uiRadius
+                color: root.isError ? Theme.warn : Theme.accent
+
+                Behavior on color { ColorAnimation { duration: 140 } }
+            }
+
+            // Contenedor principal
+            Rectangle {
+                id: mainCard
+                width: parent.width
+                implicitHeight: cardCol.implicitHeight + (root.uiBorder * 2)
+                radius: root.uiRadius
+                color: Theme.card
+                border.width: root.uiBorder
+                border.color: root.activeStroke
+                clip: true
+
+                Behavior on border.color { ColorAnimation { duration: 140 } }
+
+                ColumnLayout {
+                    id: cardCol
+                    x: root.uiBorder
+                    y: root.uiBorder
+                    width: parent.width - (root.uiBorder * 2)
+                    spacing: 0
+
+                    // 1. Franja industrial superior
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 36
+                        radius: root.uiRadius
+                        color: root.isError ? Theme.warn : Theme.accent
+                        clip: true
+
+                        Behavior on color { ColorAnimation { duration: 140 } }
+
+                        Canvas {
+                            id: stripeCanvas
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            anchors.right: parent.right
+                            width: 112
+
+                            Connections {
+                                target: Theme
+                                function onBgChanged() { stripeCanvas.requestPaint(); }
+                            }
+
+                            onPaint: {
+                                const ctx = getContext("2d");
+                                ctx.clearRect(0, 0, width, height);
+                                ctx.fillStyle = Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.25).toString();
+                                const stripeW = 8;
+                                const gap = 16;
+                                for (let x = -height; x < width + height; x += gap) {
+                                    ctx.beginPath();
+                                    ctx.moveTo(x, height);
+                                    ctx.lineTo(x + stripeW, height);
+                                    ctx.lineTo(x + stripeW + height, 0);
+                                    ctx.lineTo(x + height, 0);
+                                    ctx.closePath();
+                                    ctx.fill();
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 16
+                            anchors.rightMargin: 16
+
+                            Text {
+                                text: "認証 // SESSION LOCK"
+                                color: Theme.bg
+                                font.family: root.uiCjkFont
+                                font.pixelSize: 12
+                                font.bold: true
+                                font.letterSpacing: 2
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            Text {
+                                text: "SEC-01"
+                                color: Theme.bg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                font.bold: true
+                                font.letterSpacing: 1.5
+                            }
+                        }
+                    }
+
+                    // 2. Bloque de Reloj y Fecha
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: clockCol.implicitHeight + 36
+
+                        ColumnLayout {
+                            id: clockCol
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.leftMargin: 24
+                            anchors.rightMargin: 24
+                            spacing: 14
+
+                            // Hora principal centrada exactamente en X + segundos a la derecha
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: mainTime.implicitHeight
+
+                                Text {
+                                    id: mainTime
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: Qt.formatDateTime(clock.date, "HH:mm")
+                                    color: Theme.text
+                                    font.family: Theme.displayFont
+                                    font.pixelSize: 154
+                                    font.letterSpacing: 6
+                                    lineHeight: 0.85
+                                }
+
+                                Column {
+                                    anchors.left: mainTime.right
+                                    anchors.leftMargin: 14
+                                    anchors.bottom: mainTime.bottom
+                                    anchors.bottomMargin: 14
+                                    spacing: 2
+
+                                    Text {
+                                        text: ":" + Qt.formatDateTime(clock.date, "ss")
+                                        color: Theme.accent
+                                        font.family: Theme.displayFont
+                                        font.pixelSize: 36
+                                        font.letterSpacing: 2
+                                        lineHeight: 0.9
+                                    }
+
+                                    Text {
+                                        text: "UTC-5"
+                                        color: Theme.sub
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        font.letterSpacing: 1.2
+                                    }
+
+                                    Text {
+                                        text: "パナマ時間"
+                                        color: Theme.muted
+                                        font.family: root.uiCjkFont
+                                        font.pixelSize: 10
+                                        font.letterSpacing: 1
+                                    }
+                                }
                             }
 
                             Rectangle {
-                                anchors.centerIn: parent
-                                width: 14
-                                height: 30
-                                radius: 4
-                                color: LockState.status === "error" ? Theme.warn : Theme.highlight
-                                scale: slot.filled ? 1 : 0
-                                opacity: slot.filled ? 1 : 0
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: root.uiBorder
+                                color: Theme.border
+                            }
 
-                                Behavior on scale {
-                                    NumberAnimation {
-                                        duration: 140
-                                        easing.type: Easing.OutBack
+                            RowLayout {
+                                Layout.fillWidth: true
+
+                                Text {
+                                    text: {
+                                        const d = clock.date;
+                                        return d.getFullYear() + "年"
+                                            + String(d.getMonth() + 1).padStart(2, "0") + "月"
+                                            + String(d.getDate()).padStart(2, "0") + "日 ("
+                                            + root.jpDays[d.getDay()] + ")";
+                                    }
+                                    color: Theme.sub
+                                    font.family: root.uiCjkFont
+                                    font.pixelSize: 13
+                                    font.bold: true
+                                    font.letterSpacing: 1.5
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                Text {
+                                    text: {
+                                        const d = clock.date;
+                                        return root.enDays[d.getDay()] + " // "
+                                            + String(d.getDate()).padStart(2, "0") + " "
+                                            + root.enMonths[d.getMonth()] + " "
+                                            + d.getFullYear();
+                                    }
+                                    color: Theme.muted
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.letterSpacing: 1.5
+                                }
+                            }
+                        }
+                    }
+
+                    // Divisor grueso
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: root.uiBorder
+                        color: Theme.border
+                    }
+
+                    // 3. Identidad y Caja de Contraseña (celdas aleatorias)
+                    Item {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: authCol.implicitHeight + 36
+
+                        ColumnLayout {
+                            id: authCol
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.leftMargin: 24
+                            anchors.rightMargin: 24
+                            spacing: 12
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Rectangle {
+                                    implicitWidth: idTag.implicitWidth + 10
+                                    implicitHeight: 20
+                                    radius: root.uiRadius
+                                    color: Theme.accentSoft
+
+                                    Text {
+                                        id: idTag
+                                        anchors.centerIn: parent
+                                        text: "ID"
+                                        color: Theme.bg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        font.bold: true
                                     }
                                 }
-                                Behavior on opacity {
-                                    NumberAnimation { duration: 100 }
+
+                                Text {
+                                    text: "USER // " + LockState.displayName.toUpperCase()
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    font.letterSpacing: 1.5
+                                }
+
+                                Item { Layout.fillWidth: true }
+
+                                Text {
+                                    text: "[ " + String(root.typed).padStart(2, "0") + " / " + root.capacity + " ]"
+                                    color: root.isError ? Theme.warn : (root.typed > 0 ? Theme.accent : Theme.muted)
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.bold: root.typed > 0
+                                }
+                            }
+
+                            Rectangle {
+                                id: passBox
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: root.boxHeight
+                                radius: root.uiRadius
+                                color: Theme.bg
+                                border.width: root.uiBorder
+                                border.color: root.isError
+                                    ? Theme.warn
+                                    : (root.typed > 0 || LockState.busy ? Theme.accent : Theme.border)
+                                clip: true
+
+                                Behavior on border.color { ColorAnimation { duration: 140 } }
+
+                                Row {
+                                    anchors.centerIn: parent
+
+                                    Repeater {
+                                        model: root.capacity
+
+                                        Item {
+                                            id: slot
+                                            required property int index
+                                            width: root.cellW
+                                            height: root.boxHeight
+                                            readonly property bool filled: root.lit.indexOf(slot.index) >= 0
+
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: 4
+                                                height: 4
+                                                radius: root.uiRadius
+                                                color: Theme.muted
+                                                opacity: slot.filled ? 0 : 0.45
+                                            }
+
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: 12
+                                                height: 26
+                                                radius: root.uiRadius
+                                                color: root.isError ? Theme.warn : Theme.accent
+                                                scale: slot.filled ? 1.0 : 0.0
+                                                opacity: slot.filled ? 1.0 : 0.0
+
+                                                Behavior on scale {
+                                                    NumberAnimation {
+                                                        duration: 110
+                                                        easing.type: Easing.OutBack
+                                                    }
+                                                }
+                                                Behavior on opacity {
+                                                    NumberAnimation { duration: 80 }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: LockState.busy
+                                        ? "検証中 // VERIFYING..."
+                                        : (root.isError
+                                            ? "アクセス拒否 // " + LockState.message.toUpperCase()
+                                            : "入力待機 // ENTER PASSKEY")
+                                    color: root.isError ? Theme.warn : (LockState.busy ? Theme.accent : Theme.muted)
+                                    font.family: root.uiCjkFont
+                                    font.pixelSize: 11
+                                    font.bold: root.isError || LockState.busy
+                                    font.letterSpacing: 1.2
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    text: "[ ↵ ENTER ]"
+                                    color: root.typed > 0 ? Theme.text : Theme.muted
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.bold: root.typed > 0
+                                    font.letterSpacing: 1
                                 }
                             }
                         }
                     }
                 }
             }
-
-            // Estado / ayuda
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: LockState.busy
-                    ? "VERIFYING…"
-                    : (LockState.status === "error"
-                        ? LockState.message.toUpperCase()
-                        : (root.typed > root.capacity ? root.typed + " CHARACTERS" : "ENTER YOUR PASSWORD"))
-                color: LockState.status === "error" ? Theme.warn : Theme.muted
-                font.family: root.displayFont
-                font.weight: Font.Normal
-                font.pixelSize: 15
-                font.letterSpacing: 3
-            }
         }
 
-        // ---------- Barra inferior ----------
+        // ---------- Barra Inferior de Telemetría ----------
         Row {
             anchors.bottom: parent.bottom
             anchors.horizontalCenter: parent.horizontalCenter
-            anchors.bottomMargin: 28
-            spacing: 36
+            anchors.bottomMargin: 30
+            spacing: 12
 
-            Row {
-                spacing: 10
-                Text {
-                    text: ""
-                    color: Theme.muted
-                    font.family: root.iconFont
-                    font.pixelSize: 16
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Text {
-                    text: "LOCKED"
-                    color: Theme.muted
-                    font.family: root.displayFont
-                    font.weight: Font.Normal
-                    font.pixelSize: 16
-                    font.letterSpacing: 4
-                    anchors.verticalCenter: parent.verticalCenter
+            Rectangle {
+                implicitWidth: lockChipRow.implicitWidth + 20
+                implicitHeight: 30
+                radius: root.uiRadius
+                color: Theme.card
+                border.width: root.uiBorder
+                border.color: Theme.border
+                clip: true
+
+                Row {
+                    id: lockChipRow
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    Text {
+                        text: ""
+                        color: Theme.accent
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: LockState.busy ? "検証中 // BUSY" : "ロック中 // LOCKED"
+                        color: Theme.text
+                        font.family: root.uiCjkFont
+                        font.pixelSize: 11
+                        font.bold: true
+                        font.letterSpacing: 1.5
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
                 }
             }
 
-            Row {
-                id: batRow
+            Rectangle {
+                visible: CapsLock.active
+                implicitWidth: capsRow.implicitWidth + 20
+                implicitHeight: 30
+                radius: root.uiRadius
+                color: Theme.warn
+                border.width: root.uiBorder
+                border.color: Theme.text
+                clip: true
+
+                Row {
+                    id: capsRow
+                    anchors.centerIn: parent
+                    spacing: 6
+
+                    Text {
+                        text: "󰪛"
+                        color: Theme.bg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: "CAPS // ON"
+                        color: Theme.bg
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+            }
+
+            Rectangle {
+                id: batChip
                 readonly property var bat: UPower.displayDevice
                 readonly property int pct: bat ? Math.round(bat.percentage * 100) : 0
                 readonly property bool charging: bat && bat.state === UPowerDeviceState.Charging
-                visible: bat && bat.isPresent && bat.isLaptopBattery
-                spacing: 10
+                readonly property bool low: pct <= 15 && !charging
+                readonly property int litBlocks: Math.max(0, Math.min(5, Math.ceil(pct / 20)))
 
-                Text {
-                    text: batRow.charging ? "" : (batRow.pct > 85 ? "" : batRow.pct > 60 ? "" : batRow.pct > 35 ? "" : batRow.pct > 12 ? "" : "")
-                    color: batRow.pct <= 12 && !batRow.charging ? Theme.warn : Theme.muted
-                    font.family: root.iconFont
-                    font.pixelSize: 16
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Text {
-                    text: batRow.pct + "%"
-                    color: batRow.pct <= 12 && !batRow.charging ? Theme.warn : Theme.muted
-                    font.family: root.displayFont
-                    font.weight: Font.Normal
-                    font.pixelSize: 16
-                    font.letterSpacing: 2
-                    anchors.verticalCenter: parent.verticalCenter
+                visible: bat && bat.isPresent && bat.isLaptopBattery
+                implicitWidth: batRow.implicitWidth + 20
+                implicitHeight: 30
+                radius: root.uiRadius
+                color: Theme.card
+                border.width: root.uiBorder
+                border.color: low ? Theme.warn : Theme.border
+                clip: true
+
+                Row {
+                    id: batRow
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    Text {
+                        text: batChip.charging ? "" : "PWR"
+                        color: batChip.low ? Theme.warn : (batChip.charging ? Theme.accent : Theme.muted)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        font.bold: true
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Row {
+                        spacing: 3
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        Repeater {
+                            model: 5
+                            Rectangle {
+                                required property int index
+                                width: 7
+                                height: 12
+                                radius: root.uiRadius
+                                color: index < batChip.litBlocks
+                                    ? (batChip.low ? Theme.warn : Theme.accentSoft)
+                                    : Theme.cardAlt
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: batChip.pct + "%"
+                        color: batChip.low ? Theme.warn : Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        font.bold: true
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
                 }
             }
         }

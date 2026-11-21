@@ -24,8 +24,8 @@ PanelWindow {
         right: true
     }
 
-    implicitHeight: 30
-    exclusiveZone: Niri.overviewOpen ? 0 : 30
+    implicitHeight: 34
+    exclusiveZone: Niri.overviewOpen ? 0 : 34
     color: "transparent"
 
     WlrLayershell.layer: WlrLayer.Top
@@ -51,7 +51,7 @@ PanelWindow {
             NumberAnimation { duration: 150 }
         }
 
-        // Fondo de la barra
+        // Fondo sólido de la barra
         Rectangle {
             anchors.fill: parent
             color: Theme.bg
@@ -60,13 +60,13 @@ PanelWindow {
                 ColorAnimation { duration: 150 }
             }
 
-            // Línea inferior (se interrumpe automáticamente bajo el cajón activo)
+            // Línea inferior continua (2px) cuando no hay cajón abierto
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: 1
-                color: Theme.cardAlt
+                height: Theme.borderWidth
+                color: Theme.border
                 visible: Niri.activeBarDrawerWidth <= 0
 
                 Behavior on color { ColorAnimation { duration: 150 } }
@@ -77,8 +77,8 @@ PanelWindow {
                 anchors.left: parent.left
                 anchors.bottom: parent.bottom
                 width: Math.max(0, Niri.activeBarDrawerX)
-                height: 1
-                color: Theme.cardAlt
+                height: Theme.borderWidth
+                color: Theme.border
                 visible: Niri.activeBarDrawerWidth > 0
             }
 
@@ -88,8 +88,8 @@ PanelWindow {
                 anchors.leftMargin: Niri.activeBarDrawerX + Niri.activeBarDrawerWidth
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                height: 1
-                color: Theme.cardAlt
+                height: Theme.borderWidth
+                color: Theme.border
                 visible: Niri.activeBarDrawerWidth > 0
             }
         }
@@ -99,6 +99,7 @@ PanelWindow {
             anchors.left: parent.left
             anchors.leftMargin: 10
             anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: -1
             spacing: 10
 
             ArchIcon {}
@@ -108,13 +109,15 @@ PanelWindow {
         // Módulo central: Reloj / Dashboard
         Clock {
             anchors.centerIn: parent
+            anchors.verticalCenterOffset: -1
         }
 
-        // Módulos derechos: Batería + Red + Bluetooth + Audio
+        // Módulos derechos
         RowLayout {
             anchors.right: parent.right
             anchors.rightMargin: 10
             anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenterOffset: -1
             spacing: 4
 
             DisplayIcon {}

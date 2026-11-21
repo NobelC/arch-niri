@@ -13,18 +13,17 @@ layout {
   }
   default-column-width { proportion 1.0; }
   focus-ring {
-    width 2
+    off
   }
   border {
-    off
     width 2
   }
   shadow {
     on
-    softness 20
-    spread 2
-    offset x=0 y=4
-    color "#00000055"
+    softness 0
+    spread 0
+    offset x=4 y=4
+    color "#000000d9"
   }
 }
 

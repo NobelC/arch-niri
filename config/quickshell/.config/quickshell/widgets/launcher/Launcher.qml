@@ -33,21 +33,20 @@ PanelWindow {
         Niri.notifyLauncherState(isOpen);
     }
 
-    readonly property real panelWidth: 460
-    readonly property real topRadius: 15
-    readonly property real concaveRadius: 10
-
+    readonly property int panelWidth: 480
+    readonly property int shadowSize: 6
     readonly property int visibleRowCount: topApps.length
     readonly property real appsBlockHeight: visibleRowCount > 0
-        ? (visibleRowCount * 48) + ((visibleRowCount - 1) * 4) + 10
+        ? (visibleRowCount * 48) + ((visibleRowCount - 1) * 6) + 12
         : 0
-    readonly property real targetPanelHeight: 72 + appsBlockHeight
+    // Header (32) + padding (28) + search (42) + borders (4) + apps
+    readonly property real targetPanelHeight: 106 + appsBlockHeight
 
     property real panelHeight: targetPanelHeight
     Behavior on panelHeight {
         NumberAnimation {
-            duration: 160
-            easing.type: Easing.OutCubic
+            duration: 150
+            easing.type: Easing.OutExpo
         }
     }
 
@@ -107,6 +106,7 @@ PanelWindow {
             if (name !== "") seenNames[name] = true;
             return true;
         });
+
         visible.sort((a, b) => {
             const nameA = (a.name || "").toLowerCase();
             const nameB = (b.name || "").toLowerCase();
@@ -182,94 +182,50 @@ PanelWindow {
         onClicked: launcherWindow.closeLauncher()
     }
 
-    Item {
+   Item {
         id: dockContainer
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: launcherWindow.isOpen ? 0 : -(launcherWindow.panelHeight + 16)
+        anchors.centerIn: parent
 
-        width: launcherWindow.panelWidth + (launcherWindow.concaveRadius * 2)
-        height: launcherWindow.panelHeight
+        width: launcherWindow.panelWidth + launcherWindow.shadowSize
+        height: launcherWindow.panelHeight + launcherWindow.shadowSize
 
         opacity: launcherWindow.isOpen ? 1.0 : 0.0
+        scale: launcherWindow.isOpen ? 1.0 : 0.96
         visible: opacity > 0.01
 
-        Behavior on anchors.bottomMargin {
+        Behavior on scale {
             NumberAnimation {
-                duration: 210
-                easing.type: launcherWindow.isOpen ? Easing.OutCubic : Easing.InCubic
+                duration: launcherWindow.isOpen ? 160 : 120
+                easing.type: launcherWindow.isOpen ? Easing.OutExpo : Easing.InCubic
             }
         }
 
         Behavior on opacity {
             NumberAnimation {
-                duration: 160
+                duration: 140
                 easing.type: Easing.OutCubic
             }
-        }
-
-        Connections {
-            target: Theme
-            function onBgChanged() { silhouetteCanvas.requestPaint(); }
-            function onAccentChanged() { silhouetteCanvas.requestPaint(); }
-        }
-
-        Canvas {
-            id: silhouetteCanvas
-            anchors.fill: parent
-            antialiasing: true
-
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
-
-            onPaint: {
-                const ctx = getContext("2d");
-                ctx.reset();
-
-                const bw = 2;
-                const half = bw / 2;
-                const c = launcherWindow.concaveRadius;
-                const r = Math.min(launcherWindow.topRadius, (height - c) / 2);
-                const leftX = c;
-                const rightX = width - c;
-                const topY = half;
-                const bottomY = height;
-
-                function buildPath() {
-                    ctx.beginPath();
-                    ctx.moveTo(0, bottomY);
-                    ctx.arc(leftX - c, bottomY - c, c, Math.PI / 2, 0, true);
-                    ctx.lineTo(leftX, topY + r);
-                    ctx.arcTo(leftX, topY, leftX + r, topY, r);
-                    ctx.lineTo(rightX - r, topY);
-                    ctx.arcTo(rightX, topY, rightX, topY + r, r);
-                    ctx.lineTo(rightX, bottomY - c);
-                    ctx.arc(rightX + c, bottomY - c, c, Math.PI, Math.PI / 2, true);
-                }
-
-                buildPath();
-                ctx.lineTo(0, bottomY);
-                ctx.closePath();
-                ctx.fillStyle = Theme.bg.toString();
-                ctx.fill();
-
-                buildPath();
-                ctx.strokeStyle = Theme.accent.toString();
-                ctx.lineWidth = bw;
-                ctx.lineJoin = "round";
-                ctx.lineCap = "round";
-                ctx.stroke();
-            }
-        }
-
-        Item {
-            id: innerArea
-            anchors {
-                top: parent.top
-                bottom: parent.bottom
-                horizontalCenter: parent.horizontalCenter
-            }
+        }        // Sombra sólida desplazada (Hard Offset Shadow)
+        Rectangle {
+            x: launcherWindow.shadowSize
+            y: launcherWindow.shadowSize
             width: launcherWindow.panelWidth
+            height: launcherWindow.panelHeight
+            radius: Theme.radius
+            color: Theme.accent
+        }
+
+        // Caja principal
+        Rectangle {
+            id: panelBox
+            x: 0
+            y: 0
+            width: launcherWindow.panelWidth
+            height: launcherWindow.panelHeight
+            radius: Theme.radius
+            color: Theme.bg
+            border.width: Theme.borderWidth
+            border.color: Theme.text
             clip: true
 
             MouseArea {
@@ -277,187 +233,235 @@ PanelWindow {
             }
 
             ColumnLayout {
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    bottom: parent.bottom
-                    leftMargin: 18
-                    rightMargin: 18
-                    bottomMargin: 14
-                }
-                spacing: 10
+                anchors.fill: parent
+                anchors.margins: Theme.borderWidth
+                spacing: 0
 
-                // 1. LISTA DE APPS
-                ColumnLayout {
-                    visible: launcherWindow.visibleRowCount > 0
+                // 0. CABECERA INDUSTRIAL
+                Rectangle {
                     Layout.fillWidth: true
-                    spacing: 4
+                    Layout.preferredHeight: 32
+                    color: Theme.accent
 
-                    Repeater {
-                        model: launcherWindow.topApps
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 12
+                        spacing: 8
 
-                        delegate: Rectangle {
-                            id: appDelegate
-                            required property var modelData
-                            required property int index
+                        Text {
+                            text: "起動 // LAUNCH"
+                            color: Theme.bg
+                            font.family: Theme.cjkFont
+                            font.pixelSize: 11
+                            font.bold: true
+                            font.letterSpacing: 1.5
+                        }
 
-                            readonly property bool isSelected: index === launcherWindow.selectedIndex
+                        Item { Layout.fillWidth: true }
 
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 48
-                            radius: 10
-                            color: isSelected ? Theme.cardAlt : (itemHover.containsMouse ? Theme.card : "transparent")
-                            border.width: isSelected ? 1 : 0
-                            border.color: Theme.border
-
-                            Behavior on color {
-                                ColorAnimation { duration: 90 }
-                            }
-
-                            RowLayout {
-                                anchors {
-                                    fill: parent
-                                    leftMargin: 12
-                                    rightMargin: 12
-                                }
-                                spacing: 14
-
-                                Item {
-                                    Layout.preferredWidth: 30
-                                    Layout.preferredHeight: 30
-
-                                    Image {
-                                        id: appIconImg
-                                        anchors.fill: parent
-                                        source: appDelegate.modelData.icon
-                                            ? Quickshell.iconPath(appDelegate.modelData.icon, true)
-                                            : ""
-                                        sourceSize.width: 48
-                                        sourceSize.height: 48
-                                        fillMode: Image.PreserveAspectFit
-                                        smooth: true
-                                        mipmap: true
-                                        visible: status === Image.Ready
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        visible: !appIconImg.visible
-                                        text: "󰣆"
-                                        color: appDelegate.isSelected ? Theme.accent : Theme.accentSoft
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 20
-                                    }
-                                }
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 2
-
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: appDelegate.modelData.name || "Application"
-                                        color: appDelegate.isSelected ? Theme.accent : Theme.text
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 13
-                                        font.bold: appDelegate.isSelected
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        Layout.fillWidth: true
-                                        visible: text.length > 0
-                                        text: appDelegate.modelData.genericName || appDelegate.modelData.comment || ""
-                                        color: Theme.sub
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 11
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-
-                            MouseArea {
-                                id: itemHover
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onEntered: launcherWindow.selectedIndex = appDelegate.index
-                                onClicked: {
-                                    launcherWindow.selectedIndex = appDelegate.index;
-                                    launcherWindow.launchSelected();
-                                }
-                            }
+                        Text {
+                            text: "[ " + String(launcherWindow.visibleRowCount).padStart(2, "0") + " ]"
+                            color: Theme.bg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            font.bold: true
                         }
                     }
                 }
 
-                // 2. BARRA DE BÚSQUEDA ANCLADA ABAJO
-                Rectangle {
+                // Contenido interno (Lista + Búsqueda)
+                ColumnLayout {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 42
-                    radius: 10
-                    color: Theme.card
-                    border.width: 1
-                    border.color: searchInput.activeFocus ? Theme.accent : Theme.cardAlt
+                    Layout.fillHeight: true
+                    Layout.margins: 14
+                    spacing: 12
 
-                    RowLayout {
-                        anchors {
-                            fill: parent
-                            leftMargin: 14
-                            rightMargin: 14
+                    // 1. LISTA DE APPS
+                    ColumnLayout {
+                        visible: launcherWindow.visibleRowCount > 0
+                        Layout.fillWidth: true
+                        spacing: 6
+
+                        Repeater {
+                            model: launcherWindow.topApps
+
+                            delegate: Rectangle {
+                                id: appDelegate
+                                required property var modelData
+                                required property int index
+
+                                readonly property bool isSelected: index === launcherWindow.selectedIndex
+
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 48
+                                radius: Theme.radius
+                                color: isSelected
+                                    ? Theme.accent
+                                    : (itemHover.containsMouse ? Theme.cardAlt : Theme.card)
+                                border.width: Theme.borderWidth
+                                border.color: isSelected
+                                    ? Theme.accent
+                                    : (itemHover.containsMouse ? Theme.text : Theme.border)
+
+                                Behavior on color { ColorAnimation { duration: 80 } }
+                                Behavior on border.color { ColorAnimation { duration: 80 } }
+
+                                RowLayout {
+                                    anchors {
+                                        fill: parent
+                                        leftMargin: 10
+                                        rightMargin: 10
+                                    }
+                                    spacing: 12
+
+                                    Item {
+                                        Layout.preferredWidth: 28
+                                        Layout.preferredHeight: 28
+
+                                        Image {
+                                            id: appIconImg
+                                            anchors.fill: parent
+                                            source: appDelegate.modelData.icon
+                                                ? Quickshell.iconPath(appDelegate.modelData.icon, true)
+                                                : ""
+                                            sourceSize.width: 48
+                                            sourceSize.height: 48
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            mipmap: true
+                                            visible: status === Image.Ready
+                                        }
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            visible: !appIconImg.visible
+                                            text: "󰣆"
+                                            color: appDelegate.isSelected ? Theme.bg : Theme.accentSoft
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 18
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 1
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: appDelegate.modelData.name || "Application"
+                                            color: appDelegate.isSelected ? Theme.bg : Theme.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 12
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            visible: text.length > 0
+                                            text: appDelegate.modelData.genericName || appDelegate.modelData.comment || ""
+                                            color: appDelegate.isSelected ? Theme.bg : Theme.sub
+                                            opacity: appDelegate.isSelected ? 0.8 : 1.0
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: appDelegate.isSelected
+                                        text: "[ ↵ ]"
+                                        color: Theme.bg
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        font.bold: true
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: itemHover
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onEntered: launcherWindow.selectedIndex = appDelegate.index
+                                    onClicked: {
+                                        launcherWindow.selectedIndex = appDelegate.index;
+                                        launcherWindow.launchSelected();
+                                    }
+                                }
+                            }
                         }
-                        spacing: 10
+                    }
 
-                        Text {
-                            text: ">"
-                            color: Theme.accent
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 15
-                            font.bold: true
-                        }
+                    // 2. BARRA DE BÚSQUEDA ANCLADA ABAJO
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 42
+                        radius: Theme.radius
+                        color: Theme.card
+                        border.width: Theme.borderWidth
+                        border.color: searchInput.activeFocus ? Theme.accent : Theme.border
 
-                        TextInput {
-                            id: searchInput
-                            Layout.fillWidth: true
-                            color: Theme.text
-                            selectionColor: Theme.accent
-                            selectedTextColor: Theme.bg
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                            clip: true
-
-                            text: launcherWindow.searchText
-                            onTextChanged: launcherWindow.searchText = text
+                        RowLayout {
+                            anchors {
+                                fill: parent
+                                leftMargin: 12
+                                rightMargin: 12
+                            }
+                            spacing: 10
 
                             Text {
-                                anchors.fill: parent
-                                verticalAlignment: Text.AlignVCenter
-                                text: "Search applications..."
-                                color: Theme.muted
-                                font: searchInput.font
-                                visible: searchInput.text.length === 0
+                                text: "❯"
+                                color: Theme.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                                font.bold: true
                             }
 
-                            Keys.onEscapePressed: launcherWindow.closeLauncher()
+                            TextInput {
+                                id: searchInput
+                                Layout.fillWidth: true
+                                color: Theme.text
+                                selectionColor: Theme.accent
+                                selectedTextColor: Theme.bg
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 13
+                                clip: true
 
-                            Keys.onUpPressed: {
-                                if (launcherWindow.topApps.length > 0) {
-                                    launcherWindow.selectedIndex =
-                                        (launcherWindow.selectedIndex - 1 + launcherWindow.topApps.length) %
-                                        launcherWindow.topApps.length;
+                                text: launcherWindow.searchText
+                                onTextChanged: launcherWindow.searchText = text
+
+                                Text {
+                                    anchors.fill: parent
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: "SEARCH APPLICATIONS..."
+                                    color: Theme.muted
+                                    font: searchInput.font
+                                    visible: searchInput.text.length === 0
                                 }
-                            }
 
-                            Keys.onDownPressed: {
-                                if (launcherWindow.topApps.length > 0) {
-                                    launcherWindow.selectedIndex =
-                                        (launcherWindow.selectedIndex + 1) %
-                                        launcherWindow.topApps.length;
+                                Keys.onEscapePressed: launcherWindow.closeLauncher()
+
+                                Keys.onUpPressed: {
+                                    if (launcherWindow.topApps.length > 0) {
+                                        launcherWindow.selectedIndex =
+                                            (launcherWindow.selectedIndex - 1 + launcherWindow.topApps.length) %
+                                            launcherWindow.topApps.length;
+                                    }
                                 }
-                            }
 
-                            Keys.onReturnPressed: launcherWindow.launchSelected()
-                            Keys.onEnterPressed: launcherWindow.launchSelected()
+                                Keys.onDownPressed: {
+                                    if (launcherWindow.topApps.length > 0) {
+                                        launcherWindow.selectedIndex =
+                                            (launcherWindow.selectedIndex + 1) %
+                                            launcherWindow.topApps.length;
+                                    }
+                                }
+
+                                Keys.onReturnPressed: launcherWindow.launchSelected()
+                                Keys.onEnterPressed: launcherWindow.launchSelected()
+                            }
                         }
                     }
                 }

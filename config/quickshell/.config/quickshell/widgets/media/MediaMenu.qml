@@ -3,7 +3,6 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
-import Quickshell.Widgets
 import "../../services"
 import "../"
 
@@ -11,7 +10,7 @@ BarDrawer {
     id: drawer
     menuName: "media"
     centered: true
-    panelWidth: 520
+    panelWidth: 540
     contentHeight: root.implicitHeight
 
     IpcHandler {
@@ -21,10 +20,57 @@ BarDrawer {
         }
     }
 
+    // ---------- Botón de control rígido (nivel raíz) ----------
+    component CtrlButton: Item {
+        id: btn
+
+        property string glyph: ""
+        property real size: 34
+        property bool filled: false
+        property bool usable: true
+        signal clicked
+
+        implicitWidth: size
+        implicitHeight: size
+        opacity: usable ? 1.0 : 0.35
+
+        Rectangle {
+            anchors.fill: parent
+            radius: Theme.radius
+            color: btn.filled
+                ? Theme.accent
+                : (btnArea.containsMouse && btn.usable ? Theme.cardAlt : Theme.card)
+            border.width: Theme.borderWidth
+            border.color: btn.filled
+                ? Theme.accent
+                : (btnArea.containsMouse && btn.usable ? Theme.text : Theme.border)
+
+            Behavior on color { ColorAnimation { duration: 100 } }
+            Behavior on border.color { ColorAnimation { duration: 100 } }
+        }
+
+        Text {
+            anchors.centerIn: parent
+            text: btn.glyph
+            color: btn.filled ? Theme.bg : (btnArea.containsMouse && btn.usable ? Theme.text : Theme.sub)
+            font.family: Theme.fontFamily
+            font.pixelSize: btn.filled ? 15 : 13
+        }
+
+        MouseArea {
+            id: btnArea
+            anchors.fill: parent
+            enabled: btn.usable
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: btn.clicked()
+        }
+    }
+
     Item {
         id: root
         width: parent.width
-        implicitHeight: 150
+        implicitHeight: 158
 
         property var allowedPlayers: ["spotify", "simpmusic"]
 
@@ -76,67 +122,43 @@ BarDrawer {
             onTriggered: root.player.positionChanged()
         }
 
-        component CtrlButton: Item {
-            id: btn
-
-            property string glyph: ""
-            property real size: 38
-            property bool filled: false
-            property bool usable: true
-            signal clicked
-
-            implicitWidth: size
-            implicitHeight: size
-            opacity: usable ? 1 : 0.35
-
-            Rectangle {
-                anchors.fill: parent
-                radius: width / 2
-                color: btn.filled ? Theme.accent : (btnArea.containsMouse && btn.usable ? Theme.cardAlt : "transparent")
-            }
-            Text {
-                anchors.centerIn: parent
-                text: btn.glyph
-                color: btn.filled ? Theme.bg : Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: btn.filled ? 17 : 14
-            }
-            MouseArea {
-                id: btnArea
-                anchors.fill: parent
-                enabled: btn.usable
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: btn.clicked()
-            }
-        }
-
         // ---------- Sin reproductor ----------
-        Column {
-            anchors.centerIn: parent
+        Rectangle {
+            anchors.fill: parent
             visible: !root.hasPlayer
-            spacing: 8
+            radius: Theme.radius
+            color: Theme.card
+            border.width: Theme.borderWidth
+            border.color: Theme.border
 
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: ""
-                color: Theme.muted
-                font.family: Theme.fontFamily
-                font.pixelSize: 34
-            }
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "Nothing playing"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 15
-            }
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "Spotify · SimpMusic"
-                color: Theme.sub
-                font.family: Theme.fontFamily
-                font.pixelSize: 11
+            Column {
+                anchors.centerIn: parent
+                spacing: 6
+
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: ""
+                    color: Theme.muted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 28
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "再生停止 // NOTHING PLAYING"
+                    color: Theme.text
+                    font.family: Theme.cjkFont
+                    font.pixelSize: 12
+                    font.bold: true
+                    font.letterSpacing: 1.4
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "SPOTIFY // SIMPMUSIC"
+                    color: Theme.muted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 10
+                    font.letterSpacing: 1
+                }
             }
         }
 
@@ -144,96 +166,155 @@ BarDrawer {
         RowLayout {
             anchors.fill: parent
             visible: root.hasPlayer
-            spacing: 22
+            spacing: 20
 
-            ClippingRectangle {
+            // Carátula cuadrada con sombra sólida desplazada
+            Item {
                 Layout.preferredWidth: 150
                 Layout.preferredHeight: 150
-                radius: 18
-                color: Theme.card
+                Layout.alignment: Qt.AlignVCenter
 
-                Image {
-                    id: art
-                    anchors.fill: parent
-                    source: root.hasPlayer ? root.player.trackArtUrl : ""
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    visible: status === Image.Ready
+                Rectangle {
+                    x: 4
+                    y: 4
+                    width: 146
+                    height: 146
+                    radius: Theme.radius
+                    color: Theme.accent
                 }
-                Text {
-                    anchors.centerIn: parent
-                    visible: art.status !== Image.Ready
-                    text: ""
-                    color: Theme.muted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 40
+
+                Rectangle {
+                    x: 0
+                    y: 0
+                    width: 146
+                    height: 146
+                    radius: Theme.radius
+                    color: Theme.card
+                    border.width: Theme.borderWidth
+                    border.color: Theme.text
+                    clip: true
+
+                    Image {
+                        id: art
+                        anchors.fill: parent
+                        anchors.margins: Theme.borderWidth
+                        source: root.hasPlayer ? root.player.trackArtUrl : ""
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        visible: status === Image.Ready
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: art.status !== Image.Ready
+                        text: ""
+                        color: Theme.muted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 36
+                    }
                 }
             }
 
+            // Metadatos, barra y controles
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 0
 
-                Text {
+                // Fila superior: reproductor + estado
+                RowLayout {
                     Layout.fillWidth: true
-                    text: root.hasPlayer ? root.player.identity : ""
-                    elide: Text.ElideRight
-                    color: Theme.muted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    spacing: 8
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "音楽 // " + (root.hasPlayer ? root.player.identity.toUpperCase() : "PLAYER")
+                        elide: Text.ElideRight
+                        color: Theme.accentSoft
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 10
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                    }
+
+                    Rectangle {
+                        implicitWidth: stateTxt.implicitWidth + 10
+                        implicitHeight: 18
+                        radius: Theme.radius
+                        color: (root.hasPlayer && root.player.isPlaying) ? Theme.accent : Theme.cardAlt
+                        border.width: Theme.borderWidth
+                        border.color: (root.hasPlayer && root.player.isPlaying) ? Theme.accent : Theme.border
+
+                        Text {
+                            id: stateTxt
+                            anchors.centerIn: parent
+                            text: (root.hasPlayer && root.player.isPlaying) ? "PLAYING" : "PAUSED"
+                            color: (root.hasPlayer && root.player.isPlaying) ? Theme.bg : Theme.sub
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 9
+                            font.bold: true
+                            font.letterSpacing: 0.8
+                        }
+                    }
                 }
+
                 Text {
                     Layout.fillWidth: true
-                    Layout.topMargin: 4
-                    text: root.hasPlayer && root.player.trackTitle !== "" ? root.player.trackTitle : "Unknown title"
+                    Layout.topMargin: 6
+                    text: root.hasPlayer && root.player.trackTitle !== "" ? root.player.trackTitle : "UNKNOWN TITLE"
                     elide: Text.ElideRight
                     color: Theme.text
                     font.family: Theme.fontFamily
-                    font.pixelSize: 18
+                    font.pixelSize: 16
                     font.bold: true
                 }
+
                 Text {
                     Layout.fillWidth: true
+                    Layout.topMargin: 2
                     text: root.hasPlayer ? root.player.trackArtist : ""
                     elide: Text.ElideRight
                     color: Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.pixelSize: 12
                 }
 
-                Item {
-                    Layout.fillHeight: true
-                }
+                Item { Layout.fillHeight: true }
 
-                // Progreso (clic para saltar)
+                // Barra de progreso rígida (clic para saltar)
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 10
+                    spacing: 8
 
                     Text {
                         text: root.fmt(root.pos)
                         color: Theme.sub
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
+                        font.bold: true
                     }
 
                     Item {
                         id: bar
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 14
+                        Layout.preferredHeight: 16
 
                         Rectangle {
                             anchors.verticalCenter: parent.verticalCenter
                             width: parent.width
-                            height: 4
-                            radius: 2
-                            color: Theme.cardAlt
+                            height: 8
+                            radius: Theme.radius
+                            color: Theme.card
+                            border.width: 1
+                            border.color: Theme.border
 
                             Rectangle {
-                                width: parent.width * root.progress
-                                height: parent.height
-                                radius: 2
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.margins: 1
+                                width: Math.max(0, (parent.width - 2) * root.progress)
+                                radius: Theme.radius
                                 color: Theme.accent
                             }
                         }
@@ -248,17 +329,17 @@ BarDrawer {
 
                     Text {
                         text: root.fmt(root.length)
-                        color: Theme.sub
+                        color: Theme.muted
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
                     }
                 }
 
-                // Controles
+                // Controles cuadrados
                 RowLayout {
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.topMargin: 6
-                    spacing: 14
+                    Layout.topMargin: 8
+                    spacing: 10
 
                     CtrlButton {
                         glyph: ""
@@ -266,7 +347,7 @@ BarDrawer {
                         onClicked: root.player.previous()
                     }
                     CtrlButton {
-                        size: 44
+                        size: 38
                         filled: true
                         glyph: root.hasPlayer && root.player.isPlaying ? "" : ""
                         usable: root.hasPlayer && root.player.canTogglePlaying

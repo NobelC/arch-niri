@@ -8,9 +8,56 @@ import "../"
 BarDrawer {
     id: drawer
     menuName: "bluetooth"
-    panelWidth: 340
+    panelWidth: 360
     rightOffset: 18
     contentHeight: root.implicitHeight
+
+    // ---------- Aviso reutilizable (nivel raíz) ----------
+    component Hint: Rectangle {
+        id: hint
+        property string hintIcon: ""
+        property string hintText: ""
+        property string hintSub: ""
+
+        Layout.fillWidth: true
+        implicitHeight: hintCol.implicitHeight + 24
+        radius: Theme.radius
+        color: Theme.card
+        border.width: Theme.borderWidth
+        border.color: Theme.border
+
+        Column {
+            id: hintCol
+            anchors.centerIn: parent
+            spacing: 4
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: hint.hintIcon !== ""
+                text: hint.hintIcon
+                color: Theme.muted
+                font.family: Theme.fontFamily
+                font.pixelSize: 18
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: hint.hintText
+                color: Theme.text
+                font.family: Theme.cjkFont
+                font.pixelSize: 11
+                font.bold: true
+                font.letterSpacing: 1
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: hint.hintSub !== ""
+                text: hint.hintSub
+                color: Theme.muted
+                font.family: Theme.fontFamily
+                font.pixelSize: 10
+            }
+        }
+    }
 
     ColumnLayout {
         id: root
@@ -18,7 +65,7 @@ BarDrawer {
         spacing: 10
 
         readonly property bool active: drawer.isOpen
-        readonly property real maxListHeight: 5 * 52
+        readonly property real maxListHeight: 5 * 56
 
         readonly property var adapter: QsBt.Bluetooth.defaultAdapter
         readonly property bool hasAdapter: adapter !== null && adapter !== undefined
@@ -45,14 +92,14 @@ BarDrawer {
 
         readonly property string subtitle: {
             if (!hasAdapter)
-                return "No adapter";
+                return "NO ADAPTER";
             if (!adapterOn)
-                return "Off";
+                return "OFFLINE";
             if (connectedCount === 1)
-                return connectedList[0].name && connectedList[0].name.length > 0 ? connectedList[0].name : connectedList[0].address;
+                return (connectedList[0].name && connectedList[0].name.length > 0 ? connectedList[0].name : connectedList[0].address).toUpperCase();
             if (connectedCount > 1)
-                return connectedCount + " devices connected";
-            return scanning ? "Searching…" : "On  ·  nothing connected";
+                return "[ " + String(connectedCount).padStart(2, "0") + " ] CONNECTED";
+            return scanning ? "SCANNING..." : "ONLINE // IDLE";
         }
 
         // ---------- Utilidades ----------
@@ -98,49 +145,6 @@ BarDrawer {
                 adapter.discovering = false;
         }
 
-        // ---------- Aviso reutilizable ----------
-        component Hint: Rectangle {
-            id: hint
-            property string hintIcon: ""
-            property string hintText: ""
-            property string hintSub: ""
-
-            Layout.fillWidth: true
-            implicitHeight: hintCol.implicitHeight + 24
-            radius: 12
-            color: Theme.card
-
-            Column {
-                id: hintCol
-                anchors.centerIn: parent
-                spacing: 3
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    visible: hint.hintIcon !== ""
-                    text: hint.hintIcon
-                    color: Theme.muted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 20
-                }
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: hint.hintText
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                }
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    visible: hint.hintSub !== ""
-                    text: hint.hintSub
-                    color: Theme.muted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                }
-            }
-        }
-
         // ---------- Cabecera integrada ----------
         RowLayout {
             Layout.fillWidth: true
@@ -149,13 +153,15 @@ BarDrawer {
             Rectangle {
                 width: 32
                 height: 32
-                radius: 9
-                color: (root.adapterOn && root.connectedCount > 0) ? Theme.cardAlt : Theme.card
+                radius: Theme.radius
+                color: (root.adapterOn && root.connectedCount > 0) ? Theme.accent : Theme.card
+                border.width: Theme.borderWidth
+                border.color: (root.adapterOn && root.connectedCount > 0) ? Theme.accent : Theme.border
 
                 Text {
                     anchors.centerIn: parent
                     text: (root.adapterOn && root.connectedCount > 0) ? "󰂱" : ""
-                    color: (root.adapterOn && root.connectedCount > 0) ? Theme.highlight : Theme.muted
+                    color: (root.adapterOn && root.connectedCount > 0) ? Theme.bg : Theme.muted
                     font.family: Theme.fontFamily
                     font.pixelSize: 15
                 }
@@ -166,18 +172,21 @@ BarDrawer {
                 spacing: 1
 
                 Text {
-                    text: "Bluetooth"
+                    text: "青歯 // BLUETOOTH"
                     color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.family: Theme.cjkFont
+                    font.pixelSize: 12
                     font.bold: true
+                    font.letterSpacing: 1.2
                 }
                 Text {
                     Layout.fillWidth: true
                     text: root.subtitle
-                    color: Theme.sub
+                    color: (root.adapterOn && root.connectedCount > 0) ? Theme.accentSoft : Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 10
+                    font.bold: root.adapterOn && root.connectedCount > 0
+                    font.letterSpacing: 0.8
                     elide: Text.ElideRight
                 }
             }
@@ -185,16 +194,20 @@ BarDrawer {
             // Botón respaldo técnico (bluetui)
             Rectangle {
                 width: 26
-                height: 26
-                radius: 7
-                color: tuiHover.containsMouse ? Theme.cardAlt : "transparent"
+                height: 24
+                radius: Theme.radius
+                color: tuiHover.containsMouse ? Theme.cardAlt : Theme.card
+                border.width: Theme.borderWidth
+                border.color: tuiHover.containsMouse ? Theme.text : Theme.border
+
+                Behavior on color { ColorAnimation { duration: 100 } }
 
                 Text {
                     anchors.centerIn: parent
                     text: ""
-                    color: Theme.sub
+                    color: tuiHover.containsMouse ? Theme.text : Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.pixelSize: 12
                 }
 
                 MouseArea {
@@ -209,25 +222,28 @@ BarDrawer {
                 }
             }
 
-            // Interruptor On/Off
+            // Switch rígido On/Off
             Rectangle {
-                width: 40
-                height: 22
-                radius: 11
+                width: 42
+                height: 24
+                radius: Theme.radius
                 opacity: root.hasAdapter ? 1.0 : 0.4
-                color: root.adapterOn ? Theme.accent : Theme.cardAlt
+                color: root.adapterOn ? Theme.accent : Theme.card
+                border.width: Theme.borderWidth
+                border.color: root.adapterOn ? Theme.accent : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: 120 } }
+                Behavior on border.color { ColorAnimation { duration: 120 } }
 
                 Rectangle {
-                    width: 16
-                    height: 16
-                    radius: 8
-                    y: 3
-                    x: root.adapterOn ? 21 : 3
+                    width: 14
+                    height: 14
+                    radius: Theme.radius
+                    y: 5
+                    x: root.adapterOn ? 23 : 5
                     color: root.adapterOn ? Theme.bg : Theme.sub
 
-                    Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                    Behavior on x { NumberAnimation { duration: 130; easing.type: Easing.OutExpo } }
                 }
 
                 MouseArea {
@@ -239,17 +255,24 @@ BarDrawer {
             }
         }
 
+        // Divisor
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.borderWidth
+            color: Theme.border
+        }
+
         // ---------- Avisos de estado ----------
         Hint {
             visible: !root.hasAdapter
             hintIcon: "󰂲"
-            hintText: "No Bluetooth adapter found"
+            hintText: "機器なし // NO BT ADAPTER"
         }
         Hint {
             visible: root.hasAdapter && !root.adapterOn
             hintIcon: "󰂲"
-            hintText: "Bluetooth is off"
-            hintSub: "Turn it on to connect your devices"
+            hintText: "青歯停止 // BLUETOOTH IS OFF"
+            hintSub: "Enable Bluetooth to connect devices"
         }
 
         // ---------- Título de sección + buscar ----------
@@ -259,26 +282,35 @@ BarDrawer {
 
             Text {
                 Layout.fillWidth: true
-                text: root.devices.length > 0 ? "Devices  ·  " + root.devices.length : "Devices"
+                text: root.devices.length > 0
+                    ? "DEVICES // [ " + String(root.devices.length).padStart(2, "0") + " ]"
+                    : "DEVICES"
                 color: Theme.sub
                 font.family: Theme.fontFamily
-                font.pixelSize: 11
+                font.pixelSize: 10
+                font.bold: true
+                font.letterSpacing: 1
             }
 
             Rectangle {
-                implicitWidth: scanText.implicitWidth + 20
+                implicitWidth: scanText.implicitWidth + 16
                 implicitHeight: 24
-                radius: 8
+                radius: Theme.radius
                 color: root.scanning ? Theme.accent : (scanArea.containsMouse ? Theme.cardAlt : Theme.card)
+                border.width: Theme.borderWidth
+                border.color: root.scanning ? Theme.accent : (scanArea.containsMouse ? Theme.text : Theme.border)
+
+                Behavior on color { ColorAnimation { duration: 100 } }
 
                 Text {
                     id: scanText
                     anchors.centerIn: parent
-                    text: root.scanning ? "Stop" : "Scan"
+                    text: root.scanning ? "STOP" : "SCAN"
                     color: root.scanning ? Theme.bg : Theme.text
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    font.bold: root.scanning
+                    font.pixelSize: 9
+                    font.bold: true
+                    font.letterSpacing: 0.8
                 }
                 MouseArea {
                     id: scanArea
@@ -297,7 +329,7 @@ BarDrawer {
             Layout.fillWidth: true
             Layout.preferredHeight: Math.min(contentHeight, root.maxListHeight)
             clip: true
-            spacing: 3
+            spacing: 6
             boundsBehavior: Flickable.StopAtBounds
             model: root.devices
 
@@ -306,28 +338,47 @@ BarDrawer {
                 required property var modelData
                 readonly property var dev: modelData
                 readonly property bool lowBattery: dev.batteryAvailable && dev.battery <= 0.2
+                readonly property int batBlocks: dev.batteryAvailable
+                    ? Math.max(1, Math.min(4, Math.ceil(dev.battery * 4)))
+                    : 0
 
                 width: list.width
-                height: 49
-                radius: 10
-                color: dev.connected ? Theme.card : (rowArea.containsMouse ? Theme.cardAlt : "transparent")
+                height: 52
+                radius: Theme.radius
+                color: dev.connected ? Theme.card : (rowArea.containsMouse ? Theme.card : Theme.bg)
+                border.width: Theme.borderWidth
+                border.color: dev.connected ? Theme.accent : (rowArea.containsMouse ? Theme.border : Theme.cardAlt)
+                clip: true
+
+                // Franja lateral de acento en dispositivos conectados
+                Rectangle {
+                    visible: row.dev.connected
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.margins: Theme.borderWidth
+                    width: 3
+                    color: Theme.accent
+                }
 
                 Rectangle {
                     id: tile
                     anchors.left: parent.left
-                    anchors.leftMargin: 8
+                    anchors.leftMargin: row.dev.connected ? 13 : 9
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 32
-                    height: 32
-                    radius: 10
+                    width: 30
+                    height: 30
+                    radius: Theme.radius
                     color: row.dev.connected ? Theme.accent : Theme.cardAlt
+                    border.width: 1
+                    border.color: row.dev.connected ? Theme.accent : Theme.border
 
                     Text {
                         anchors.centerIn: parent
                         text: root.glyphFor(row.dev)
-                        color: row.dev.connected ? Theme.bg : Theme.muted
+                        color: row.dev.connected ? Theme.bg : Theme.sub
                         font.family: Theme.fontFamily
-                        font.pixelSize: 14
+                        font.pixelSize: 13
                     }
                 }
 
@@ -337,7 +388,7 @@ BarDrawer {
                     anchors.right: actionButton.left
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 1
+                    spacing: 2
 
                     Text {
                         width: parent.width
@@ -345,7 +396,7 @@ BarDrawer {
                         text: root.deviceName(row.dev)
                         color: row.dev.connected ? Theme.text : Theme.sub
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                        font.pixelSize: 11
                         font.bold: row.dev.connected
                     }
 
@@ -353,36 +404,44 @@ BarDrawer {
                         spacing: 6
 
                         Text {
-                            text: row.dev.connected ? "Connected" : (row.dev.paired ? "Paired" : "Available")
-                            color: Theme.muted
+                            text: row.dev.connected ? "CONNECTED" : (row.dev.paired ? "PAIRED" : "AVAILABLE")
+                            color: row.dev.connected ? Theme.accentSoft : Theme.muted
                             font.family: Theme.fontFamily
-                            font.pixelSize: 10
+                            font.pixelSize: 9
+                            font.bold: row.dev.connected
+                            font.letterSpacing: 0.6
                         }
 
+                        // Mini medidor de batería en 4 bloques rígidos
                         Row {
                             visible: row.dev.connected && row.dev.batteryAvailable
                             spacing: 4
                             anchors.verticalCenter: parent.verticalCenter
 
-                            Rectangle {
+                            Row {
+                                spacing: 2
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: 20
-                                height: 6
-                                radius: 3
-                                color: Theme.cardAlt
 
-                                Rectangle {
-                                    width: parent.width * Math.max(0, Math.min(1, row.dev.battery))
-                                    height: parent.height
-                                    radius: 3
-                                    color: row.lowBattery ? Theme.warn : Theme.accent
+                                Repeater {
+                                    model: 4
+                                    Rectangle {
+                                        required property int index
+                                        width: 5
+                                        height: 8
+                                        radius: Theme.radius
+                                        color: index < row.batBlocks
+                                            ? (row.lowBattery ? Theme.warn : Theme.accent)
+                                            : Theme.cardAlt
+                                    }
                                 }
                             }
+
                             Text {
                                 text: Math.round(row.dev.battery * 100) + "%"
                                 color: row.lowBattery ? Theme.warn : Theme.muted
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 10
+                                font.pixelSize: 9
+                                font.bold: true
                             }
                         }
                     }
@@ -393,18 +452,28 @@ BarDrawer {
                     anchors.right: parent.right
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 84
-                    height: 28
-                    radius: 8
-                    color: actionArea.containsMouse ? Theme.border : (row.dev.connected ? Theme.cardAlt : Theme.card)
+                    width: 82
+                    height: 26
+                    radius: Theme.radius
+                    color: actionArea.containsMouse
+                        ? (row.dev.connected ? Theme.warn : Theme.accent)
+                        : Theme.bg
+                    border.width: Theme.borderWidth
+                    border.color: actionArea.containsMouse
+                        ? (row.dev.connected ? Theme.warn : Theme.accent)
+                        : Theme.border
+
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Behavior on border.color { ColorAnimation { duration: 100 } }
 
                     Text {
                         anchors.centerIn: parent
-                        text: row.dev.connected ? "Disconnect" : (row.dev.paired ? "Connect" : "Pair")
-                        color: Theme.text
+                        text: row.dev.connected ? "DISCONNECT" : (row.dev.paired ? "CONNECT" : "PAIR")
+                        color: actionArea.containsMouse ? Theme.bg : Theme.text
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: 9
                         font.bold: true
+                        font.letterSpacing: 0.6
                     }
 
                     MouseArea {
@@ -435,8 +504,8 @@ BarDrawer {
         Hint {
             visible: root.adapterOn && root.devices.length === 0
             hintIcon: "󰂲"
-            hintText: root.scanning ? "Searching for devices…" : "No devices found"
-            hintSub: root.scanning ? "" : "Press Scan to look again"
+            hintText: root.scanning ? "探索中 // SCANNING..." : "機器なし // NO DEVICES"
+            hintSub: root.scanning ? "" : "Press SCAN to search nearby devices"
         }
     }
 }

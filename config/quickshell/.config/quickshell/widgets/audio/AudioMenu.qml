@@ -8,7 +8,7 @@ import "../"
 BarDrawer {
     id: drawer
     menuName: "audio"
-    panelWidth: 350
+    panelWidth: 360
     rightOffset: 6
     contentHeight: root.implicitHeight
 
@@ -21,6 +21,82 @@ BarDrawer {
             ...root.inputDevices,
             ...root.rawAppStreams
         ]
+    }
+
+    // ---------- Slider rígido reutilizable (nivel raíz) ----------
+    component VolumeSlider: Item {
+        id: slider
+        property real value: 0.0
+        property color fillColor: Theme.accent
+        property bool muted: false
+        signal moved(real newValue)
+
+        Layout.fillWidth: true
+        implicitHeight: 22
+
+        Rectangle {
+            id: track
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width
+            height: 8
+            radius: Theme.radius
+            color: Theme.bg
+            border.width: 1
+            border.color: Theme.border
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.margins: 1
+                width: Math.max(0, (parent.width - 2) * Math.max(0, Math.min(1, slider.muted ? 0 : slider.value)))
+                radius: Theme.radius
+                color: slider.muted ? Theme.muted : slider.fillColor
+
+                Behavior on width {
+                    enabled: !dragArea.pressed
+                    NumberAnimation { duration: 80; easing.type: Easing.OutCubic }
+                }
+                Behavior on color { ColorAnimation { duration: 120 } }
+            }
+        }
+
+        // Deslizador rectangular rígido
+        Rectangle {
+            width: 10
+            height: 18
+            radius: Theme.radius
+            anchors.verticalCenter: parent.verticalCenter
+            x: Math.max(0, Math.min(track.width - width, (track.width * Math.max(0, Math.min(1, slider.muted ? 0 : slider.value))) - (width / 2)))
+            color: slider.muted ? Theme.sub : Theme.text
+            border.width: Theme.borderWidth
+            border.color: slider.muted ? Theme.muted : slider.fillColor
+
+            Behavior on x {
+                enabled: !dragArea.pressed
+                NumberAnimation { duration: 80; easing.type: Easing.OutCubic }
+            }
+        }
+
+        MouseArea {
+            id: dragArea
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+
+            function updateFromX(mouseX) {
+                const ratio = Math.max(0, Math.min(1, mouseX / width));
+                slider.moved(ratio);
+            }
+
+            onPressed: mouse => updateFromX(mouse.x)
+            onPositionChanged: mouse => {
+                if (pressed) updateFromX(mouse.x);
+            }
+            onWheel: wheel => {
+                const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
+                slider.moved(Math.max(0, Math.min(1, slider.value + step)));
+            }
+        }
     }
 
     ColumnLayout {
@@ -80,7 +156,6 @@ BarDrawer {
             return out;
         }
 
-        // Agrupa streams duplicados de una misma aplicación en una sola fila
         readonly property var groupedApps: {
             const map = {};
             const list = [];
@@ -106,76 +181,6 @@ BarDrawer {
             return "";
         }
 
-        // ---------- Slider reutilizable ----------
-        component VolumeSlider: Item {
-            id: slider
-            property real value: 0.0
-            property color fillColor: Theme.accent
-            property bool muted: false
-            signal moved(real newValue)
-
-            Layout.fillWidth: true
-            implicitHeight: 22
-
-            Rectangle {
-                id: track
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width
-                height: 6
-                radius: 3
-                color: Theme.cardAlt
-
-                Rectangle {
-                    width: parent.width * Math.max(0, Math.min(1, slider.muted ? 0 : slider.value))
-                    height: parent.height
-                    radius: 3
-                    color: slider.muted ? Theme.muted : slider.fillColor
-
-                    Behavior on width {
-                        enabled: !dragArea.pressed
-                        NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                    }
-                    Behavior on color { ColorAnimation { duration: 150 } }
-                }
-            }
-
-            Rectangle {
-                width: 14
-                height: 14
-                radius: 7
-                anchors.verticalCenter: parent.verticalCenter
-                x: Math.max(0, Math.min(track.width - width, (track.width * Math.max(0, Math.min(1, slider.muted ? 0 : slider.value))) - (width / 2)))
-                color: slider.muted ? Theme.sub : Theme.text
-                border.width: 2
-                border.color: slider.muted ? Theme.muted : slider.fillColor
-
-                Behavior on x {
-                    enabled: !dragArea.pressed
-                    NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                }
-            }
-
-            MouseArea {
-                id: dragArea
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-
-                function updateFromX(mouseX) {
-                    const ratio = Math.max(0, Math.min(1, mouseX / width));
-                    slider.moved(ratio);
-                }
-
-                onPressed: mouse => updateFromX(mouse.x)
-                onPositionChanged: mouse => {
-                    if (pressed) updateFromX(mouse.x);
-                }
-                onWheel: wheel => {
-                    const step = wheel.angleDelta.y > 0 ? 0.05 : -0.05;
-                    slider.moved(Math.max(0, Math.min(1, slider.value + step)));
-                }
-            }
-        }
-
         // ---------- Cabecera fija ----------
         RowLayout {
             Layout.fillWidth: true
@@ -184,13 +189,17 @@ BarDrawer {
             Rectangle {
                 width: 32
                 height: 32
-                radius: 9
-                color: !root.sinkMuted ? Theme.cardAlt : Theme.card
+                radius: Theme.radius
+                color: root.sinkMuted ? Theme.warn : Theme.accent
+                border.width: Theme.borderWidth
+                border.color: root.sinkMuted ? Theme.warn : Theme.accent
+
+                Behavior on color { ColorAnimation { duration: 120 } }
 
                 Text {
                     anchors.centerIn: parent
                     text: root.sinkIcon()
-                    color: root.sinkMuted ? Theme.warn : Theme.accentSoft
+                    color: Theme.bg
                     font.family: Theme.fontFamily
                     font.pixelSize: 15
                 }
@@ -201,34 +210,40 @@ BarDrawer {
                 spacing: 1
 
                 Text {
-                    text: "Audio"
+                    text: "音響 // AUDIO"
                     color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.family: Theme.cjkFont
+                    font.pixelSize: 12
                     font.bold: true
+                    font.letterSpacing: 1.2
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: Audio.nodeLabel(root.sink, "No output device")
-                    color: Theme.sub
+                    text: Audio.nodeLabel(root.sink, "NO OUTPUT DEVICE").toUpperCase()
+                    color: root.sinkMuted ? Theme.warn : Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 10
+                    font.letterSpacing: 0.6
                     elide: Text.ElideRight
                 }
             }
 
             Rectangle {
                 width: 26
-                height: 26
-                radius: 7
-                color: tuiHover.containsMouse ? Theme.cardAlt : "transparent"
+                height: 24
+                radius: Theme.radius
+                color: tuiHover.containsMouse ? Theme.cardAlt : Theme.card
+                border.width: Theme.borderWidth
+                border.color: tuiHover.containsMouse ? Theme.text : Theme.border
+
+                Behavior on color { ColorAnimation { duration: 100 } }
 
                 Text {
                     anchors.centerIn: parent
                     text: ""
-                    color: Theme.sub
+                    color: tuiHover.containsMouse ? Theme.text : Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.pixelSize: 12
                 }
 
                 MouseArea {
@@ -244,21 +259,44 @@ BarDrawer {
             }
         }
 
+        // Divisor
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.borderWidth
+            color: Theme.border
+        }
+
         // ---------- Control Maestro fijo (Salida + Micrófono) ----------
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: masterCol.implicitHeight + 22
-            radius: 12
+            implicitHeight: masterCol.implicitHeight + 24
+            radius: Theme.radius
             color: Theme.card
+            border.width: Theme.borderWidth
+            border.color: Theme.border
+            clip: true
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.borderWidth
+                width: 3
+                color: root.sinkMuted ? Theme.warn : Theme.accent
+            }
 
             ColumnLayout {
                 id: masterCol
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.margins: 11
+                anchors.topMargin: 12
+                anchors.bottomMargin: 12
+                anchors.leftMargin: 15
+                anchors.rightMargin: 12
                 spacing: 10
 
+                // Salida maestra
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 10
@@ -266,15 +304,17 @@ BarDrawer {
                     Rectangle {
                         width: 28
                         height: 28
-                        radius: 8
-                        color: muteOutHover.containsMouse ? Theme.border : Theme.cardAlt
+                        radius: Theme.radius
+                        color: root.sinkMuted ? Theme.warn : (muteOutHover.containsMouse ? Theme.cardAlt : Theme.bg)
+                        border.width: Theme.borderWidth
+                        border.color: root.sinkMuted ? Theme.warn : (muteOutHover.containsMouse ? Theme.text : Theme.border)
 
                         Text {
                             anchors.centerIn: parent
                             text: root.sinkIcon()
-                            color: root.sinkMuted ? Theme.warn : Theme.accentSoft
+                            color: root.sinkMuted ? Theme.bg : Theme.accentSoft
                             font.family: Theme.fontFamily
-                            font.pixelSize: 14
+                            font.pixelSize: 13
                         }
 
                         MouseArea {
@@ -304,16 +344,17 @@ BarDrawer {
                     }
 
                     Text {
-                        Layout.preferredWidth: 34
+                        Layout.preferredWidth: 36
                         horizontalAlignment: Text.AlignRight
-                        text: root.sinkMuted ? "Mute" : Math.round(root.sinkVol * 100) + "%"
+                        text: root.sinkMuted ? "MUTE" : Math.round(root.sinkVol * 100) + "%"
                         color: root.sinkMuted ? Theme.warn : Theme.text
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 10
                         font.bold: true
                     }
                 }
 
+                // Micrófono maestro
                 RowLayout {
                     visible: root.source !== null
                     Layout.fillWidth: true
@@ -322,15 +363,17 @@ BarDrawer {
                     Rectangle {
                         width: 28
                         height: 28
-                        radius: 8
-                        color: muteInHover.containsMouse ? Theme.border : Theme.cardAlt
+                        radius: Theme.radius
+                        color: root.sourceMuted ? Theme.warn : (muteInHover.containsMouse ? Theme.cardAlt : Theme.bg)
+                        border.width: Theme.borderWidth
+                        border.color: root.sourceMuted ? Theme.warn : (muteInHover.containsMouse ? Theme.text : Theme.border)
 
                         Text {
                             anchors.centerIn: parent
                             text: root.sourceMuted ? "󰍭" : "󰍬"
-                            color: root.sourceMuted ? Theme.warn : Theme.highlight
+                            color: root.sourceMuted ? Theme.bg : Theme.highlight
                             font.family: Theme.fontFamily
-                            font.pixelSize: 14
+                            font.pixelSize: 13
                         }
 
                         MouseArea {
@@ -358,12 +401,13 @@ BarDrawer {
                     }
 
                     Text {
-                        Layout.preferredWidth: 34
+                        Layout.preferredWidth: 36
                         horizontalAlignment: Text.AlignRight
-                        text: root.sourceMuted ? "Mute" : Math.round(root.sourceVol * 100) + "%"
+                        text: root.sourceMuted ? "MUTE" : Math.round(root.sourceVol * 100) + "%"
                         color: root.sourceMuted ? Theme.warn : Theme.sub
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 10
+                        font.bold: true
                     }
                 }
             }
@@ -387,16 +431,18 @@ BarDrawer {
                 // Salidas físicas
                 Text {
                     visible: root.physicalOutputs.length > 0
-                    text: "Output devices"
-                    color: Theme.sub
+                    text: "OUTPUTS"
+                    color: Theme.muted
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 9
+                    font.bold: true
+                    font.letterSpacing: 1
                 }
 
                 ColumnLayout {
                     visible: root.physicalOutputs.length > 0
                     Layout.fillWidth: true
-                    spacing: 3
+                    spacing: 4
 
                     Repeater {
                         model: root.physicalOutputs
@@ -408,12 +454,25 @@ BarDrawer {
 
                             Layout.fillWidth: true
                             implicitHeight: 34
-                            radius: 9
-                            color: isDefault ? Theme.cardAlt : (outHover.containsMouse ? Theme.card : "transparent")
+                            radius: Theme.radius
+                            color: isDefault ? Theme.cardAlt : (outHover.containsMouse ? Theme.card : Theme.bg)
+                            border.width: Theme.borderWidth
+                            border.color: isDefault ? Theme.accent : (outHover.containsMouse ? Theme.border : Theme.cardAlt)
+                            clip: true
+
+                            Rectangle {
+                                visible: outDevRow.isDefault
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.margins: Theme.borderWidth
+                                width: 3
+                                color: Theme.accent
+                            }
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.leftMargin: 10
+                                anchors.leftMargin: outDevRow.isDefault ? 13 : 10
                                 anchors.rightMargin: 10
                                 spacing: 8
 
@@ -449,16 +508,18 @@ BarDrawer {
                 // Buses virtuales (Stream-Share / Music-Bus)
                 Text {
                     visible: root.virtualBuses.length > 0
-                    text: "Virtual buses"
-                    color: Theme.sub
+                    text: "VIRTUAL BUSES"
+                    color: Theme.muted
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 9
+                    font.bold: true
+                    font.letterSpacing: 1
                 }
 
                 ColumnLayout {
                     visible: root.virtualBuses.length > 0
                     Layout.fillWidth: true
-                    spacing: 3
+                    spacing: 4
 
                     Repeater {
                         model: root.virtualBuses
@@ -470,12 +531,25 @@ BarDrawer {
 
                             Layout.fillWidth: true
                             implicitHeight: 32
-                            radius: 9
-                            color: isDefault ? Theme.cardAlt : (busHover.containsMouse ? Theme.card : "transparent")
+                            radius: Theme.radius
+                            color: isDefault ? Theme.cardAlt : (busHover.containsMouse ? Theme.card : Theme.bg)
+                            border.width: Theme.borderWidth
+                            border.color: isDefault ? Theme.highlight : (busHover.containsMouse ? Theme.border : Theme.cardAlt)
+                            clip: true
+
+                            Rectangle {
+                                visible: busRow.isDefault
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.margins: Theme.borderWidth
+                                width: 3
+                                color: Theme.highlight
+                            }
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.leftMargin: 10
+                                anchors.leftMargin: busRow.isDefault ? 13 : 10
                                 anchors.rightMargin: 10
                                 spacing: 8
 
@@ -511,16 +585,18 @@ BarDrawer {
                 // Entradas (Micrófonos + RNNoise)
                 Text {
                     visible: root.inputDevices.length > 1
-                    text: "Input devices"
-                    color: Theme.sub
+                    text: "INPUTS"
+                    color: Theme.muted
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 9
+                    font.bold: true
+                    font.letterSpacing: 1
                 }
 
                 ColumnLayout {
                     visible: root.inputDevices.length > 1
                     Layout.fillWidth: true
-                    spacing: 3
+                    spacing: 4
 
                     Repeater {
                         model: root.inputDevices
@@ -532,12 +608,25 @@ BarDrawer {
 
                             Layout.fillWidth: true
                             implicitHeight: 34
-                            radius: 9
-                            color: isDefault ? Theme.cardAlt : (inHover.containsMouse ? Theme.card : "transparent")
+                            radius: Theme.radius
+                            color: isDefault ? Theme.cardAlt : (inHover.containsMouse ? Theme.card : Theme.bg)
+                            border.width: Theme.borderWidth
+                            border.color: isDefault ? Theme.highlight : (inHover.containsMouse ? Theme.border : Theme.cardAlt)
+                            clip: true
+
+                            Rectangle {
+                                visible: inDevRow.isDefault
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.margins: Theme.borderWidth
+                                width: 3
+                                color: Theme.highlight
+                            }
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.leftMargin: 10
+                                anchors.leftMargin: inDevRow.isDefault ? 13 : 10
                                 anchors.rightMargin: 10
                                 spacing: 8
 
@@ -573,10 +662,12 @@ BarDrawer {
                 // Aplicaciones (sin duplicados)
                 Text {
                     visible: root.groupedApps.length > 0
-                    text: "Applications"
-                    color: Theme.sub
+                    text: "APPLICATIONS"
+                    color: Theme.muted
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 9
+                    font.bold: true
+                    font.letterSpacing: 1
                 }
 
                 ColumnLayout {
@@ -595,17 +686,19 @@ BarDrawer {
                             readonly property real appVol: primary && primary.audio ? primary.audio.volume : 0
 
                             Layout.fillWidth: true
-                            implicitHeight: appCol.implicitHeight + 16
-                            radius: 10
+                            implicitHeight: appCol.implicitHeight + 18
+                            radius: Theme.radius
                             color: Theme.card
+                            border.width: Theme.borderWidth
+                            border.color: Theme.border
 
                             ColumnLayout {
                                 id: appCol
                                 anchors.left: parent.left
                                 anchors.right: parent.right
                                 anchors.top: parent.top
-                                anchors.margins: 8
-                                spacing: 4
+                                anchors.margins: 9
+                                spacing: 5
 
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -613,19 +706,21 @@ BarDrawer {
 
                                     Text {
                                         Layout.fillWidth: true
-                                        text: appRow.modelData.name
+                                        text: appRow.modelData.name.toUpperCase()
                                         color: Theme.text
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: 11
+                                        font.pixelSize: 10
                                         font.bold: true
+                                        font.letterSpacing: 0.6
                                         elide: Text.ElideRight
                                     }
 
                                     Text {
-                                        text: appRow.appMuted ? "Mute" : Math.round(appRow.appVol * 100) + "%"
-                                        color: appRow.appMuted ? Theme.warn : Theme.muted
+                                        text: appRow.appMuted ? "MUTE" : Math.round(appRow.appVol * 100) + "%"
+                                        color: appRow.appMuted ? Theme.warn : Theme.accent
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 10
+                                        font.bold: true
 
                                         MouseArea {
                                             anchors.fill: parent

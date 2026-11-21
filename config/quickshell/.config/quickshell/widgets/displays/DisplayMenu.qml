@@ -7,7 +7,7 @@ import "../"
 BarDrawer {
     id: drawer
     menuName: "displays"
-    panelWidth: 350
+    panelWidth: 360
     rightOffset: 120
     contentHeight: root.implicitHeight
 
@@ -16,7 +16,7 @@ BarDrawer {
         width: parent.width
         spacing: 10
 
-        // Cabecera
+        // ---------- Cabecera ----------
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
@@ -24,13 +24,15 @@ BarDrawer {
             Rectangle {
                 width: 32
                 height: 32
-                radius: 9
-                color: Theme.cardAlt
+                radius: Theme.radius
+                color: Theme.accent
+                border.width: Theme.borderWidth
+                border.color: Theme.accent
 
                 Text {
                     anchors.centerIn: parent
                     text: Displays.count > 1 ? "󰍺" : "󰍹"
-                    color: Theme.accent
+                    color: Theme.bg
                     font.family: Theme.fontFamily
                     font.pixelSize: 15
                 }
@@ -41,76 +43,111 @@ BarDrawer {
                 spacing: 1
 
                 Text {
-                    text: "Displays"
+                    text: "画面 // DISPLAYS"
                     color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.family: Theme.cjkFont
+                    font.pixelSize: 12
                     font.bold: true
+                    font.letterSpacing: 1.2
                 }
                 Text {
-                    text: Displays.count + (Displays.count === 1 ? " monitor connected" : " monitors connected")
+                    text: "[ " + String(Displays.count).padStart(2, "0") + " ] "
+                        + (Displays.count === 1 ? "MONITOR CONNECTED" : "MONITORS CONNECTED")
                     color: Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 10
+                    font.letterSpacing: 0.8
                 }
             }
         }
 
-        // Selector de Modo (solo si hay 2+ monitores)
-        RowLayout {
+        // Divisor
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.borderWidth
+            color: Theme.border
+        }
+
+        // ---------- Selector de Modo (solo si hay 2+ monitores) ----------
+        ColumnLayout {
             visible: Displays.count > 1
             Layout.fillWidth: true
             spacing: 6
 
-            Repeater {
-                model: [
-                    { id: "extend",    label: "Extend",    glyph: "󰍺" },
-                    { id: "mirror",    label: "Mirror",    glyph: "󰆏" },
-                    { id: "clamshell", label: "Clamshell", glyph: "󰌢" }
-                ]
+            Text {
+                text: "LAYOUT // MODE"
+                color: Theme.muted
+                font.family: Theme.fontFamily
+                font.pixelSize: 9
+                font.bold: true
+                font.letterSpacing: 1
+            }
 
-                delegate: Rectangle {
-                    id: modeBtn
-                    required property var modelData
-                    readonly property bool selected: Displays.mode === modelData.id
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
 
-                    Layout.fillWidth: true
-                    implicitHeight: 34
-                    radius: 9
-                    color: selected ? Theme.accent : (mHover.containsMouse ? Theme.cardAlt : Theme.card)
+                Repeater {
+                    model: [
+                        { id: "extend",    label: "EXTEND",    glyph: "󰍺" },
+                        { id: "mirror",    label: "MIRROR",    glyph: "󰆏" },
+                        { id: "clamshell", label: "CLAMSHELL", glyph: "󰌢" }
+                    ]
 
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 5
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modeBtn.modelData.glyph
-                            color: modeBtn.selected ? Theme.bg : Theme.accentSoft
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
+                    delegate: Rectangle {
+                        id: modeBtn
+                        required property var modelData
+                        readonly property bool selected: Displays.mode === modelData.id
+
+                        Layout.fillWidth: true
+                        implicitHeight: 32
+                        radius: Theme.radius
+                        color: selected
+                            ? Theme.accent
+                            : (mHover.containsMouse ? Theme.cardAlt : Theme.card)
+                        border.width: Theme.borderWidth
+                        border.color: selected
+                            ? Theme.accent
+                            : (mHover.containsMouse ? Theme.text : Theme.border)
+
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 5
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modeBtn.modelData.glyph
+                                color: modeBtn.selected ? Theme.bg : Theme.accentSoft
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modeBtn.modelData.label
+                                color: modeBtn.selected ? Theme.bg : Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 9
+                                font.bold: true
+                                font.letterSpacing: 0.6
+                            }
                         }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modeBtn.modelData.label
-                            color: modeBtn.selected ? Theme.bg : Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            font.bold: modeBtn.selected
-                        }
-                    }
 
-                    MouseArea {
-                        id: mHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: Displays.setMode(modeBtn.modelData.id)
+                        MouseArea {
+                            id: mHover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Displays.setMode(modeBtn.modelData.id)
+                        }
                     }
                 }
             }
         }
 
-        // Lista de monitores detectados
+        // ---------- Lista de monitores detectados ----------
         Repeater {
             model: Displays.outputs
 
@@ -118,19 +155,37 @@ BarDrawer {
                 id: outCard
                 required property var modelData
                 readonly property bool isVert: modelData.transform === "90" || modelData.transform === "270"
+                readonly property bool isPrim: modelData.isPrimary
 
                 Layout.fillWidth: true
-                implicitHeight: cardCol.implicitHeight + 18
-                radius: 11
+                implicitHeight: cardCol.implicitHeight + 22
+                radius: Theme.radius
                 color: Theme.card
-                opacity: modelData.enabled ? 1.0 : 0.5
+                border.width: Theme.borderWidth
+                border.color: isPrim ? Theme.accent : Theme.border
+                opacity: modelData.enabled ? 1.0 : 0.45
+                clip: true
+
+                // Franja lateral de acento en el monitor principal
+                Rectangle {
+                    visible: outCard.isPrim
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.margins: Theme.borderWidth
+                    width: 3
+                    color: Theme.accent
+                }
 
                 ColumnLayout {
                     id: cardCol
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.margins: 9
+                    anchors.topMargin: 10
+                    anchors.bottomMargin: 10
+                    anchors.leftMargin: outCard.isPrim ? 14 : 10
+                    anchors.rightMargin: 10
                     spacing: 8
 
                     RowLayout {
@@ -139,7 +194,7 @@ BarDrawer {
 
                         Text {
                             Layout.fillWidth: true
-                            text: outCard.modelData.name + (outCard.modelData.model !== "" ? " · " + outCard.modelData.model : "")
+                            text: (outCard.modelData.name + (outCard.modelData.model !== "" ? " // " + outCard.modelData.model : "")).toUpperCase()
                             color: Theme.text
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
@@ -147,11 +202,24 @@ BarDrawer {
                             elide: Text.ElideRight
                         }
 
-                        Text {
-                            text: outCard.modelData.maxMode
-                            color: Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
+                        Rectangle {
+                            visible: outCard.modelData.maxMode !== ""
+                            implicitWidth: modeTxt.implicitWidth + 10
+                            implicitHeight: 18
+                            radius: Theme.radius
+                            color: Theme.bg
+                            border.width: 1
+                            border.color: Theme.border
+
+                            Text {
+                                id: modeTxt
+                                anchors.centerIn: parent
+                                text: outCard.modelData.maxMode
+                                color: Theme.muted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 9
+                                font.bold: true
+                            }
                         }
                     }
 
@@ -163,23 +231,32 @@ BarDrawer {
                         Rectangle {
                             Layout.fillWidth: true
                             implicitHeight: 26
-                            radius: 7
-                            color: outCard.modelData.isPrimary ? Theme.accentSoft : (pHover.containsMouse ? Theme.border : Theme.cardAlt)
+                            radius: Theme.radius
+                            color: outCard.isPrim
+                                ? Theme.accentSoft
+                                : (pHover.containsMouse ? Theme.cardAlt : Theme.bg)
+                            border.width: Theme.borderWidth
+                            border.color: outCard.isPrim
+                                ? Theme.accentSoft
+                                : (pHover.containsMouse ? Theme.text : Theme.border)
+
+                            Behavior on color { ColorAnimation { duration: 100 } }
 
                             Text {
                                 anchors.centerIn: parent
-                                text: outCard.modelData.isPrimary ? "★ Primary" : "Set Primary"
-                                color: outCard.modelData.isPrimary ? Theme.bg : Theme.text
+                                text: outCard.isPrim ? "★ PRIMARY" : "SET PRIMARY"
+                                color: outCard.isPrim ? Theme.bg : Theme.text
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 10
-                                font.bold: outCard.modelData.isPrimary
+                                font.pixelSize: 9
+                                font.bold: true
+                                font.letterSpacing: 0.6
                             }
 
                             MouseArea {
                                 id: pHover
                                 anchors.fill: parent
                                 hoverEnabled: true
-                                enabled: !outCard.modelData.isPrimary && Displays.count > 1
+                                enabled: !outCard.isPrim && Displays.count > 1
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: Displays.setPrimary(outCard.modelData.name)
                             }
@@ -189,15 +266,21 @@ BarDrawer {
                         Rectangle {
                             Layout.fillWidth: true
                             implicitHeight: 26
-                            radius: 7
-                            color: rHover.containsMouse ? Theme.border : Theme.cardAlt
+                            radius: Theme.radius
+                            color: rHover.containsMouse ? Theme.cardAlt : Theme.bg
+                            border.width: Theme.borderWidth
+                            border.color: rHover.containsMouse ? Theme.text : Theme.border
+
+                            Behavior on color { ColorAnimation { duration: 100 } }
 
                             Text {
                                 anchors.centerIn: parent
-                                text: outCard.isVert ? "󰌥 Vertical" : "󰌤 Horizontal"
+                                text: outCard.isVert ? "󰌥 VERTICAL" : "󰌤 HORIZONTAL"
                                 color: Theme.text
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 10
+                                font.pixelSize: 9
+                                font.bold: true
+                                font.letterSpacing: 0.6
                             }
 
                             MouseArea {

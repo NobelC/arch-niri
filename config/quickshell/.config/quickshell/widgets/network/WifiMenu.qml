@@ -9,9 +9,56 @@ import "../"
 BarDrawer {
     id: drawer
     menuName: "wifi"
-    panelWidth: 340
+    panelWidth: 360
     rightOffset: 32
     contentHeight: root.implicitHeight
+
+    // ---------- Aviso reutilizable (nivel raíz) ----------
+    component Hint: Rectangle {
+        id: hint
+        property string hintIcon: ""
+        property string hintText: ""
+        property string hintSub: ""
+
+        Layout.fillWidth: true
+        implicitHeight: hintCol.implicitHeight + 24
+        radius: Theme.radius
+        color: Theme.card
+        border.width: Theme.borderWidth
+        border.color: Theme.border
+
+        Column {
+            id: hintCol
+            anchors.centerIn: parent
+            spacing: 4
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: hint.hintIcon !== ""
+                text: hint.hintIcon
+                color: Theme.muted
+                font.family: Theme.fontFamily
+                font.pixelSize: 18
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: hint.hintText
+                color: Theme.text
+                font.family: Theme.cjkFont
+                font.pixelSize: 11
+                font.bold: true
+                font.letterSpacing: 1
+            }
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: hint.hintSub !== ""
+                text: hint.hintSub
+                color: Theme.muted
+                font.family: Theme.fontFamily
+                font.pixelSize: 10
+            }
+        }
+    }
 
     ColumnLayout {
         id: root
@@ -20,7 +67,7 @@ BarDrawer {
 
         readonly property bool active: drawer.isOpen
         property string askingFor: ""
-        readonly property real maxListHeight: 5 * 42
+        readonly property real maxListHeight: 5 * 46
 
         // ---------- Estado ----------
         readonly property var wifiDevice: {
@@ -56,10 +103,10 @@ BarDrawer {
         }
 
         function quality(s) {
-            if (s >= 0.75) return "Excellent";
-            if (s >= 0.5)  return "Good";
-            if (s >= 0.25) return "Fair";
-            return "Weak";
+            if (s >= 0.75) return "EXCELLENT";
+            if (s >= 0.5)  return "GOOD";
+            if (s >= 0.25) return "FAIR";
+            return "WEAK";
         }
 
         function sigGlyph(s) {
@@ -105,9 +152,9 @@ BarDrawer {
         readonly property var details: {
             const out = [];
             if (root.band !== "")
-                out.push({ k: "Band", v: root.band + (root.channel !== "" ? "  ·  ch " + root.channel : "") });
+                out.push({ k: "BAND", v: root.band + (root.channel !== "" ? " // CH " + root.channel : "") });
             if (root.rate !== "")
-                out.push({ k: "Speed", v: root.rate });
+                out.push({ k: "SPEED", v: root.rate });
             if (root.ip !== "")
                 out.push({ k: "IP", v: root.ip });
             return out;
@@ -125,7 +172,7 @@ BarDrawer {
                     chan = p[1] || "";
                     const mhz = parseInt(p[2]);
                     if (!isNaN(mhz))
-                        band = mhz >= 5925 ? "6 GHz" : (mhz >= 4900 ? "5 GHz" : "2.4 GHz");
+                        band = mhz >= 5925 ? "6 GHZ" : (mhz >= 4900 ? "5 GHZ" : "2.4 GHZ");
                     rate = (p[3] || "").replace("Mbit/s", "Mb/s").trim();
                 }
             }
@@ -164,48 +211,6 @@ BarDrawer {
         Process { id: radio }
         Process { id: portal; command: ["xdg-open", "http://detectportal.firefox.com"] }
 
-        component Hint: Rectangle {
-            id: hint
-            property string hintIcon: ""
-            property string hintText: ""
-            property string hintSub: ""
-
-            Layout.fillWidth: true
-            implicitHeight: hintCol.implicitHeight + 24
-            radius: 12
-            color: Theme.card
-
-            Column {
-                id: hintCol
-                anchors.centerIn: parent
-                spacing: 3
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    visible: hint.hintIcon !== ""
-                    text: hint.hintIcon
-                    color: Theme.muted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 20
-                }
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: hint.hintText
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                }
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    visible: hint.hintSub !== ""
-                    text: hint.hintSub
-                    color: Theme.muted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                }
-            }
-        }
-
         // ---------- Cabecera integrada ----------
         RowLayout {
             Layout.fillWidth: true
@@ -214,13 +219,15 @@ BarDrawer {
             Rectangle {
                 width: 32
                 height: 32
-                radius: 9
-                color: (root.wifiOn && root.current) ? Theme.cardAlt : Theme.card
+                radius: Theme.radius
+                color: (root.wifiOn && root.current) ? Theme.accent : Theme.card
+                border.width: Theme.borderWidth
+                border.color: (root.wifiOn && root.current) ? Theme.accent : Theme.border
 
                 Text {
                     anchors.centerIn: parent
                     text: root.wifiOn && root.current ? root.sigGlyph(root.current.signalStrength) : "󰤭"
-                    color: (root.wifiOn && root.current) ? Theme.accentSoft : Theme.muted
+                    color: (root.wifiOn && root.current) ? Theme.bg : Theme.muted
                     font.family: Theme.fontFamily
                     font.pixelSize: 15
                 }
@@ -231,23 +238,26 @@ BarDrawer {
                 spacing: 1
 
                 Text {
-                    text: "Wi-Fi"
+                    text: "無線 // WI-FI"
                     color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.family: Theme.cjkFont
+                    font.pixelSize: 12
                     font.bold: true
+                    font.letterSpacing: 1.2
                 }
                 Text {
                     Layout.fillWidth: true
                     text: {
-                        if (!root.hasAdapter) return "No adapter";
-                        if (!root.wifiOn) return "Off";
-                        if (root.current) return root.current.name;
-                        return root.networks.length > 0 ? "Not connected" : "Searching…";
+                        if (!root.hasAdapter) return "NO ADAPTER";
+                        if (!root.wifiOn) return "OFFLINE";
+                        if (root.current) return root.current.name.toUpperCase();
+                        return root.networks.length > 0 ? "NOT CONNECTED" : "SCANNING...";
                     }
-                    color: Theme.sub
+                    color: (root.wifiOn && root.current) ? Theme.accentSoft : Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 10
+                    font.bold: root.wifiOn && root.current !== null
+                    font.letterSpacing: 0.8
                     elide: Text.ElideRight
                 }
             }
@@ -255,16 +265,20 @@ BarDrawer {
             // Botón respaldo técnico (nmtui)
             Rectangle {
                 width: 26
-                height: 26
-                radius: 7
-                color: tuiHover.containsMouse ? Theme.cardAlt : "transparent"
+                height: 24
+                radius: Theme.radius
+                color: tuiHover.containsMouse ? Theme.cardAlt : Theme.card
+                border.width: Theme.borderWidth
+                border.color: tuiHover.containsMouse ? Theme.text : Theme.border
+
+                Behavior on color { ColorAnimation { duration: 100 } }
 
                 Text {
                     anchors.centerIn: parent
                     text: ""
-                    color: Theme.sub
+                    color: tuiHover.containsMouse ? Theme.text : Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.pixelSize: 12
                 }
 
                 MouseArea {
@@ -279,25 +293,28 @@ BarDrawer {
                 }
             }
 
-            // Interruptor On/Off
+            // Switch rígido On/Off
             Rectangle {
-                width: 40
-                height: 22
-                radius: 11
+                width: 42
+                height: 24
+                radius: Theme.radius
                 opacity: root.hasAdapter ? 1.0 : 0.4
-                color: root.wifiOn ? Theme.accent : Theme.cardAlt
+                color: root.wifiOn ? Theme.accent : Theme.card
+                border.width: Theme.borderWidth
+                border.color: root.wifiOn ? Theme.accent : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: 120 } }
+                Behavior on border.color { ColorAnimation { duration: 120 } }
 
                 Rectangle {
-                    width: 16
-                    height: 16
-                    radius: 8
-                    y: 3
-                    x: root.wifiOn ? 21 : 3
+                    width: 14
+                    height: 14
+                    radius: Theme.radius
+                    y: 5
+                    x: root.wifiOn ? 23 : 5
                     color: root.wifiOn ? Theme.bg : Theme.sub
 
-                    Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                    Behavior on x { NumberAnimation { duration: 130; easing.type: Easing.OutExpo } }
                 }
 
                 MouseArea {
@@ -309,21 +326,31 @@ BarDrawer {
             }
         }
 
+        // Divisor
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.borderWidth
+            color: Theme.border
+        }
+
         // ---------- Portal cautivo ----------
         Rectangle {
             visible: root.wifiOn && Networking.connectivity === NetworkConnectivity.Portal
             Layout.fillWidth: true
-            implicitHeight: 30
-            radius: 10
+            implicitHeight: 32
+            radius: Theme.radius
             color: Theme.accent
+            border.width: Theme.borderWidth
+            border.color: Theme.text
 
             Text {
                 anchors.centerIn: parent
-                text: "Sign in to the network"
+                text: "PORTAL // SIGN IN TO NETWORK"
                 color: Theme.bg
                 font.family: Theme.fontFamily
-                font.pixelSize: 12
+                font.pixelSize: 11
                 font.bold: true
+                font.letterSpacing: 1
             }
             MouseArea {
                 anchors.fill: parent
@@ -336,13 +363,13 @@ BarDrawer {
         Hint {
             visible: !root.hasAdapter
             hintIcon: "󰤭"
-            hintText: "No Wi-Fi adapter found"
+            hintText: "機器なし // NO WI-FI ADAPTER"
         }
         Hint {
             visible: root.hasAdapter && !root.wifiOn
             hintIcon: "󰤭"
-            hintText: "Wi-Fi is off"
-            hintSub: "Turn it on to see nearby networks"
+            hintText: "無線停止 // WI-FI IS OFF"
+            hintSub: "Enable Wi-Fi to scan nearby networks"
         }
 
         // ---------- Red conectada ----------
@@ -351,15 +378,35 @@ BarDrawer {
             visible: root.wifiOn && root.current !== null
             Layout.fillWidth: true
             implicitHeight: cardCol.implicitHeight + 24
-            radius: 12
+            radius: Theme.radius
             color: Theme.card
+            border.width: Theme.borderWidth
+            border.color: Theme.accent
+            clip: true
+
+            readonly property int litSegments: root.current
+                ? Math.max(1, Math.min(10, Math.round(root.current.signalStrength * 10)))
+                : 0
+
+            // Franja lateral de estado
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.borderWidth
+                width: 3
+                color: Theme.accent
+            }
 
             ColumnLayout {
                 id: cardCol
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.margins: 12
+                anchors.topMargin: 12
+                anchors.bottomMargin: 12
+                anchors.leftMargin: 15
+                anchors.rightMargin: 12
                 spacing: 8
 
                 RowLayout {
@@ -375,33 +422,43 @@ BarDrawer {
                             text: root.current ? root.current.name : ""
                             color: Theme.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: 13
+                            font.pixelSize: 12
                             font.bold: true
                             elide: Text.ElideRight
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: root.current ? "Connected  ·  " + root.quality(root.current.signalStrength) + "  " + root.pct(root.current.signalStrength) + "%" : ""
+                            text: root.current
+                                ? "LINK // " + root.quality(root.current.signalStrength) + " " + root.pct(root.current.signalStrength) + "%"
+                                : ""
                             color: Theme.sub
                             font.family: Theme.fontFamily
-                            font.pixelSize: 11
+                            font.pixelSize: 10
+                            font.letterSpacing: 0.6
                             elide: Text.ElideRight
                         }
                     }
 
                     Rectangle {
-                        implicitWidth: dcText.implicitWidth + 18
-                        implicitHeight: 26
-                        radius: 8
-                        color: dcArea.containsMouse ? Theme.border : Theme.cardAlt
+                        implicitWidth: dcText.implicitWidth + 14
+                        implicitHeight: 24
+                        radius: Theme.radius
+                        color: dcArea.containsMouse ? Theme.warn : Theme.bg
+                        border.width: Theme.borderWidth
+                        border.color: dcArea.containsMouse ? Theme.warn : Theme.border
+
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Behavior on border.color { ColorAnimation { duration: 100 } }
 
                         Text {
                             id: dcText
                             anchors.centerIn: parent
-                            text: "Disconnect"
-                            color: Theme.text
+                            text: "DISCONNECT"
+                            color: dcArea.containsMouse ? Theme.bg : Theme.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: 11
+                            font.pixelSize: 9
+                            font.bold: true
+                            font.letterSpacing: 0.8
                         }
                         MouseArea {
                             id: dcArea
@@ -416,21 +473,20 @@ BarDrawer {
                     }
                 }
 
-                // Barra de intensidad
-                Rectangle {
+                // Barra de intensidad segmentada en 10 bloques
+                RowLayout {
                     Layout.fillWidth: true
-                    implicitHeight: 4
-                    radius: 2
-                    color: Theme.cardAlt
+                    spacing: 3
 
-                    Rectangle {
-                        width: parent.width * (root.current ? Math.max(0, Math.min(1, root.current.signalStrength)) : 0)
-                        height: parent.height
-                        radius: 2
-                        color: Theme.accent
+                    Repeater {
+                        model: 10
 
-                        Behavior on width {
-                            NumberAnimation { duration: 200 }
+                        Rectangle {
+                            required property int index
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 6
+                            radius: Theme.radius
+                            color: index < card.litSegments ? Theme.accent : Theme.cardAlt
                         }
                     }
                 }
@@ -444,18 +500,20 @@ BarDrawer {
                         spacing: 8
 
                         Text {
-                            Layout.preferredWidth: 48
-                            text: parent.modelData.k
+                            Layout.preferredWidth: 52
+                            text: modelData.k
                             color: Theme.muted
                             font.family: Theme.fontFamily
-                            font.pixelSize: 11
+                            font.pixelSize: 10
+                            font.bold: true
+                            font.letterSpacing: 0.8
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: parent.modelData.v
+                            text: modelData.v
                             color: Theme.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: 11
+                            font.pixelSize: 10
                             horizontalAlignment: Text.AlignRight
                             elide: Text.ElideRight
                         }
@@ -471,16 +529,19 @@ BarDrawer {
 
             Text {
                 Layout.fillWidth: true
-                text: "Available networks"
+                text: "AVAILABLE NETWORKS"
                 color: Theme.sub
                 font.family: Theme.fontFamily
-                font.pixelSize: 11
+                font.pixelSize: 10
+                font.bold: true
+                font.letterSpacing: 1
             }
             Text {
-                text: root.others.length
-                color: Theme.muted
+                text: "[ " + String(root.others.length).padStart(2, "0") + " ]"
+                color: Theme.accent
                 font.family: Theme.fontFamily
-                font.pixelSize: 11
+                font.pixelSize: 10
+                font.bold: true
             }
         }
 
@@ -490,7 +551,7 @@ BarDrawer {
             Layout.fillWidth: true
             Layout.preferredHeight: Math.min(contentHeight, root.maxListHeight)
             clip: true
-            spacing: 2
+            spacing: 4
             boundsBehavior: Flickable.StopAtBounds
             model: root.others
 
@@ -502,27 +563,29 @@ BarDrawer {
                 readonly property bool asking: root.askingFor === net.name
 
                 width: list.width
-                height: asking ? 78 : 40
-                radius: 10
-                color: rowArea.containsMouse && !asking ? Theme.card : "transparent"
+                height: asking ? 82 : 42
+                radius: Theme.radius
+                color: asking ? Theme.cardAlt : (rowArea.containsMouse ? Theme.card : "transparent")
+                border.width: (asking || rowArea.containsMouse) ? Theme.borderWidth : 0
+                border.color: asking ? Theme.accent : Theme.border
 
                 Item {
                     id: head
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    height: 40
+                    height: 42
 
                     Text {
                         id: sig
                         anchors.left: parent.left
-                        anchors.leftMargin: 8
+                        anchors.leftMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
                         width: 22
                         text: root.sigGlyph(row.net.signalStrength)
-                        color: Theme.muted
+                        color: rowArea.containsMouse || row.asking ? Theme.accent : Theme.muted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 16
+                        font.pixelSize: 15
                     }
 
                     Column {
@@ -531,21 +594,24 @@ BarDrawer {
                         anchors.right: lockIcon.left
                         anchors.rightMargin: 8
                         anchors.verticalCenter: parent.verticalCenter
+                        spacing: 1
 
                         Text {
                             width: parent.width
-                            text: row.net.name && row.net.name.length > 0 ? row.net.name : "Hidden network"
+                            text: row.net.name && row.net.name.length > 0 ? row.net.name : "HIDDEN NETWORK"
                             color: Theme.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: 12
+                            font.pixelSize: 11
+                            font.bold: row.asking || rowArea.containsMouse
                             elide: Text.ElideRight
                         }
                         Text {
                             width: parent.width
-                            text: (row.net.known ? "Saved  ·  " : "") + (row.secured ? "Secured" : "Open") + "  ·  " + root.pct(row.net.signalStrength) + "%"
+                            text: (row.net.known ? "SAVED // " : "") + (row.secured ? "SECURED" : "OPEN") + " // " + root.pct(row.net.signalStrength) + "%"
                             color: Theme.muted
                             font.family: Theme.fontFamily
-                            font.pixelSize: 10
+                            font.pixelSize: 9
+                            font.letterSpacing: 0.5
                             elide: Text.ElideRight
                         }
                     }
@@ -559,7 +625,7 @@ BarDrawer {
                         text: ""
                         color: Theme.muted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                        font.pixelSize: 11
                     }
 
                     MouseArea {
@@ -582,12 +648,12 @@ BarDrawer {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
-                    anchors.margins: 6
-                    height: 28
-                    radius: 8
-                    color: Theme.cardAlt
-                    border.width: 1
-                    border.color: pass.activeFocus ? Theme.accentSoft : "transparent"
+                    anchors.margins: 8
+                    height: 30
+                    radius: Theme.radius
+                    color: Theme.bg
+                    border.width: Theme.borderWidth
+                    border.color: pass.activeFocus ? Theme.accent : Theme.border
 
                     TextInput {
                         id: pass
@@ -597,8 +663,10 @@ BarDrawer {
                         verticalAlignment: TextInput.AlignVCenter
                         echoMode: TextInput.Password
                         color: Theme.text
+                        selectionColor: Theme.accent
+                        selectedTextColor: Theme.bg
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                        font.pixelSize: 11
                         focus: row.asking
                         clip: true
                         Keys.onEscapePressed: {
@@ -616,7 +684,7 @@ BarDrawer {
                         Text {
                             visible: pass.text === ""
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "Password · Enter to connect"
+                            text: "PASSKEY // ENTER TO CONNECT"
                             color: Theme.muted
                             font: pass.font
                         }
@@ -628,7 +696,7 @@ BarDrawer {
         Hint {
             visible: root.wifiOn && root.hasAdapter && root.others.length === 0
             hintIcon: "󰤟"
-            hintText: root.current ? "No other networks nearby" : "Searching for networks…"
+            hintText: root.current ? "他網なし // NO OTHER NETWORKS" : "探索中 // SCANNING..."
         }
     }
 }

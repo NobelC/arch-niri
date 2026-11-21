@@ -9,10 +9,8 @@ PanelWindow {
     id: popupWindow
 
     readonly property bool hasPopups: Notifications.popups.length > 0
-    readonly property real panelWidth: 340
-    readonly property real topConcave: 12
-    readonly property real bottomRadius: 16
-    readonly property real targetHeight: hasPopups ? (listCol.implicitHeight + 24) : 0
+    readonly property int panelWidth: 340
+    readonly property int shadowSize: 4
 
     anchors {
         top: true
@@ -20,194 +18,161 @@ PanelWindow {
     }
 
     margins {
-        top: 29
-        right: 0
+        top: 46
+        right: 14
     }
 
-    implicitWidth: panelWidth + (topConcave * 2)
-    implicitHeight: Math.max(1, drawerContainer.height)
+    implicitWidth: panelWidth + shadowSize
+    implicitHeight: Math.max(1, listCol.implicitHeight + shadowSize)
     color: "transparent"
-    visible: hasPopups || drawerContainer.height > 0.5
+    visible: hasPopups
     exclusionMode: ExclusionMode.Ignore
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-notifications"
 
-    Item {
-        id: drawerContainer
+    ColumnLayout {
+        id: listCol
         anchors.top: parent.top
-        anchors.right: parent.right
-        width: popupWindow.panelWidth + (popupWindow.topConcave * 2)
-        height: popupWindow.targetHeight
-        clip: true
+        anchors.left: parent.left
+        width: popupWindow.panelWidth + popupWindow.shadowSize
+        spacing: 12
 
-        Behavior on height {
-            NumberAnimation {
-                duration: popupWindow.hasPopups ? 260 : 200
-                easing.type: popupWindow.hasPopups ? Easing.OutExpo : Easing.InCubic
-            }
-        }
+        Repeater {
+            model: Notifications.popups
 
-        Connections {
-            target: Theme
-            function onBgChanged() { bgCanvas.requestPaint(); }
-            function onCardAltChanged() { bgCanvas.requestPaint(); }
-        }
+            delegate: Item {
+                id: toastItem
+                required property var modelData
+                readonly property bool isCritical: modelData.urgency === NotificationUrgency.Critical
+                readonly property color accentCol: isCritical ? Theme.warn : Theme.accent
 
-        onWidthChanged: bgCanvas.requestPaint()
-        onHeightChanged: bgCanvas.requestPaint()
+                Layout.fillWidth: true
+                implicitHeight: cardBox.implicitHeight + popupWindow.shadowSize
 
-        Canvas {
-            id: bgCanvas
-            anchors.fill: parent
-            antialiasing: true
-
-            onPaint: {
-                const ctx = getContext("2d");
-                ctx.reset();
-
-                const w = width;
-                const h = height;
-                if (h <= 0.5) return;
-
-                const c = Math.min(popupWindow.topConcave, h * 0.45);
-                const r = Math.min(popupWindow.bottomRadius, Math.max(0, h - c));
-                const leftX = c;
-                const rightX = w - c;
-
-                function buildOutline() {
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    ctx.quadraticCurveTo(leftX, 0, leftX, c);
-                    ctx.lineTo(leftX, h - r);
-                    ctx.quadraticCurveTo(leftX, h, leftX + r, h);
-                    ctx.lineTo(rightX - r, h);
-                    ctx.quadraticCurveTo(rightX, h, rightX, h - r);
-                    ctx.lineTo(rightX, c);
-                    ctx.quadraticCurveTo(rightX, 0, w, 0);
+                Timer {
+                    interval: toastItem.isCritical ? 8000 : 5000
+                    running: !cardHover.containsMouse
+                    onTriggered: Notifications.dismissPopup(toastItem.modelData.id)
                 }
 
-                buildOutline();
-                ctx.closePath();
-                ctx.fillStyle = Theme.bg.toString();
-                ctx.fill();
+                // Sombra sólida desplazada (Hard Offset Shadow)
+                Rectangle {
+                    x: popupWindow.shadowSize
+                    y: popupWindow.shadowSize
+                    width: popupWindow.panelWidth
+                    height: cardBox.height
+                    radius: Theme.radius
+                    color: toastItem.accentCol
+                }
 
-                buildOutline();
-                ctx.strokeStyle = Theme.cardAlt.toString();
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }
-        }
-
-        // Anclado abajo para extruir suavemente desde la barra sin aplastarse
-        ColumnLayout {
-            id: listCol
-            anchors {
-                bottom: parent.bottom
-                left: parent.left
-                right: parent.right
-                bottomMargin: 14
-                leftMargin: popupWindow.topConcave + 12
-                rightMargin: popupWindow.topConcave + 12
-            }
-            spacing: 8
-
-            Repeater {
-                model: Notifications.popups
-
-                delegate: Rectangle {
-                    id: card
-                    required property var modelData
-                    readonly property bool isCritical: modelData.urgency === NotificationUrgency.Critical
-
-                    Layout.fillWidth: true
-                    implicitHeight: contentCol.implicitHeight + 20
-                    radius: 11
-                    color: Theme.card
-                    border.width: isCritical ? 1 : 0
-                    border.color: Theme.warn
-
-                    Timer {
-                        interval: card.isCritical ? 8000 : 5000
-                        running: !cardHover.containsMouse
-                        onTriggered: Notifications.dismissPopup(card.modelData.id)
-                    }
+                // Cuerpo del toast
+                Rectangle {
+                    id: cardBox
+                    x: 0
+                    y: 0
+                    width: popupWindow.panelWidth
+                    implicitHeight: cardCol.implicitHeight + (Theme.borderWidth * 2)
+                    radius: Theme.radius
+                    color: Theme.bg
+                    border.width: Theme.borderWidth
+                    border.color: toastItem.isCritical ? Theme.warn : Theme.text
+                    clip: true
 
                     ColumnLayout {
-                        id: contentCol
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 10
-                        spacing: 4
+                        id: cardCol
+                        x: Theme.borderWidth
+                        y: Theme.borderWidth
+                        width: parent.width - (Theme.borderWidth * 2)
+                        spacing: 0
 
-                        RowLayout {
+                        // Franja superior de estado
+                        Rectangle {
                             Layout.fillWidth: true
-                            spacing: 6
+                            Layout.preferredHeight: 24
+                            color: toastItem.accentCol
 
-                            Rectangle {
-                                width: 6
-                                height: 6
-                                radius: 3
-                                color: card.isCritical ? Theme.warn : Theme.accent
-                            }
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 8
+                                spacing: 6
 
-                            Text {
-                                Layout.fillWidth: true
-                                text: card.modelData.appName
-                                color: Theme.accentSoft
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 10
-                                font.bold: true
-                                elide: Text.ElideRight
-                            }
+                                Text {
+                                    text: toastItem.isCritical ? "警告 // CRITICAL" : "通知 // NOTIF"
+                                    color: Theme.bg
+                                    font.family: Theme.cjkFont
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    font.letterSpacing: 1.2
+                                }
 
-                            Text {
-                                text: card.modelData.time
-                                color: Theme.muted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 10
-                            }
+                                Item { Layout.fillWidth: true }
 
-                            Text {
-                                text: "󰅖"
-                                color: closeHover.containsMouse ? Theme.warn : Theme.muted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
+                                Text {
+                                    text: toastItem.modelData.time
+                                    color: Theme.bg
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                }
 
-                                MouseArea {
-                                    id: closeHover
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: Notifications.dismissPopup(card.modelData.id)
+                                Text {
+                                    text: "󰅖"
+                                    color: Theme.bg
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: Notifications.dismissPopup(toastItem.modelData.id)
+                                    }
                                 }
                             }
                         }
 
-                        Text {
-                            visible: text !== ""
+                        // Contenido de la notificación
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            text: card.modelData.summary
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            font.bold: true
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 2
-                            elide: Text.ElideRight
-                        }
+                            Layout.margins: 10
+                            spacing: 4
 
-                        Text {
-                            visible: text !== ""
-                            Layout.fillWidth: true
-                            text: card.modelData.body
-                            color: Theme.sub
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 3
-                            elide: Text.ElideRight
+                            Text {
+                                Layout.fillWidth: true
+                                text: toastItem.modelData.appName.toUpperCase()
+                                color: toastItem.isCritical ? Theme.warn : Theme.accentSoft
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                font.bold: true
+                                font.letterSpacing: 1
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                visible: text !== ""
+                                Layout.fillWidth: true
+                                text: toastItem.modelData.summary
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                font.bold: true
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 2
+                                elide: Text.ElideRight
+                            }
+
+                            Text {
+                                visible: text !== ""
+                                Layout.fillWidth: true
+                                text: toastItem.modelData.body
+                                color: Theme.sub
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 3
+                                elide: Text.ElideRight
+                            }
                         }
                     }
 
@@ -216,7 +181,7 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.RightButton
-                        onClicked: Notifications.dismissPopup(card.modelData.id)
+                        onClicked: Notifications.dismissPopup(toastItem.modelData.id)
                     }
                 }
             }

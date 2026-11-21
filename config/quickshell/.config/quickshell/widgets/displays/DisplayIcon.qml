@@ -6,20 +6,39 @@ Item {
     implicitWidth: 26
     implicitHeight: 24
 
+    readonly property bool isActive: mouseArea.containsMouse || Niri.activeBarMenu === "displays"
+
+    // Marco exterior fino (1px)
     Rectangle {
         anchors.fill: parent
-        radius: 6
-        color: (mouseArea.containsMouse || Niri.activeBarMenu === "displays") ? Theme.cardAlt : "transparent"
-        Behavior on color { ColorAnimation { duration: 150 } }
+        radius: Theme.radius
+        color: "transparent"
+        border.width: 1
+        border.color: Theme.accent
+        opacity: root.isActive ? 1.0 : 0.0
+
+        Behavior on opacity { NumberAnimation { duration: 100 } }
+    }
+
+    // Cuadro sólido interior separado por gap
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: 3
+        radius: Theme.radius
+        color: Theme.accent
+        opacity: root.isActive ? 1.0 : 0.0
+
+        Behavior on opacity { NumberAnimation { duration: 100 } }
     }
 
     Text {
         anchors.centerIn: parent
         text: Displays.count > 1 ? "󰍺" : "󰍹"
-        color: Displays.count > 1 ? Theme.accent : Theme.sub
+        color: root.isActive ? Theme.bg : (Displays.count > 1 ? Theme.accent : Theme.sub)
         font.family: Theme.fontFamily
-        font.pixelSize: 14
-        Behavior on color { ColorAnimation { duration: 150 } }
+        font.pixelSize: 13
+
+        Behavior on color { ColorAnimation { duration: 100 } }
     }
 
     MouseArea {

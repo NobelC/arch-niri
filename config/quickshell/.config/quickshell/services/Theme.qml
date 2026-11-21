@@ -26,7 +26,15 @@ Singleton {
 
     // ---------- Tipografías globales ----------
     readonly property string fontFamily: "JetBrainsMono Nerd Font"
+    readonly property string cjkFont: "Noto Sans CJK JP"
     readonly property string displayFont: "Anton"
+
+    // ---------- Tokens Neo-Brutalistas ----------
+    readonly property int radius: 0
+    readonly property int borderWidth: 2
+    readonly property int shadowOffset: 6
+    readonly property color shadowColor: dark ? "#07070c" : "#181825"
+    readonly property color gridColor: Qt.rgba(text.r, text.g, text.b, dark ? 0.08 : 0.10)
 
     function applyJson(raw) {
         try {

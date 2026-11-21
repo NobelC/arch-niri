@@ -8,7 +8,7 @@ import "../"
 BarDrawer {
     id: drawer
     menuName: "notifications"
-    panelWidth: 350
+    panelWidth: 360
     rightOffset: 92
     contentHeight: root.implicitHeight
 
@@ -19,7 +19,7 @@ BarDrawer {
 
         readonly property real maxListHeight: 380
 
-        // Cabecera
+        // ---------- Cabecera ----------
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
@@ -27,13 +27,15 @@ BarDrawer {
             Rectangle {
                 width: 32
                 height: 32
-                radius: 9
-                color: Notifications.effectiveDnd ? Theme.card : Theme.cardAlt
+                radius: Theme.radius
+                color: Notifications.effectiveDnd ? Theme.warn : Theme.accent
+                border.width: Theme.borderWidth
+                border.color: Notifications.effectiveDnd ? Theme.warn : Theme.accent
 
                 Text {
                     anchors.centerIn: parent
                     text: Notifications.effectiveDnd ? "󰂛" : "󰂚"
-                    color: Notifications.effectiveDnd ? Theme.muted : Theme.accent
+                    color: Theme.bg
                     font.family: Theme.fontFamily
                     font.pixelSize: 15
                 }
@@ -44,20 +46,25 @@ BarDrawer {
                 spacing: 1
 
                 Text {
-                    text: "Notifications"
+                    text: "通知 // NOTIFICATIONS"
                     color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.family: Theme.cjkFont
+                    font.pixelSize: 12
                     font.bold: true
+                    font.letterSpacing: 1.2
                 }
                 Text {
                     Layout.fillWidth: true
                     text: Privacy.active
-                        ? "Silenced by Privacy Mode"
-                        : (Notifications.dnd ? "Do Not Disturb" : (Notifications.unreadCount + " saved"))
-                    color: Theme.sub
+                        ? "PRIVACY // SILENCED"
+                        : (Notifications.dnd
+                            ? "DND // ACTIVE"
+                            : "[ " + String(Notifications.unreadCount).padStart(2, "0") + " ] SAVED")
+                    color: Notifications.effectiveDnd ? Theme.warn : Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 10
+                    font.bold: Notifications.effectiveDnd
+                    font.letterSpacing: 0.8
                     elide: Text.ElideRight
                 }
             }
@@ -67,16 +74,23 @@ BarDrawer {
                 visible: Notifications.unreadCount > 0
                 implicitWidth: clearTxt.implicitWidth + 14
                 implicitHeight: 24
-                radius: 7
-                color: clearHover.containsMouse ? Theme.border : Theme.cardAlt
+                radius: Theme.radius
+                color: clearHover.containsMouse ? Theme.warn : Theme.card
+                border.width: Theme.borderWidth
+                border.color: clearHover.containsMouse ? Theme.warn : Theme.border
+
+                Behavior on color { ColorAnimation { duration: 100 } }
+                Behavior on border.color { ColorAnimation { duration: 100 } }
 
                 Text {
                     id: clearTxt
                     anchors.centerIn: parent
-                    text: "Clear"
-                    color: Theme.text
+                    text: "CLEAR"
+                    color: clearHover.containsMouse ? Theme.bg : Theme.text
                     font.family: Theme.fontFamily
                     font.pixelSize: 10
+                    font.bold: true
+                    font.letterSpacing: 0.8
                 }
 
                 MouseArea {
@@ -88,25 +102,28 @@ BarDrawer {
                 }
             }
 
-            // Switch DND
+            // Switch DND rígido
             Rectangle {
-                width: 40
-                height: 22
-                radius: 11
-                opacity: Privacy.active ? 0.5 : 1.0
-                color: Notifications.effectiveDnd ? Theme.warn : Theme.cardAlt
+                width: 42
+                height: 24
+                radius: Theme.radius
+                opacity: Privacy.active ? 0.45 : 1.0
+                color: Notifications.effectiveDnd ? Theme.warn : Theme.card
+                border.width: Theme.borderWidth
+                border.color: Notifications.effectiveDnd ? Theme.warn : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: 120 } }
+                Behavior on border.color { ColorAnimation { duration: 120 } }
 
                 Rectangle {
-                    width: 16
-                    height: 16
-                    radius: 8
-                    y: 3
-                    x: Notifications.effectiveDnd ? 21 : 3
+                    width: 14
+                    height: 14
+                    radius: Theme.radius
+                    y: 5
+                    x: Notifications.effectiveDnd ? 23 : 5
                     color: Notifications.effectiveDnd ? Theme.bg : Theme.sub
 
-                    Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                    Behavior on x { NumberAnimation { duration: 130; easing.type: Easing.OutExpo } }
                 }
 
                 MouseArea {
@@ -118,14 +135,21 @@ BarDrawer {
             }
         }
 
-        // Lista de historial
+        // Divisor
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.borderWidth
+            color: Theme.border
+        }
+
+        // ---------- Lista de historial ----------
         ListView {
             id: histList
             visible: Notifications.history.length > 0
             Layout.fillWidth: true
             Layout.preferredHeight: Math.min(contentHeight, root.maxListHeight)
             clip: true
-            spacing: 6
+            spacing: 8
             boundsBehavior: Flickable.StopAtBounds
             model: Notifications.history
 
@@ -135,18 +159,32 @@ BarDrawer {
                 readonly property bool isCritical: modelData.urgency === NotificationUrgency.Critical
 
                 width: histList.width
-                implicitHeight: rowCol.implicitHeight + 18
-                radius: 10
+                implicitHeight: rowCol.implicitHeight + 20
+                radius: Theme.radius
                 color: Theme.card
-                border.width: isCritical ? 1 : 0
-                border.color: Theme.warn
+                border.width: Theme.borderWidth
+                border.color: isCritical ? Theme.warn : Theme.border
+                clip: true
+
+                // Franja lateral de estado
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.margins: Theme.borderWidth
+                    width: 3
+                    color: row.isCritical ? Theme.warn : Theme.accent
+                }
 
                 ColumnLayout {
                     id: rowCol
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.margins: 9
+                    anchors.topMargin: 10
+                    anchors.bottomMargin: 10
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 10
                     spacing: 3
 
                     RowLayout {
@@ -155,11 +193,12 @@ BarDrawer {
 
                         Text {
                             Layout.fillWidth: true
-                            text: row.modelData.appName
-                            color: Theme.accentSoft
+                            text: row.modelData.appName.toUpperCase()
+                            color: row.isCritical ? Theme.warn : Theme.accentSoft
                             font.family: Theme.fontFamily
                             font.pixelSize: 10
                             font.bold: true
+                            font.letterSpacing: 0.8
                             elide: Text.ElideRight
                         }
 
@@ -210,13 +249,15 @@ BarDrawer {
             }
         }
 
-        // Estado vacío
+        // ---------- Estado vacío ----------
         Rectangle {
             visible: Notifications.history.length === 0
             Layout.fillWidth: true
-            implicitHeight: 72
-            radius: 12
+            implicitHeight: 76
+            radius: Theme.radius
             color: Theme.card
+            border.width: Theme.borderWidth
+            border.color: Theme.border
 
             Column {
                 anchors.centerIn: parent
@@ -231,10 +272,12 @@ BarDrawer {
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "No notifications"
+                    text: "通知なし // NO NOTIFICATIONS"
                     color: Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.family: Theme.cjkFont
+                    font.pixelSize: 10
+                    font.bold: true
+                    font.letterSpacing: 1
                 }
             }
         }

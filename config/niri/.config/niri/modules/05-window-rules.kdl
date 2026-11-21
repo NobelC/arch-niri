@@ -1,13 +1,11 @@
 // --- 0. REGLAS GENERALES ---
-
-// Esquinas redondeadas, modo columna (sin fullscreen ni flotante por defecto) y 100% de ancho
+// Esquinas rectas, modo columna (sin fullscreen ni flotante por defecto) y 100% de ancho
 window-rule {
-    geometry-corner-radius 10
+    geometry-corner-radius 0
     clip-to-geometry true
     open-fullscreen false
     default-column-width { proportion 1.0; }
 }
-
 // --- 1. DIÁLOGOS DEL SISTEMA Y SEGURIDAD ---
 
 // Agente Polkit: flotante y oculto al compartir pantalla

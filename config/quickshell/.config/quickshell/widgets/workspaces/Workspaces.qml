@@ -3,78 +3,63 @@ import "../../services"
 
 Row {
     id: root
-    spacing: 8
+    spacing: 4
 
     readonly property int minWorkspaces: 2
 
     Repeater {
         model: Math.max(Niri.workspaces.length, root.minWorkspaces)
 
-        delegate: Rectangle {
-            id: pill
+        delegate: Item {
+            id: block
+            required property int index
             readonly property var wsData: index < Niri.workspaces.length ? Niri.workspaces[index] : null
             readonly property int wsIdx: wsData ? wsData.idx : (index + 1)
             readonly property bool isActive: wsData ? wsData.is_active : false
             readonly property bool hasWindows: wsData ? (wsData.active_window_id !== null) : false
 
-            width: isActive ? 28 : 10
-            height: 10
-            radius: height / 2
-            color: isActive ? Theme.accentSoft : (hasWindows ? Theme.muted : Theme.border)
-
-            // Borde interior luminoso en la pastilla activa
-            border.width: isActive ? 1 : 0
-            border.color: Theme.highlight
+            width: isActive ? 34 : 16
+            height: 16
 
             Behavior on width {
-                NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-            }
-            Behavior on color {
-                ColorAnimation { duration: 200 }
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
 
-            // Capa exterior del glow (difuminada)
+            // Marco exterior fino (1px) en el activo o al hacer hover
             Rectangle {
-                anchors.centerIn: parent
-                width: parent.width + 8
-                height: parent.height + 8
-                radius: height / 2
-                color: Theme.accentSoft
-                opacity: pill.isActive ? 0.16 : 0.0
-                z: -2
+                anchors.fill: parent
+                radius: Theme.radius
+                color: "transparent"
+                border.width: 1
+                border.color: Theme.accent
+                opacity: block.isActive ? 1.0 : (wsHover.containsMouse ? 0.55 : 0.0)
 
-                Behavior on opacity {
-                    NumberAnimation { duration: 200 }
-                }
-                Behavior on color {
-                    ColorAnimation { duration: 200 }
-                }
+                Behavior on opacity { NumberAnimation { duration: 120 } }
             }
 
-            // Capa interior del glow (más intensa junto al borde)
+            // Bloque interior separado por el gap de 2px
             Rectangle {
-                anchors.centerIn: parent
-                width: parent.width + 4
-                height: parent.height + 4
-                radius: height / 2
-                color: Theme.accentSoft
-                opacity: pill.isActive ? 0.28 : 0.0
-                z: -1
+                anchors.fill: parent
+                anchors.margins: 3
+                radius: Theme.radius
+                color: block.isActive
+                    ? Theme.accent
+                    : (block.hasWindows ? Theme.sub : "transparent")
+                border.width: block.isActive ? 0 : Theme.borderWidth
+                border.color: block.hasWindows ? Theme.sub : Theme.border
 
-                Behavior on opacity {
-                    NumberAnimation { duration: 200 }
-                }
-                Behavior on color {
-                    ColorAnimation { duration: 200 }
-                }
+                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on border.color { ColorAnimation { duration: 150 } }
             }
 
             MouseArea {
+                id: wsHover
                 anchors.fill: parent
-                anchors.topMargin: -6
-                anchors.bottomMargin: -6
+                anchors.topMargin: -4
+                anchors.bottomMargin: -4
+                hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: Niri.focusWorkspace(wsIdx)
+                onClicked: Niri.focusWorkspace(block.wsIdx)
             }
         }
     }

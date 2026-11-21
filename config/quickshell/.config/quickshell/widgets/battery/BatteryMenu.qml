@@ -7,7 +7,7 @@ import "../"
 BarDrawer {
     id: drawer
     menuName: "battery"
-    panelWidth: 320
+    panelWidth: 340
     rightOffset: 62
     contentHeight: root.implicitHeight
 
@@ -24,17 +24,19 @@ BarDrawer {
         }
 
         readonly property string statusSubtitle: {
-            if (Battery.full) return "Fully charged";
+            if (Battery.full) return "FULLY CHARGED";
             if (Battery.charging) {
                 return Battery.timeFormatted !== ""
-                    ? ("Charging  ·  " + Battery.timeFormatted + " until full")
-                    : "Charging";
+                    ? ("CHARGING // " + Battery.timeFormatted.toUpperCase())
+                    : "CHARGING";
             }
             if (Battery.timeFormatted !== "") {
-                return Battery.timeFormatted + " remaining";
+                return Battery.timeFormatted.toUpperCase() + " LEFT";
             }
-            return Battery.status;
+            return (Battery.status || "DISCHARGING").toUpperCase();
         }
+
+        readonly property int litSegments: Math.max(0, Math.min(10, Math.round(Battery.capacity / 10)))
 
         function batteryIcon() {
             if (Battery.charging) return "󰂄";
@@ -56,13 +58,18 @@ BarDrawer {
             Rectangle {
                 width: 32
                 height: 32
-                radius: 9
-                color: Theme.cardAlt
+                radius: Theme.radius
+                color: root.stateColor
+                border.width: Theme.borderWidth
+                border.color: root.stateColor
+
+                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on border.color { ColorAnimation { duration: 150 } }
 
                 Text {
                     anchors.centerIn: parent
                     text: root.batteryIcon()
-                    color: root.stateColor
+                    color: Theme.bg
                     font.family: Theme.fontFamily
                     font.pixelSize: 15
                 }
@@ -73,69 +80,119 @@ BarDrawer {
                 spacing: 1
 
                 Text {
-                    text: "Battery  ·  " + Battery.capacity + "%"
+                    text: "電力 // BATTERY"
                     color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
+                    font.family: Theme.cjkFont
+                    font.pixelSize: 12
                     font.bold: true
+                    font.letterSpacing: 1.2
                 }
                 Text {
                     Layout.fillWidth: true
                     text: root.statusSubtitle
                     color: Theme.sub
                     font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.pixelSize: 10
+                    font.letterSpacing: 0.6
                     elide: Text.ElideRight
                 }
             }
+
+            Rectangle {
+                implicitWidth: pctTxt.implicitWidth + 12
+                implicitHeight: 24
+                radius: Theme.radius
+                color: Theme.card
+                border.width: Theme.borderWidth
+                border.color: root.stateColor
+
+                Text {
+                    id: pctTxt
+                    anchors.centerIn: parent
+                    text: Battery.capacity + "%"
+                    color: root.stateColor
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    font.bold: true
+                }
+            }
+        }
+
+        // Divisor
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.borderWidth
+            color: Theme.border
         }
 
         // ---------- Tarjeta de carga y métricas ----------
         Rectangle {
             Layout.fillWidth: true
-            implicitHeight: statsCol.implicitHeight + 22
-            radius: 12
+            implicitHeight: statsCol.implicitHeight + 24
+            radius: Theme.radius
             color: Theme.card
+            border.width: Theme.borderWidth
+            border.color: Theme.border
+            clip: true
+
+            // Franja lateral de estado
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.borderWidth
+                width: 3
+                color: root.stateColor
+
+                Behavior on color { ColorAnimation { duration: 150 } }
+            }
 
             ColumnLayout {
                 id: statsCol
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.margins: 11
-                spacing: 9
+                anchors.topMargin: 12
+                anchors.bottomMargin: 12
+                anchors.leftMargin: 15
+                anchors.rightMargin: 12
+                spacing: 10
 
-                // Barra de progreso de batería
-                Rectangle {
+                // Barra de progreso segmentada en 10 bloques
+                RowLayout {
                     Layout.fillWidth: true
-                    implicitHeight: 6
-                    radius: 3
-                    color: Theme.cardAlt
+                    spacing: 3
 
-                    Rectangle {
-                        width: parent.width * Math.max(0, Math.min(1, Battery.capacity / 100.0))
-                        height: parent.height
-                        radius: 3
-                        color: root.stateColor
+                    Repeater {
+                        model: 10
 
-                        Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-                        Behavior on color { ColorAnimation { duration: 200 } }
+                        Rectangle {
+                            required property int index
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 8
+                            radius: Theme.radius
+                            color: index < root.litSegments ? root.stateColor : Theme.cardAlt
+
+                            Behavior on color { ColorAnimation { duration: 120 } }
+                        }
                     }
                 }
 
-                // Métricas: Consumo, Salud, Ciclos
+                // Métricas: Consumo y Salud
                 RowLayout {
                     Layout.fillWidth: true
 
                     Text {
                         Layout.fillWidth: true
-                        text: Battery.charging ? "Charge rate" : "Power draw"
+                        text: Battery.charging ? "CHARGE RATE" : "POWER DRAW"
                         color: Theme.muted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 10
+                        font.bold: true
+                        font.letterSpacing: 0.8
                     }
                     Text {
-                        text: Battery.powerWatts > 0 ? (Battery.powerWatts.toFixed(1) + " W") : "—"
+                        text: Battery.powerWatts > 0 ? (Battery.powerWatts.toFixed(1) + " W") : "--"
                         color: Theme.text
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
@@ -148,81 +205,98 @@ BarDrawer {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "Battery health"
+                        text: "HEALTH"
                         color: Theme.muted
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 10
+                        font.bold: true
+                        font.letterSpacing: 0.8
                     }
                     Text {
-                        text: Battery.healthPercent + "%" + (Battery.cycleCount > 0 ? "  (" + Battery.cycleCount + " cycles)" : "")
+                        text: Battery.healthPercent + "%" + (Battery.cycleCount > 0 ? " // " + Battery.cycleCount + " CYC" : "")
                         color: Battery.healthPercent < 80 ? Theme.warn : Theme.text
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 10
+                        font.bold: true
                     }
                 }
             }
         }
 
         // ---------- Selector de Perfil de Energía (powerprofilesctl) ----------
-        Text {
-            visible: Battery.hasPowerProfiles
-            text: "Power profile"
-            color: Theme.sub
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-        }
-
-        RowLayout {
+        ColumnLayout {
             visible: Battery.hasPowerProfiles
             Layout.fillWidth: true
             spacing: 6
 
-            Repeater {
-                model: [
-                    { id: "power-saver", label: "Saver", glyph: "󰌪" },
-                    { id: "balanced",    label: "Balanced", glyph: "󰗑" },
-                    { id: "performance", label: "Perf", glyph: "󱐋" }
-                ]
+            Text {
+                text: "POWER // PROFILE"
+                color: Theme.muted
+                font.family: Theme.fontFamily
+                font.pixelSize: 9
+                font.bold: true
+                font.letterSpacing: 1
+            }
 
-                delegate: Rectangle {
-                    id: profBtn
-                    required property var modelData
-                    readonly property bool selected: Battery.activeProfile === modelData.id
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 6
 
-                    Layout.fillWidth: true
-                    implicitHeight: 36
-                    radius: 9
-                    color: selected ? Theme.accent : (profHover.containsMouse ? Theme.cardAlt : Theme.card)
+                Repeater {
+                    model: [
+                        { id: "power-saver", label: "SAVER",    glyph: "󰌪" },
+                        { id: "balanced",    label: "BALANCED", glyph: "󰗑" },
+                        { id: "performance", label: "PERF",     glyph: "󱐋" }
+                    ]
 
-                    Behavior on color { ColorAnimation { duration: 150 } }
+                    delegate: Rectangle {
+                        id: profBtn
+                        required property var modelData
+                        readonly property bool selected: Battery.activeProfile === modelData.id
 
-                    Row {
-                        anchors.centerIn: parent
-                        spacing: 5
+                        Layout.fillWidth: true
+                        implicitHeight: 34
+                        radius: Theme.radius
+                        color: selected
+                            ? Theme.accent
+                            : (profHover.containsMouse ? Theme.cardAlt : Theme.card)
+                        border.width: Theme.borderWidth
+                        border.color: selected
+                            ? Theme.accent
+                            : (profHover.containsMouse ? Theme.text : Theme.border)
 
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: profBtn.modelData.glyph
-                            color: profBtn.selected ? Theme.bg : Theme.accentSoft
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 5
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: profBtn.modelData.glyph
+                                color: profBtn.selected ? Theme.bg : Theme.accentSoft
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: profBtn.modelData.label
+                                color: profBtn.selected ? Theme.bg : Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 9
+                                font.bold: true
+                                font.letterSpacing: 0.6
+                            }
                         }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: profBtn.modelData.label
-                            color: profBtn.selected ? Theme.bg : Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            font.bold: profBtn.selected
-                        }
-                    }
 
-                    MouseArea {
-                        id: profHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: Battery.setPowerProfile(profBtn.modelData.id)
+                        MouseArea {
+                            id: profHover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Battery.setPowerProfile(profBtn.modelData.id)
+                        }
                     }
                 }
             }

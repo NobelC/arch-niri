@@ -5,10 +5,18 @@ import "../../services"
 Item {
     id: root
     visible: Battery.available
-    implicitWidth: Battery.available ? (contentRow.implicitWidth + 16) : 0
+    implicitWidth: Battery.available ? Math.max(26, contentRow.implicitWidth + 12) : 0
     implicitHeight: 24
     Layout.preferredWidth: implicitWidth
     Layout.preferredHeight: implicitHeight
+
+    readonly property bool isActive: mouseArea.containsMouse || Niri.activeBarMenu === "battery"
+    readonly property color activeColor: {
+        if (Battery.charging || Battery.full) return Theme.accent;
+        if (Battery.capacity <= 15) return Theme.warn;
+        if (Battery.capacity <= 30) return Theme.highlight;
+        return Theme.accent;
+    }
 
     function batteryIcon() {
         if (Battery.charging) return "󰂄";
@@ -35,14 +43,29 @@ Item {
         return Theme.accentSoft;
     }
 
+    // Marco exterior fino (1px)
     Rectangle {
         anchors.fill: parent
-        radius: 6
-        color: (mouseArea.containsMouse || Niri.activeBarMenu === "battery") ? Theme.cardAlt : "transparent"
+        radius: Theme.radius
+        color: "transparent"
+        border.width: 1
+        border.color: root.activeColor
+        opacity: root.isActive ? 1.0 : 0.0
 
-        Behavior on color {
-            ColorAnimation { duration: 150 }
-        }
+        Behavior on opacity { NumberAnimation { duration: 100 } }
+        Behavior on border.color { ColorAnimation { duration: 100 } }
+    }
+
+    // Cuadro sólido interior separado por gap
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: 3
+        radius: Theme.radius
+        color: root.activeColor
+        opacity: root.isActive ? 1.0 : 0.0
+
+        Behavior on opacity { NumberAnimation { duration: 100 } }
+        Behavior on color { ColorAnimation { duration: 100 } }
     }
 
     Row {
@@ -53,11 +76,11 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: root.batteryIcon()
-            color: root.batteryColor()
+            color: root.isActive ? Theme.bg : root.batteryColor()
             font.family: Theme.fontFamily
-            font.pixelSize: 14
+            font.pixelSize: 13
 
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { ColorAnimation { duration: 100 } }
         }
     }
 
