@@ -14,6 +14,7 @@ cliphist
 ddcutil
 dockerfile-language-server
 dosfstools
+edk2-ovmf
 efibootmgr
 exfatprogs
 eza
@@ -28,6 +29,7 @@ github-cli
 gopls
 gparted
 greetd
+grub
 hunspell-en_us
 hunspell-es_any
 imagemagick
@@ -37,9 +39,9 @@ jq
 keepassxc
 less
 libayatana-appindicator
+libisoburn
 libnotify
 libva-utils
-limine
 linux
 linux-firmware
 lua-language-server
@@ -64,6 +66,7 @@ playerctl
 polkit-gnome
 power-profiles-daemon
 pyright
+qemu-desktop
 qt6-imageformats
 quickshell
 resvg
@@ -75,6 +78,7 @@ steam
 stow
 swaybg
 swayidle
+tree
 tree-sitter-cli
 ttf-jetbrains-mono-nerd
 unzip
