@@ -20,6 +20,7 @@ ShellRoot {
     DashboardMenu {}
     MediaMenu {}
     PerformanceMenu {}
+    ClipboardMenu {}
     WifiMenu {}
     BluetoothMenu {}
     AudioMenu {}

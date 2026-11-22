@@ -19,7 +19,11 @@ spawn-sh-at-startup "[ -f \"$HOME/.local/state/quickshell/overview-wallpaper.jpg
 spawn-sh-at-startup "pkill -x smart-lid; \"$HOME/.local/bin/smart-lid\""
 spawn-sh-at-startup "\"$HOME/.local/bin/smart-idle\""
 spawn-sh-at-startup "\"$HOME/.local/bin/display-manager\" watch"
-spawn-at-startup "wl-clip-persist" "--clipboard" "regular"
 
 // --- 7. FIREWALL INTERACTIVO (OpenSnitch UI para perfiles MED/LOW) ---
 spawn-at-startup "opensnitch-ui" "--background"
+
+// --- 8. PORTAPAPELES (Persistencia + Historial de texto e imágenes) ---
+spawn-at-startup "wl-clip-persist" "--clipboard" "regular"
+spawn-sh-at-startup "wl-paste --type text --watch cliphist store"
+spawn-sh-at-startup "wl-paste --type image --watch cliphist store"

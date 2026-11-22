@@ -7,24 +7,23 @@ binds {
     Mod+Return hotkey-overlay-title="Open terminal" { spawn "ghostty"; }
     Mod+Alt+B hotkey-overlay-title="OpenBrowser" { spawn "firefox"; }
     Mod+F { spawn "ghostty" "-e" "zsh" "-ic" "y; exec zsh"; }
-    Mod+W { spawn "ghostty" "-e" "btop";}
+    Mod+W { spawn "ghostty" "-e" "btop"; }
 
-   // --- QUICKSHELL --
+    // --- QUICKSHELL ---
     Mod+Space { spawn "qs" "ipc" "call" "launcher" "toggle"; }
     Mod+Alt+L { spawn "qs" "ipc" "call" "lock" "lock"; }
     Mod+Shift+W hotkey-overlay-title="Selector de wallpapers" { spawn "qs" "ipc" "call" "wallpaper" "toggle"; }
     Mod+M hotkey-overlay-title="Reproductor multimedia" { spawn "qs" "ipc" "call" "media" "toggle"; }
-    // Ejemplo para lanzar una función de Bash interactiva en Ghostty (como tu selector de proyectos):
-    // Mod+Alt+P hotkey-overlay-title="Selector de proyectos" { spawn "ghostty" "-e" "bash" "-ic" "pp; exec bash"; }
     Mod+P hotkey-overlay-title="Modo Privacidad / Presentación" { spawn "qs" "ipc" "call" "privacy" "toggle"; }
-    Mod+Shift+P { spawn "qs" "ipc" "call" "performance" "toggle"; }
+    Mod+Shift+P hotkey-overlay-title="Monitor de rendimiento" { spawn "qs" "ipc" "call" "performance" "toggle"; }
+    Mod+V hotkey-overlay-title="Historial del portapapeles" { spawn "qs" "ipc" "call" "clipboard" "toggle"; }
 
     // --- GESTIÓN BÁSICA DE VENTANAS Y COLUMNAS ---
     Mod+Q repeat=false { spawn-sh "\"$HOME/.local/bin/smart-close\""; }
     Mod+O repeat=false { toggle-overview; }
 
     // Maximizar columna (respeta gaps y barras) vs Pantalla completa real
-    Mod+Alt+F       { maximize-column; }
+    Mod+Alt+F   { maximize-column; }
     Mod+Shift+F { fullscreen-window; }
     Mod+C       { center-column; }
 
@@ -39,9 +38,9 @@ binds {
     Mod+Shift+Equal { set-window-height "+10%"; }
 
     // Ventanas flotantes y pestañas dentro de una columna
-    Mod+V       { toggle-window-floating; }
+    Mod+Alt+V   { toggle-window-floating; }
     Mod+Shift+V { switch-focus-between-floating-and-tiling; }
-    Mod+Alt+W       { toggle-column-tabbed-display; }
+    Mod+Alt+W   { toggle-column-tabbed-display; }
 
     // Agrupar/expulsar ventanas dentro de una misma columna vertical
     Mod+BracketLeft  { consume-or-expel-window-left; }
@@ -70,13 +69,11 @@ binds {
     Mod+Ctrl+L { move-column-right; }
 
     // --- ESPACIOS DE TRABAJO (Workspaces verticales) ---
-    // Cambiar entre workspaces (arriba/abajo)
     Mod+Page_Down { focus-workspace-down; }
     Mod+Page_Up   { focus-workspace-up; }
     Mod+U         { focus-workspace-down; }
     Mod+I         { focus-workspace-up; }
 
-    // Mover columna al workspace superior/inferior
     Mod+Ctrl+Page_Down { move-column-to-workspace-down; }
     Mod+Ctrl+Page_Up   { move-column-to-workspace-up; }
     Mod+Ctrl+U         { move-column-to-workspace-down; }
@@ -111,4 +108,4 @@ binds {
     Mod+WheelScrollUp   cooldown-ms=150 { focus-workspace-up; }
     Mod+WheelScrollRight                { focus-column-right; }
     Mod+WheelScrollLeft                 { focus-column-left; }
-  }
+}

@@ -9,6 +9,7 @@ binds {
     // --- BRILLO DE PANTALLA (backlight) ---
     XF86MonBrightnessUp   allow-when-locked=true { spawn-sh "\"$HOME/.local/bin/smart-brightness\" up 5"; }
     XF86MonBrightnessDown allow-when-locked=true { spawn-sh "\"$HOME/.local/bin/smart-brightness\" down 5"; }
+
     // --- MULTIMEDIA (MPRIS / playerctl) ---
     XF86AudioPlay  allow-when-locked=true { spawn "playerctl" "play-pause"; }
     XF86AudioPause allow-when-locked=true { spawn "playerctl" "play-pause"; }
@@ -23,7 +24,7 @@ binds {
 
     // --- ENERGÍA Y BLOQUEO DE PANTALLA ---
     // Apaga el panel al instante (se enciende al mover el ratón o pulsar cualquier tecla)
-    Mod+Shift+P { power-off-monitors; }
+    Mod+Alt+P { power-off-monitors; }
 
     // Salir de Niri (muestra confirmación para evitar cierres accidentales)
     Mod+Shift+E     { quit; }

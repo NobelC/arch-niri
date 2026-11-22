@@ -10,6 +10,7 @@ brightnessctl
 btop
 btrfs-progs
 cage
+cliphist
 ddcutil
 dockerfile-language-server
 dosfstools
