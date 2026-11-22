@@ -1,19 +1,29 @@
 import QtQuick
+import Quickshell
 import "../../services"
 
 Row {
     id: root
     spacing: 4
 
+    property string screenName: ""
     readonly property int minWorkspaces: 2
 
+    readonly property var screenWorkspaces: {
+        const all = Niri.workspaces || [];
+        if (!root.screenName) return all;
+        const filtered = all.filter(w => w.output === root.screenName);
+        filtered.sort((a, b) => a.idx - b.idx);
+        return filtered;
+    }
+
     Repeater {
-        model: Math.max(Niri.workspaces.length, root.minWorkspaces)
+        model: Math.max(root.screenWorkspaces.length, root.minWorkspaces)
 
         delegate: Item {
             id: block
             required property int index
-            readonly property var wsData: index < Niri.workspaces.length ? Niri.workspaces[index] : null
+            readonly property var wsData: index < root.screenWorkspaces.length ? root.screenWorkspaces[index] : null
             readonly property int wsIdx: wsData ? wsData.idx : (index + 1)
             readonly property bool isActive: wsData ? wsData.is_active : false
             readonly property bool hasWindows: wsData ? (wsData.active_window_id !== null) : false
@@ -25,7 +35,6 @@ Row {
                 NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
 
-            // Marco exterior fino (1px) en el activo o al hacer hover
             Rectangle {
                 anchors.fill: parent
                 radius: Theme.radius
@@ -37,7 +46,6 @@ Row {
                 Behavior on opacity { NumberAnimation { duration: 120 } }
             }
 
-            // Bloque interior separado por el gap de 2px
             Rectangle {
                 anchors.fill: parent
                 anchors.margins: 3
@@ -59,7 +67,17 @@ Row {
                 anchors.bottomMargin: -4
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: Niri.focusWorkspace(block.wsIdx)
+                onClicked: {
+                    if (root.screenName !== "") {
+                        Quickshell.execDetached([
+                            "bash", "-c",
+                            "niri msg action focus-monitor \"$1\" && niri msg action focus-workspace \"$2\"",
+                            "bash", root.screenName, String(block.wsIdx)
+                        ]);
+                    } else {
+                        Niri.focusWorkspace(block.wsIdx);
+                    }
+                }
             }
         }
     }

@@ -25,12 +25,21 @@ PanelWindow {
     }
 
     implicitHeight: 34
-    exclusiveZone: Niri.overviewOpen ? 0 : 34
     color: "transparent"
 
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "quickshell-bar"
+    readonly property string screenName: screen ? screen.name : ""
+    readonly property bool barEnabled: {
+      const _p = Displays.primary;
+      const _o = Displays.outputs;
+      const _c = Displays.count;
+      return Displays.shouldShowBar(screenName);
+    }
 
+    visible: barEnabled
+    exclusiveZone: (barEnabled && !Niri.overviewOpen) ? 34 : 0    
+  
     Item {
         id: barSlideContainer
         anchors.left: parent.left
@@ -103,7 +112,7 @@ PanelWindow {
             spacing: 10
 
             ArchIcon {}
-            Workspaces {}
+            Workspaces { screenName: barWindow.screenName }
         }
 
         // Módulo central: Reloj / Dashboard

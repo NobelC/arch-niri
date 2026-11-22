@@ -63,15 +63,17 @@ handle_lid_close() {
       lock_and_suspend
       ;;
     awake)
-      if ! has_external_monitor; then
+      if has_external_monitor; then
+        "$HOME/.local/bin/display-manager" lid-close >/dev/null 2>&1 || true
+      else
         qs ipc call lock lock >/dev/null 2>&1 || true
+        niri msg output "$INTERNAL_OUTPUT" off >/dev/null 2>&1 || true
       fi
-      niri msg output "$INTERNAL_OUTPUT" off >/dev/null 2>&1 || true
       ;;
     auto)
       if has_external_monitor; then
-        # Modo Clamshell: sin bloquear para seguir trabajando en el monitor externo
-        niri msg output "$INTERNAL_OUTPUT" off >/dev/null 2>&1 || true
+        # Modo Clamshell: delega en display-manager (guarda ventanas, mata mirror, pasa barra a TV)
+        "$HOME/.local/bin/display-manager" lid-close >/dev/null 2>&1 || true
       elif is_recording_or_music; then
         # Música/grabación activa: bloquea la sesión y apaga solo el panel
         qs ipc call lock lock >/dev/null 2>&1 || true
@@ -83,7 +85,7 @@ handle_lid_close() {
   esac
 }
 handle_lid_open() {
-  niri msg output "$INTERNAL_OUTPUT" on >/dev/null 2>&1 || true
+  "$HOME/.local/bin/display-manager" lid-open >/dev/null 2>&1 || true
 }
 
 handle_drm_event() {

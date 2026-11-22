@@ -68,102 +68,21 @@ BarDrawer {
             color: Theme.border
         }
 
-        // ---------- Selector de Modo (solo si hay 2+ monitores) ----------
-        ColumnLayout {
-            visible: Displays.count > 1
-            Layout.fillWidth: true
-            spacing: 6
-
-            Text {
-                text: "LAYOUT // MODE"
-                color: Theme.muted
-                font.family: Theme.fontFamily
-                font.pixelSize: 9
-                font.bold: true
-                font.letterSpacing: 1
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 6
-
-                Repeater {
-                    model: [
-                        { id: "extend",    label: "EXTEND",    glyph: "󰍺" },
-                        { id: "mirror",    label: "MIRROR",    glyph: "󰆏" },
-                        { id: "clamshell", label: "CLAMSHELL", glyph: "󰌢" }
-                    ]
-
-                    delegate: Rectangle {
-                        id: modeBtn
-                        required property var modelData
-                        readonly property bool selected: Displays.mode === modelData.id
-
-                        Layout.fillWidth: true
-                        implicitHeight: 32
-                        radius: Theme.radius
-                        color: selected
-                            ? Theme.accent
-                            : (mHover.containsMouse ? Theme.cardAlt : Theme.card)
-                        border.width: Theme.borderWidth
-                        border.color: selected
-                            ? Theme.accent
-                            : (mHover.containsMouse ? Theme.text : Theme.border)
-
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        Behavior on border.color { ColorAnimation { duration: 100 } }
-
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: 5
-
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modeBtn.modelData.glyph
-                                color: modeBtn.selected ? Theme.bg : Theme.accentSoft
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                            }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modeBtn.modelData.label
-                                color: modeBtn.selected ? Theme.bg : Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 9
-                                font.bold: true
-                                font.letterSpacing: 0.6
-                            }
-                        }
-
-                        MouseArea {
-                            id: mHover
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: Displays.setMode(modeBtn.modelData.id)
-                        }
-                    }
-                }
-            }
-        }
-
-        // ---------- Lista de monitores detectados ----------
+        // ---------- Lista de monitores conectados ----------
         Repeater {
             model: Displays.outputs
 
             delegate: Rectangle {
                 id: outCard
                 required property var modelData
-                readonly property bool isVert: modelData.transform === "90" || modelData.transform === "270"
                 readonly property bool isPrim: modelData.isPrimary
 
                 Layout.fillWidth: true
-                implicitHeight: cardCol.implicitHeight + 22
+                implicitHeight: cardRow.implicitHeight + 20
                 radius: Theme.radius
                 color: Theme.card
                 border.width: Theme.borderWidth
                 border.color: isPrim ? Theme.accent : Theme.border
-                opacity: modelData.enabled ? 1.0 : 0.45
                 clip: true
 
                 // Franja lateral de acento en el monitor principal
@@ -177,119 +96,102 @@ BarDrawer {
                     color: Theme.accent
                 }
 
-                ColumnLayout {
-                    id: cardCol
+                RowLayout {
+                    id: cardRow
                     anchors.left: parent.left
                     anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.topMargin: 10
-                    anchors.bottomMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
                     anchors.leftMargin: outCard.isPrim ? 14 : 10
                     anchors.rightMargin: 10
                     spacing: 8
 
-                    RowLayout {
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: 6
+                        spacing: 3
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: (outCard.modelData.name + (outCard.modelData.model !== "" ? " // " + outCard.modelData.model : "")).toUpperCase()
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                font.bold: true
+                                elide: Text.ElideRight
+                            }
+
+                            // Etiqueta de modo de trabajo
+                            Rectangle {
+                                implicitWidth: badgeTxt.implicitWidth + 10
+                                implicitHeight: 18
+                                radius: Theme.radius
+                                color: outCard.isPrim
+                                    ? Theme.accent
+                                    : (outCard.modelData.workMode === "individual" ? Theme.highlight : Theme.bg)
+                                border.width: 1
+                                border.color: outCard.isPrim
+                                    ? Theme.accent
+                                    : (outCard.modelData.workMode === "individual" ? Theme.highlight : Theme.border)
+
+                                Text {
+                                    id: badgeTxt
+                                    anchors.centerIn: parent
+                                    text: outCard.isPrim
+                                        ? "PRIMARY"
+                                        : (outCard.modelData.workMode || "extend").toUpperCase()
+                                    color: (outCard.isPrim || outCard.modelData.workMode === "individual")
+                                        ? Theme.bg
+                                        : Theme.sub
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 8
+                                    font.bold: true
+                                    font.letterSpacing: 0.6
+                                }
+                            }
+                        }
 
                         Text {
                             Layout.fillWidth: true
-                            text: (outCard.modelData.name + (outCard.modelData.model !== "" ? " // " + outCard.modelData.model : "")).toUpperCase()
-                            color: Theme.text
+                            text: (outCard.modelData.currentMode || (outCard.modelData.width + "x" + outCard.modelData.height))
+                                + "  ·  SCALE " + Number(outCard.modelData.scale || 1.0).toFixed(2) + "x"
+                                + (outCard.modelData.hasSaved ? "  ·  SAVED" : "")
+                            color: Theme.sub
                             font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            font.bold: true
+                            font.pixelSize: 9
+                            font.letterSpacing: 0.4
                             elide: Text.ElideRight
-                        }
-
-                        Rectangle {
-                            visible: outCard.modelData.maxMode !== ""
-                            implicitWidth: modeTxt.implicitWidth + 10
-                            implicitHeight: 18
-                            radius: Theme.radius
-                            color: Theme.bg
-                            border.width: 1
-                            border.color: Theme.border
-
-                            Text {
-                                id: modeTxt
-                                anchors.centerIn: parent
-                                text: outCard.modelData.maxMode
-                                color: Theme.muted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 9
-                                font.bold: true
-                            }
                         }
                     }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
+                    // Botón Engranaje -> abre DisplayStudio (ventana editora estilo Launcher)
+                    Rectangle {
+                        Layout.preferredWidth: 32
+                        Layout.preferredHeight: 32
+                        radius: Theme.radius
+                        color: gearArea.containsMouse ? Theme.accent : Theme.bg
+                        border.width: Theme.borderWidth
+                        border.color: gearArea.containsMouse ? Theme.accent : Theme.border
 
-                        // Botón Principal
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: 26
-                            radius: Theme.radius
-                            color: outCard.isPrim
-                                ? Theme.accentSoft
-                                : (pHover.containsMouse ? Theme.cardAlt : Theme.bg)
-                            border.width: Theme.borderWidth
-                            border.color: outCard.isPrim
-                                ? Theme.accentSoft
-                                : (pHover.containsMouse ? Theme.text : Theme.border)
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Behavior on border.color { ColorAnimation { duration: 100 } }
 
-                            Behavior on color { ColorAnimation { duration: 100 } }
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: outCard.isPrim ? "★ PRIMARY" : "SET PRIMARY"
-                                color: outCard.isPrim ? Theme.bg : Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 9
-                                font.bold: true
-                                font.letterSpacing: 0.6
-                            }
-
-                            MouseArea {
-                                id: pHover
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                enabled: !outCard.isPrim && Displays.count > 1
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: Displays.setPrimary(outCard.modelData.name)
-                            }
+                        Text {
+                            anchors.centerIn: parent
+                            text: ""
+                            color: gearArea.containsMouse ? Theme.bg : Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 14
                         }
 
-                        // Botón Orientación (Horizontal / Vertical)
-                        Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: 26
-                            radius: Theme.radius
-                            color: rHover.containsMouse ? Theme.cardAlt : Theme.bg
-                            border.width: Theme.borderWidth
-                            border.color: rHover.containsMouse ? Theme.text : Theme.border
-
-                            Behavior on color { ColorAnimation { duration: 100 } }
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: outCard.isVert ? "󰌥 VERTICAL" : "󰌤 HORIZONTAL"
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 9
-                                font.bold: true
-                                font.letterSpacing: 0.6
-                            }
-
-                            MouseArea {
-                                id: rHover
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: Displays.setRotate(outCard.modelData.name, outCard.isVert ? "normal" : "90")
-                            }
+                        MouseArea {
+                            id: gearArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Displays.openStudio(outCard.modelData.name)
                         }
                     }
                 }
