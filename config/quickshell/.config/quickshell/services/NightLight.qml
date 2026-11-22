@@ -6,7 +6,9 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property string statePath: Quickshell.env("HOME") + "/.local/state/quickshell/night-light"
+    readonly property string home: Quickshell.env("HOME")
+    readonly property string scriptPath: home + "/.local/bin/night-light"
+    readonly property string statePath: home + "/.local/state/quickshell/night-light"
     property string mode: "auto"   // "on" | "off" | "auto"
     property int temp: 4000
     readonly property bool active: mode !== "off"
@@ -27,15 +29,15 @@ Singleton {
     }
 
     function toggle() {
-        Quickshell.execDetached(["night-light", "toggle"]);
+        Quickshell.execDetached([root.scriptPath, "toggle"]);
     }
 
     function setAuto() {
-        Quickshell.execDetached(["night-light", "auto"]);
+        Quickshell.execDetached([root.scriptPath, "auto"]);
     }
 
     function stepTemp(delta) {
-        Quickshell.execDetached(["night-light", "step", String(delta)]);
+        Quickshell.execDetached([root.scriptPath, "step", String(delta)]);
     }
 
     IpcHandler {

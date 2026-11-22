@@ -161,10 +161,21 @@ BarDrawer {
                 width: histList.width
                 implicitHeight: rowCol.implicitHeight + 20
                 radius: Theme.radius
-                color: Theme.card
+                color: rowMouse.containsMouse ? Theme.cardAlt : Theme.card
                 border.width: Theme.borderWidth
-                border.color: isCritical ? Theme.warn : Theme.border
+                border.color: isCritical ? Theme.warn : (rowMouse.containsMouse ? Theme.accent : Theme.border)
                 clip: true
+
+                Behavior on color { ColorAnimation { duration: 100 } }
+                Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                MouseArea {
+                    id: rowMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: Notifications.activate(row.modelData.id)
+                }
 
                 // Franja lateral de estado
                 Rectangle {

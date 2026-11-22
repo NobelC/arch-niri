@@ -13,11 +13,13 @@ import "widgets/media"
 import "widgets/clock"
 import "widgets/notifications"
 import "widgets/displays"
+import "widgets/menus"
 
 ShellRoot {
     Bar {}
     DashboardMenu {}
     MediaMenu {}
+    PerformanceMenu {}
     WifiMenu {}
     BluetoothMenu {}
     AudioMenu {}

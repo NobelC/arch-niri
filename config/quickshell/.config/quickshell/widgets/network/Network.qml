@@ -7,9 +7,13 @@ Item {
     implicitHeight: 24
 
     readonly property bool isActive: mouseArea.containsMouse || Niri.activeBarMenu === "wifi"
+    readonly property bool isConnected: Network.connectionType === "ethernet" || (Network.wifiEnabled && Network.connectionType === "wifi")
+
     readonly property color activeColor: {
+        if (!root.isConnected) return Theme.muted;
+        if (NetTrust.profile === "low") return Theme.warn;
+        if (NetTrust.profile === "med") return Theme.highlight;
         if (Network.connectionType === "ethernet") return Theme.highlight;
-        if (!Network.wifiEnabled || Network.connectionType === "none") return Theme.muted;
         return Theme.accent;
     }
 
@@ -26,8 +30,10 @@ Item {
     }
 
     function networkColor() {
+        if (!root.isConnected) return Theme.muted;
+        if (NetTrust.profile === "low") return Theme.warn;
+        if (NetTrust.profile === "med") return Theme.highlight;
         if (Network.connectionType === "ethernet") return Theme.highlight;
-        if (!Network.wifiEnabled || Network.connectionType === "none") return Theme.muted;
         return Theme.accentSoft;
     }
 

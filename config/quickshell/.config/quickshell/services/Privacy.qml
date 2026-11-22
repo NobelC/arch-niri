@@ -6,7 +6,9 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property string statePath: Quickshell.env("HOME") + "/.local/state/quickshell/privacy-mode"
+    readonly property string home: Quickshell.env("HOME")
+    readonly property string scriptPath: home + "/.local/bin/privacy-mode"
+    readonly property string statePath: home + "/.local/state/quickshell/privacy-mode"
     property bool active: false
     property bool initialized: false
 
@@ -30,11 +32,11 @@ Singleton {
     }
 
     function toggle() {
-        Quickshell.execDetached(["privacy-mode", "toggle"]);
+        Quickshell.execDetached([root.scriptPath, "toggle"]);
     }
 
     function setEnabled(enable) {
-        Quickshell.execDetached(["privacy-mode", enable ? "on" : "off"]);
+        Quickshell.execDetached([root.scriptPath, enable ? "on" : "off"]);
     }
 
     IpcHandler {

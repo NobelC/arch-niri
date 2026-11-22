@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ACTION="${1:-status}"
+USER_NAME="${NET_TRUST_USER:-${SUDO_USER:-NobelC}}"
+USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+STATE_DIR="${USER_HOME}/.local/state/quickshell"
+STATE_FILE="${STATE_DIR}/net-trust.json"
+
+mkdir -p "$STATE_DIR"
+
+get_active_con() {
+  nmcli -t -f NAME,TYPE,DEVICE con show --active \
+    | awk -F: '$2=="802-11-wireless" || $2=="802-3-ethernet" {print $1 "|" $2 "|" $3; exit}'
+}
+
+zone_to_profile() {
+  case "$1" in
+    trust-high) echo "high" ;;
+    trust-med)  echo "med"  ;;
+    *)          echo "low"  ;;
+  esac
+}
+
+change_zone_fast() {
+  local zone="$1" iface="$2"
+  [[ -n "$iface" ]] || return 0
+  busctl call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1 \
+    org.fedoraproject.FirewallD1.zone changeZoneOfInterface ss "$zone" "$iface" >/dev/null 2>&1 \
+    || firewall-cmd --zone="$zone" --change-interface="$iface" >/dev/null 2>&1 || true
+}
+
+write_state() {
+  local con="$1" iface="$2" zone="$3" snitch_override="${4:-}" skip_query="${5:-0}"
+  local profile snitch info services="" ports=""
+  profile="$(zone_to_profile "$zone")"
+
+  if [[ -n "$snitch_override" ]]; then
+    snitch="$snitch_override"
+  else
+    snitch="$(systemctl is-active opensnitchd 2>/dev/null || true)"
+    [[ -z "$snitch" ]] && snitch="inactive"
+  fi
+
+  if [[ "$skip_query" == "1" ]]; then
+    if [[ "$profile" == "high" ]]; then
+      services="mdns ssh"
+      ports="22000/tcp 22000/udp 21027/udp 53317/tcp 53317/udp"
+    fi
+  else
+    info="$(firewall-cmd --zone="$zone" --list-all 2>/dev/null || true)"
+    services="$(awk '/^[[:space:]]*services:/ {sub(/^[[:space:]]*services:[[:space:]]*/, ""); print; exit}' <<< "$info")"
+    ports="$(awk '/^[[:space:]]*ports:/ {sub(/^[[:space:]]*ports:[[:space:]]*/, ""); print; exit}' <<< "$info")"
+  fi
+
+  jq -n \
+    --arg con "$con" \
+    --arg iface "$iface" \
+    --arg zone "$zone" \
+    --arg profile "$profile" \
+    --arg snitch "$snitch" \
+    --arg services "$services" \
+    --arg ports "$ports" \
+    '{connection: $con, iface: $iface, zone: $zone, profile: $profile, opensnitch: $snitch, services: $services, ports: $ports}' \
+    > "$STATE_FILE"
+  chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
+}
+
+sync_opensnitch() {
+  local profile="$1"
+  if [[ "$profile" == "high" ]]; then
+    systemctl --no-block stop opensnitchd 2>/dev/null || true
+  else
+    systemctl --no-block start opensnitchd 2>/dev/null || true
+  fi
+}
+
+case "$ACTION" in
+  set)
+    PROFILE="${2:-low}"
+    TARGET_CON="${3:-}"
+    ACTIVE="$(get_active_con)"
+    CON_NAME="${TARGET_CON:-${ACTIVE%%|*}}"
+    REST="${ACTIVE#*|}"
+    CON_TYPE="${REST%%|*}"
+    IFACE="${REST#*|}"
+
+    [[ -n "$CON_NAME" ]] || { echo "No active connection" >&2; exit 1; }
+
+    case "$PROFILE" in
+      high) ZONE="trust-high"; MAC_MODE="permanent"; MDNS="2"; DOT="0"; SNITCH="inactive" ;;
+      med)  ZONE="trust-med";  MAC_MODE="stable";    MDNS="0"; DOT="1"; SNITCH="active"   ;;
+      low)  ZONE="trust-low";  MAC_MODE="random";    MDNS="0"; DOT="2"; SNITCH="active"   ;;
+      *)    echo "Invalid profile: $PROFILE" >&2; exit 1 ;;
+    esac
+
+    nm_args=(connection.zone "$ZONE" connection.mdns "$MDNS" connection.dns-over-tls "$DOT")
+    [[ "$CON_TYPE" == "802-11-wireless" ]] && nm_args+=(wifi.cloned-mac-address "$MAC_MODE")
+
+    nmcli con modify "$CON_NAME" "${nm_args[@]}" &
+    change_zone_fast "$ZONE" "$IFACE" &
+    sync_opensnitch "$PROFILE"
+    wait
+
+    write_state "$CON_NAME" "$IFACE" "$ZONE" "$SNITCH" 1
+    ;;
+
+  pass)
+    SVC="${2:-}"
+    MINS="${3:-15}"
+    SECS="$((MINS * 60))"
+    ZONE="trust-med"
+
+    case "$SVC" in
+      ssh)
+        firewall-cmd --zone="$ZONE" --add-port=22/tcp --timeout="${SECS}s" >/dev/null
+        ;;
+      syncthing)
+        firewall-cmd --zone="$ZONE" --add-port=22000/tcp --add-port=22000/udp --add-port=21027/udp --timeout="${SECS}s" >/dev/null
+        ;;
+      localsend)
+        firewall-cmd --zone="$ZONE" --add-port=53317/tcp --add-port=53317/udp --timeout="${SECS}s" >/dev/null
+        ;;
+      *)
+        echo "Unknown service: $SVC" >&2
+        exit 1
+        ;;
+    esac
+
+    ACTIVE="$(get_active_con)"
+    CON_NAME="${ACTIVE%%|*}"
+    IFACE="${ACTIVE##*|}"
+    CUR_ZONE="$(firewall-cmd --get-zone-of-interface="$IFACE" 2>/dev/null || echo "$ZONE")"
+    write_state "$CON_NAME" "$IFACE" "$CUR_ZONE"
+    ;;
+
+  sync|status)
+    ACTIVE="$(get_active_con)"
+    if [[ -z "$ACTIVE" ]]; then
+      write_state "" "" "trust-low" "inactive" 1
+      exit 0
+    fi
+    CON_NAME="${ACTIVE%%|*}"
+    IFACE="${ACTIVE##*|}"
+    ZONE="$(nmcli -g connection.zone con show "$CON_NAME" 2>/dev/null || true)"
+    [[ -z "$ZONE" ]] && ZONE="trust-low"
+    change_zone_fast "$ZONE" "$IFACE"
+    sync_opensnitch "$(zone_to_profile "$ZONE")"
+    write_state "$CON_NAME" "$IFACE" "$ZONE"
+    ;;
+esac

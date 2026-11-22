@@ -74,10 +74,28 @@ PanelWindow {
                     width: popupWindow.panelWidth
                     implicitHeight: cardCol.implicitHeight + (Theme.borderWidth * 2)
                     radius: Theme.radius
-                    color: Theme.bg
+                    color: cardHover.containsMouse ? Theme.card : Theme.bg
                     border.width: Theme.borderWidth
-                    border.color: toastItem.isCritical ? Theme.warn : Theme.text
+                    border.color: (toastItem.isCritical || cardHover.containsMouse) ? toastItem.accentCol : Theme.text
                     clip: true
+
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                    // Clic izquierdo = ir a la app emisora | Clic derecho = descartar
+                    MouseArea {
+                        id: cardHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.RightButton)
+                                Notifications.dismissPopup(toastItem.modelData.id);
+                            else
+                                Notifications.activate(toastItem.modelData.id);
+                        }
+                    }
 
                     ColumnLayout {
                         id: cardCol
@@ -174,14 +192,6 @@ PanelWindow {
                                 elide: Text.ElideRight
                             }
                         }
-                    }
-
-                    MouseArea {
-                        id: cardHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.RightButton
-                        onClicked: Notifications.dismissPopup(toastItem.modelData.id)
                     }
                 }
             }

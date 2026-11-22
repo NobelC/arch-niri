@@ -1,0 +1,108 @@
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "type": "small",
+    "color": {
+      "1": "blue",
+      "2": "cyan"
+    },
+    "padding": {
+      "top": 4,
+      "left": 2,
+      "right": 4
+    }
+  },
+  "display": {
+    "separator": "// ",
+    "color": {
+      "keys": "blue",
+      "separator": "dim_white",
+      "title": "magenta"
+    },
+    "bar": {
+      "char": {
+        "elapsed": "■",
+        "total": "□"
+      },
+      "border": {
+        "left": "[",
+        "right": "]"
+      },
+      "width": 10
+    }
+  },
+  "modules": [
+    {
+      "type": "custom",
+      "format": "{#1;7;34} 端末 // ARCH-NIRI {#}{#1;34}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{#}"
+    },
+    {
+      "type": "title",
+      "key": "┃ HOST   ",
+      "format": "{#1;35}{user-name}{#}{#dim_white}@{#}{#1;36}{host-name}{#}"
+    },
+    {
+      "type": "os",
+      "key": "┃ OS     ",
+      "format": "{name} {arch}"
+    },
+    {
+      "type": "kernel",
+      "key": "┃ KERNEL ",
+      "format": "{release}"
+    },
+    {
+      "type": "packages",
+      "key": "┃ PKGS   "
+    },
+    {
+      "type": "uptime",
+      "key": "┃ UPTIME "
+    },
+    {
+      "type": "custom",
+      "format": "{#34}┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{#}"
+    },
+    {
+      "type": "wm",
+      "key": "┃ WM     "
+    },
+    {
+      "type": "shell",
+      "key": "┃ SHELL  "
+    },
+    {
+      "type": "terminal",
+      "key": "┃ TERM   "
+    },
+    {
+      "type": "cpu",
+      "key": "┃ CPU    ",
+      "showPeCoreCount": false
+    },
+    {
+      "type": "memory",
+      "key": "┃ MEM    ",
+      "format": "{percentage-bar} {used} / {total} ({percentage})"
+    },
+    {
+      "type": "disk",
+      "key": "┃ DISK   ",
+      "folders": "/",
+      "format": "{size-percentage-bar} {size-used} / {size-total} ({size-percentage})"
+    },
+    {
+      "type": "colors",
+      "key": "┃ ANSI   ",
+      "symbol": "block",
+      "block": {
+        "width": 2,
+        "range": [0, 7]
+      }
+    },
+    {
+      "type": "custom",
+      "format": "{#1;34}┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{#}"
+    }
+  ]
+}

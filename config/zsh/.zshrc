@@ -20,8 +20,4 @@ unset _f
 
 [[ -n $ZSH_PROF ]] && zprof
 true
-
-# >>> project-picker >>>
-[ -r "/home/nobelc/.config/project-picker/pp.sh" ] && . "/home/nobelc/.config/project-picker/pp.sh"
-# <<< project-picker <<<
 export PATH="$HOME/.local/bin:$PATH"

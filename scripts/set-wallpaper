@@ -1,56 +1,78 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-WALL="${1:-}"
-if [ -z "$WALL" ] || [ ! -f "$WALL" ]; then
-    echo "Uso: set-wallpaper /ruta/a/imagen" >&2
-    exit 1
+IMG="${1:-}"
+[[ -f "$IMG" ]] || exit 1
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/arch-niri/wallpapers"
+mkdir -p "$STATE_DIR" "$CACHE_DIR"
+
+# 1. Actualizar symlink de inmediato
+ln -sfn "$IMG" "$STATE_DIR/current-wallpaper"
+
+# Hash instantáneo por metadatos
+hash="$(stat -c '%s-%Y-%n' "$IMG" | cksum | awk '{print $1}')"
+cached_hex="$CACHE_DIR/${hash}.hex"
+cached_overview="$CACHE_DIR/${hash}-overview.jpg"
+
+# 2. Fondo + paleta EN PARALELO
+awww img "$IMG" --transition-type wipe --transition-angle 30 --transition-fps 60 --transition-duration 0.30 >/dev/null 2>&1 &
+PID_AWWW=$!
+
+hex=""
+[[ -f "$cached_hex" ]] && hex="$(tr -d '[:space:]' < "$cached_hex")"
+
+if [[ "$hex" =~ ^#[0-9a-fA-F]{6}$ ]]; then
+  # Cache hit (~0.21s)
+  matugen color hex "$hex" >/dev/null 2>&1 &
+  PID_MATUGEN=$!
+else
+  # Cache miss: aplica tema y guarda el hex para la próxima
+  (
+    json="$(matugen image "$IMG" --source-color-index 0 --resize-filter nearest --json hex 2>/dev/null || true)"
+    extracted="$(printf '%s' "$json" | jq -r '[.colors.source_color | .. | strings | select(test("^#[0-9a-fA-F]{6}$"))] | first // empty' 2>/dev/null || true)"
+    if [[ "$extracted" =~ ^#[0-9a-fA-F]{6}$ ]]; then
+      printf '%s\n' "$extracted" > "$cached_hex"
+    fi
+  ) &
+  PID_MATUGEN=$!
 fi
 
-ABS_WALL="$(realpath "$WALL")"
-STATE_DIR="$HOME/.local/state/quickshell"
-OVERVIEW_WALL="$STATE_DIR/overview-wallpaper.jpg"
-mkdir -p "$STATE_DIR"
+# 3. Overview blur + limpieza automática de caché huérfana (en segundo plano desacoplado)
+nohup bash -c '
+  img="$1"; cur_hash="$2"; cached_ov="$3"; cache_dir="$4"; state_dir="$5"
 
-# 1. Actualiza enlace de estado para LockScreen y persistencia
-ln -sf "$ABS_WALL" "$STATE_DIR/current-wallpaper"
+  if [[ ! -f "$cached_ov" ]]; then
+    magick "$img" -resize 960x540^ -gravity center -extent 960x540 -blur 0x10 -quality 85 "$cached_ov" 2>/dev/null || true
+  fi
+  if [[ -f "$cached_ov" ]]; then
+    cp -f "$cached_ov" "$state_dir/overview-wallpaper.jpg"
+    pkill -x swaybg 2>/dev/null || true
+    setsid -f swaybg -i "$state_dir/overview-wallpaper.jpg" -m fill >/dev/null 2>&1
+  fi
 
-# 2. Aplica wallpaper nítido en el escritorio con awww
-if command -v awww >/dev/null 2>&1; then
-    if ! pgrep -x awww-daemon >/dev/null 2>&1; then
-        awww-daemon --format xrgb >/dev/null 2>&1 &
-        sleep 0.3
-    fi
-    awww img "$ABS_WALL" --transition-type grow --transition-pos 0.5,0.5 --transition-duration 0.9 --transition-fps 60
-fi
+  # Podar archivos huérfanos en caché (wallpapers borrados, editados o residuos viejos)
+  wall_dir="$HOME/Pictures/Wallpapers"
+  if [[ -d "$wall_dir" ]]; then
+    declare -A valid_hashes=()
+    valid_hashes["$cur_hash"]=1
+    while IFS= read -r f; do
+      fh="$(stat -c "%s-%Y-%n" "$f" | cksum | awk "{print \$1}")"
+      valid_hashes["$fh"]=1
+    done < <(find -L "$wall_dir" -maxdepth 2 -type f \
+      \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" -o -iname "*.avif" \) 2>/dev/null)
 
-# 3. Genera versión difuminada con textura y contraste para el backdrop del Overview
-if command -v swaybg >/dev/null 2>&1; then
-    if command -v magick >/dev/null 2>&1; then
-        magick "$ABS_WALL" -resize 1920x1080^ -gravity center -extent 1920x1080 \
-               -blur 0x9 -modulate 68,110,100 "$OVERVIEW_WALL" 2>/dev/null || cp "$ABS_WALL" "$OVERVIEW_WALL"
-    else
-        cp "$ABS_WALL" "$OVERVIEW_WALL"
-    fi
+    shopt -s nullglob
+    for cf in "$cache_dir"/*; do
+      base="${cf##*/}"
+      ch="${base%%[-.]*}"
+      if [[ ( "$base" == *.hex || "$base" == *-overview.jpg ) && -n "${valid_hashes[$ch]:-}" ]]; then
+        continue
+      fi
+      rm -f "$cf"
+    done
+  fi
+' _ "$IMG" "$hash" "$cached_overview" "$CACHE_DIR" "$STATE_DIR" </dev/null >/dev/null 2>&1 &
 
-    OLD_PID=$(pgrep -x swaybg || true)
-    setsid -f swaybg -i "$OVERVIEW_WALL" -m fill >/dev/null 2>&1
-    sleep 0.15
-    if [ -n "$OLD_PID" ]; then
-        kill $OLD_PID 2>/dev/null || true
-    fi
-fi
-
-# 4. Extrae paleta dinámica con matugen (con soporte garantizado para WebP/AVIF)
-if command -v matugen >/dev/null 2>&1; then
-    mkdir -p "$HOME/.config/niri" "$HOME/.local/state/matugen"
-    if ! matugen image "$ABS_WALL" --source-color-index 0 2>/dev/null; then
-        TMP_PNG="/tmp/matugen-wallpaper-fallback.png"
-        if command -v dwebp >/dev/null 2>&1; then
-            dwebp "$ABS_WALL" -o "$TMP_PNG" >/dev/null 2>&1
-        elif command -v ffmpeg >/dev/null 2>&1; then
-            ffmpeg -y -i "$ABS_WALL" -vframes 1 "$TMP_PNG" >/dev/null 2>&1
-        fi
-        [ -f "$TMP_PNG" ] && matugen image "$TMP_PNG" --source-color-index 0
-    fi
-fi
+wait "$PID_AWWW" "$PID_MATUGEN"

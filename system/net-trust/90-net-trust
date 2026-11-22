@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+IFACE="${1:-}"
+EVENT="${2:-}"
+
+[[ "$EVENT" == "up" ]] || exit 0
+[[ "$IFACE" == "lo" ]] && exit 0
+
+USER_NAME="${NET_TRUST_USER:-NobelC}"
+export NET_TRUST_USER="$USER_NAME"
+
+/usr/local/bin/net-trust-apply sync
+
+UID_NUM="$(id -u "$USER_NAME" 2>/dev/null || true)"
+USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+STATE_FILE="${USER_HOME}/.local/state/quickshell/net-trust.json"
+
+if [[ -n "$UID_NUM" && -f "$STATE_FILE" && -S "/run/user/${UID_NUM}/bus" ]]; then
+  CON="$(jq -r '.connection // "UNKNOWN"' "$STATE_FILE")"
+  PROF="$(jq -r '.profile // "low"' "$STATE_FILE" | tr '[:lower:]' '[:upper:]')"
+  URG="normal"
+  [[ "$PROF" == "LOW" ]] && URG="critical"
+  sudo -u "$USER_NAME" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${UID_NUM}/bus" \
+    notify-send -u "$URG" "防衛 // NET TRUST" "${CON} → ${PROF}" 2>/dev/null || true
+fi

@@ -69,6 +69,12 @@ BarDrawer {
         property string askingFor: ""
         readonly property real maxListHeight: 5 * 46
 
+        readonly property color trustColor: {
+            if (NetTrust.profile === "low") return Theme.warn;
+            if (NetTrust.profile === "med") return Theme.highlight;
+            return Theme.accent;
+        }
+
         // ---------- Estado ----------
         readonly property var wifiDevice: {
             const devs = Networking.devices.values;
@@ -132,7 +138,9 @@ BarDrawer {
 
         onActiveChanged: {
             root.updateScanner();
-            if (!active)
+            if (active)
+                NetTrust.sync();
+            else
                 root.askingFor = "";
         }
         onWifiOnChanged: root.updateScanner()
@@ -220,9 +228,11 @@ BarDrawer {
                 width: 32
                 height: 32
                 radius: Theme.radius
-                color: (root.wifiOn && root.current) ? Theme.accent : Theme.card
+                color: (root.wifiOn && root.current) ? root.trustColor : Theme.card
                 border.width: Theme.borderWidth
-                border.color: (root.wifiOn && root.current) ? Theme.accent : Theme.border
+                border.color: (root.wifiOn && root.current) ? root.trustColor : Theme.border
+
+                Behavior on color { ColorAnimation { duration: 120 } }
 
                 Text {
                     anchors.centerIn: parent
@@ -381,8 +391,10 @@ BarDrawer {
             radius: Theme.radius
             color: Theme.card
             border.width: Theme.borderWidth
-            border.color: Theme.accent
+            border.color: root.trustColor
             clip: true
+
+            Behavior on border.color { ColorAnimation { duration: 120 } }
 
             readonly property int litSegments: root.current
                 ? Math.max(1, Math.min(10, Math.round(root.current.signalStrength * 10)))
@@ -395,7 +407,9 @@ BarDrawer {
                 anchors.bottom: parent.bottom
                 anchors.margins: Theme.borderWidth
                 width: 3
-                color: Theme.accent
+                color: root.trustColor
+
+                Behavior on color { ColorAnimation { duration: 120 } }
             }
 
             ColumnLayout {
@@ -486,7 +500,7 @@ BarDrawer {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 6
                             radius: Theme.radius
-                            color: index < card.litSegments ? Theme.accent : Theme.cardAlt
+                            color: index < card.litSegments ? root.trustColor : Theme.cardAlt
                         }
                     }
                 }
@@ -516,6 +530,163 @@ BarDrawer {
                             font.pixelSize: 10
                             horizontalAlignment: Text.AlignRight
                             elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                // ---------- PERFIL DE CONFIANZA (TRUST ZONE) ----------
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 1
+                    color: Theme.border
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "防衛 // TRUST PROFILE"
+                        color: Theme.muted
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
+
+                    Text {
+                        text: NetTrust.snitchActive ? "SNITCH ON" : "SNITCH PAUSED"
+                        color: NetTrust.snitchActive ? root.trustColor : Theme.muted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 8
+                        font.bold: true
+                        font.letterSpacing: 0.6
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 5
+
+                    Repeater {
+                        model: [
+                            { id: "high", label: "01 // HIGH", tone: "accent" },
+                            { id: "med",  label: "02 // MED",  tone: "highlight" },
+                            { id: "low",  label: "03 // LOW",  tone: "warn" }
+                        ]
+
+                        delegate: Rectangle {
+                            id: tBtn
+                            required property var modelData
+                            readonly property bool selected: NetTrust.profile === modelData.id
+                            readonly property color btnTone: modelData.tone === "warn"
+                                ? Theme.warn
+                                : (modelData.tone === "highlight" ? Theme.highlight : Theme.accent)
+
+                            Layout.fillWidth: true
+                            implicitHeight: 26
+                            radius: Theme.radius
+                            color: selected
+                                ? btnTone
+                                : (tArea.containsMouse ? Theme.cardAlt : Theme.bg)
+                            border.width: Theme.borderWidth
+                            border.color: selected
+                                ? Theme.text
+                                : (tArea.containsMouse ? btnTone : Theme.border)
+
+                            Behavior on color { ColorAnimation { duration: 100 } }
+                            Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: tBtn.modelData.label
+                                color: tBtn.selected ? Theme.bg : Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 9
+                                font.bold: true
+                                font.letterSpacing: 0.5
+                            }
+
+                            MouseArea {
+                                id: tArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: NetTrust.setProfile(tBtn.modelData.id)
+                            }
+                        }
+                    }
+                }
+
+                // Resumen de políticas del perfil activo
+                Text {
+                    Layout.fillWidth: true
+                    text: {
+                        if (NetTrust.profile === "high")
+                            return "LAN OPEN // SSH · SYNCTHING · LOCALSEND · MDNS";
+                        if (NetTrust.profile === "med")
+                            return "PORTS CLOSED // STABLE MAC · TEMP PASSES BELOW";
+                        return "LOCKDOWN // DROP ALL · RANDOM MAC · DNS-OVER-TLS";
+                    }
+                    color: NetTrust.profile === "low" ? Theme.warn : Theme.sub
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 8
+                    font.bold: NetTrust.profile === "low"
+                    font.letterSpacing: 0.4
+                    elide: Text.ElideRight
+                }
+
+                // Pases temporales de puertos (solo en perfil MED)
+                RowLayout {
+                    visible: NetTrust.profile === "med"
+                    Layout.fillWidth: true
+                    spacing: 5
+
+                    Repeater {
+                        model: [
+                            { svc: "ssh",       mins: 15, label: "+ SSH 15M"  },
+                            { svc: "syncthing", mins: 30, label: "+ SYNC 30M" },
+                            { svc: "localsend", mins: 15, label: "+ SEND 15M" }
+                        ]
+
+                        delegate: Rectangle {
+                            id: pBtn
+                            required property var modelData
+                            readonly property bool isOpen: (modelData.svc === "ssh" && NetTrust.sshPassOpen)
+                                || (modelData.svc === "syncthing" && NetTrust.syncPassOpen)
+                                || (modelData.svc === "localsend" && NetTrust.sendPassOpen)
+
+                            Layout.fillWidth: true
+                            implicitHeight: 24
+                            radius: Theme.radius
+                            color: isOpen
+                                ? Theme.highlight
+                                : (pArea.containsMouse ? Theme.cardAlt : Theme.bg)
+                            border.width: 1
+                            border.color: isOpen
+                                ? Theme.highlight
+                                : (pArea.containsMouse ? Theme.text : Theme.border)
+
+                            Behavior on color { ColorAnimation { duration: 100 } }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: pBtn.isOpen ? ("✓ " + pBtn.modelData.svc.toUpperCase()) : pBtn.modelData.label
+                                color: pBtn.isOpen ? Theme.bg : Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 8
+                                font.bold: true
+                                font.letterSpacing: 0.4
+                            }
+
+                            MouseArea {
+                                id: pArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: NetTrust.grantPass(pBtn.modelData.svc, pBtn.modelData.mins)
+                            }
                         }
                     }
                 }

@@ -32,3 +32,7 @@ post_hook = 'mkdir -p "$HOME/.config/btop/themes" && ln -sf "$HOME/.local/state/
 input_path = '~/.config/matugen/templates/yazi-theme.toml'
 output_path = '~/.local/state/matugen/yazi-theme.toml'
 post_hook = 'ln -sf "$HOME/.local/state/matugen/yazi-theme.toml" "$HOME/.config/yazi/theme.toml"'
+
+[templates.opensnitch]
+input_path = "~/.config/matugen/templates/opensnitch.qss"
+output_path = "~/.config/opensnitch/themes/neo-brutal.qss"

@@ -7,22 +7,19 @@ spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
 // --- 3. INTERFAZ PRINCIPAL (Quickshell) ---
 spawn-at-startup "qs"
 
-// --- 4. TEMPERATURA DE COLOR AUTOMÁTICA (wlsunset) ---
-spawn-sh-at-startup "pkill -x wlsunset; wlsunset -t 4000 -T 6500 -l 8.4 -L -80.1"
+// --- 4. TEMPERATURA DE COLOR AUTOMÁTICA (night-light -> wlsunset) ---
 spawn-sh-at-startup "\"$HOME/.local/bin/night-light\" apply"
-
 
 // --- 5. WALLPAPER DINÁMICO (awww en escritorio + swaybg en Overview) ---
 spawn-at-startup "awww-daemon" "--format" "xrgb"
 spawn-sh-at-startup "[ -L \"$HOME/.local/state/quickshell/current-wallpaper\" ] && awww img \"$(readlink -f \"$HOME/.local/state/quickshell/current-wallpaper\")\" --transition-type none"
 spawn-sh-at-startup "[ -f \"$HOME/.local/state/quickshell/overview-wallpaper.jpg\" ] && swaybg -i \"$HOME/.local/state/quickshell/overview-wallpaper.jpg\" -m fill"
 
-// --- 6. ENERGÍA Y BLOQUEO POR INACTIVIDAD ---
-spawn-sh-at-startup "pkill -x swayidle; swayidle -w timeout 300 'qs ipc call lock lock >/dev/null 2>&1 &' timeout 330 'niri msg action power-off-monitors' resume 'niri msg action power-off-monitors' before-sleep 'qs ipc call lock lock >/dev/null 2>&1; sleep 0.4'"
-
-// --- 7. GESTIÓN CONTEXTUAL DE TAPA (Smart Clamshell) ---
-spawn-sh-at-startup "pkill -x smart-lid; smart-lid"
+// --- 6. ENERGÍA, TAPA Y MONITORES ---
+spawn-sh-at-startup "pkill -x smart-lid; \"$HOME/.local/bin/smart-lid\""
 spawn-sh-at-startup "\"$HOME/.local/bin/smart-idle\""
 spawn-sh-at-startup "\"$HOME/.local/bin/display-manager\" watch"
+spawn-at-startup "wl-clip-persist" "--clipboard" "regular"
 
-spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
+// --- 7. FIREWALL INTERACTIVO (OpenSnitch UI para perfiles MED/LOW) ---
+spawn-at-startup "opensnitch-ui" "--background"

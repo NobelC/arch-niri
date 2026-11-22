@@ -4,12 +4,12 @@ libtiff5
 localsend-bin
 matugen-bin
 neo-login-git
+onlyoffice-bin
 pake-cli
 paru-bin
 paru-bin-debug
 phinger-cursors
 ttf-ms-win11-auto
 vesktop-bin
-wps-office
 wps-office-mime
 xcursor-hackneyed-dark

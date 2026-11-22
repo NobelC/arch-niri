@@ -1,4 +1,4 @@
-# arch-niri
+# arch-niri  (NEO-BRUTALISM)
 
 Entorno de escritorio personal, modular y declarativo para **Arch Linux** construido sobre el compositor scrollable **Niri** y una interfaz completa en **Quickshell**, con generación dinámica de paleta de colores mediante **Matugen** y gestión automatizada de dotfiles con **GNU Stow**.
 

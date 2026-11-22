@@ -1,0 +1,99 @@
+/* Neo-Brutalist Theme for OpenSnitch (Matugen) */
+* {
+    border-radius: 0px;
+    font-family: "JetBrainsMono Nerd Font", "Monospace";
+    font-size: 11px;
+}
+
+QWidget, QDialog, QMainWindow {
+    background-color: {{colors.surface.default.hex}};
+    color: {{colors.on_surface.default.hex}};
+}
+
+QFrame, QGroupBox, QTabWidget::pane {
+    background-color: {{colors.surface_container.default.hex}};
+    border: 2px solid {{colors.outline.default.hex}};
+}
+
+QLabel {
+    background-color: transparent;
+    color: {{colors.on_surface.default.hex}};
+}
+
+QPushButton {
+    background-color: {{colors.surface_container_high.default.hex}};
+    color: {{colors.on_surface.default.hex}};
+    border: 2px solid {{colors.outline.default.hex}};
+    padding: 6px 14px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background-color: {{colors.primary.default.hex}};
+    color: {{colors.on_primary.default.hex}};
+    border: 2px solid {{colors.primary.default.hex}};
+}
+
+/* Botón Allow (acento principal) y Deny (alerta) */
+QPushButton#allowButton {
+    background-color: {{colors.primary.default.hex}};
+    color: {{colors.on_primary.default.hex}};
+    border: 2px solid {{colors.on_surface.default.hex}};
+}
+
+QPushButton#denyButton {
+    background-color: {{colors.error.default.hex}};
+    color: {{colors.on_error.default.hex}};
+    border: 2px solid {{colors.on_surface.default.hex}};
+}
+
+QComboBox, QLineEdit, QSpinBox {
+    background-color: {{colors.surface.default.hex}};
+    color: {{colors.on_surface.default.hex}};
+    border: 2px solid {{colors.outline.default.hex}};
+    padding: 4px 8px;
+}
+
+QComboBox:focus, QLineEdit:focus {
+    border: 2px solid {{colors.primary.default.hex}};
+}
+
+QComboBox QAbstractItemView {
+    background-color: {{colors.surface_container.default.hex}};
+    color: {{colors.on_surface.default.hex}};
+    border: 2px solid {{colors.primary.default.hex}};
+    selection-background-color: {{colors.primary.default.hex}};
+    selection-color: {{colors.on_primary.default.hex}};
+}
+
+QTableView, QTreeView, QListView {
+    background-color: {{colors.surface.default.hex}};
+    alternate-background-color: {{colors.surface_container_low.default.hex}};
+    color: {{colors.on_surface.default.hex}};
+    gridline-color: {{colors.outline_variant.default.hex}};
+    border: 2px solid {{colors.outline.default.hex}};
+    selection-background-color: {{colors.primary.default.hex}};
+    selection-color: {{colors.on_primary.default.hex}};
+}
+
+QHeaderView::section {
+    background-color: {{colors.surface_container_high.default.hex}};
+    color: {{colors.primary.default.hex}};
+    border: 1px solid {{colors.outline.default.hex}};
+    padding: 4px 6px;
+    font-weight: bold;
+}
+
+QTabBar::tab {
+    background-color: {{colors.surface_container.default.hex}};
+    color: {{colors.on_surface_variant.default.hex}};
+    border: 2px solid {{colors.outline.default.hex}};
+    padding: 6px 10px;
+    font-weight: bold;
+}
+
+QTabBar::tab:selected {
+    background-color: {{colors.primary.default.hex}};
+    color: {{colors.on_primary.default.hex}};
+    border: 2px solid {{colors.primary.default.hex}};
+}

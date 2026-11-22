@@ -1,0 +1,20 @@
+window,
+dialog,
+messagedialog,
+popover,
+popover > contents,
+menu,
+.background,
+headerbar,
+button,
+entry,
+progressbar,
+progressbar trough,
+progressbar progress {
+    border-radius: 0px;
+}
+
+window.csd,
+dialog.csd {
+    box-shadow: none;
+}

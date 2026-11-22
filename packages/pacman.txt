@@ -16,8 +16,10 @@ dosfstools
 efibootmgr
 exfatprogs
 eza
+fastfetch
 fd
 firefox
+firewalld
 fzf
 ghostty
 git
@@ -53,6 +55,7 @@ noto-fonts-cjk
 npm
 ntfs-3g
 obsidian
+opensnitch
 openssh
 pipewire
 pipewire-pulse
@@ -66,6 +69,7 @@ resvg
 ripgrep
 rust-analyzer
 shellcheck
+spotify-launcher
 steam
 stow
 swaybg
@@ -77,6 +81,7 @@ vulkan-intel
 webkit2gtk-4.1
 wiremix
 wireplumber
+wl-clip-persist
 wl-clipboard
 wl-mirror
 wlsunset

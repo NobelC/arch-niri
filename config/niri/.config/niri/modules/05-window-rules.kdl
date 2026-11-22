@@ -100,3 +100,21 @@ window-rule {
     exclude title=r#"^Steam$"#
     open-floating true
 }
+
+// Diálogos estándar del sistema y portales (abrir, guardar, progreso, autenticación)
+window-rule {
+    match app-id=r#"(?i)^(xdg-desktop-portal.*|org\.freedesktop\.impl\.portal.*|zenity|polkit-gnome.*|spotify-launcher)$"#
+    open-floating true
+}
+
+// Cuadros de diálogo comunes por título (fuentes, color, impresión, guardar/abrir)
+window-rule {
+    match title=r#"(?i)(open file|save file|save as|select|choose|abrir|guardar|imprimir|print|preferences|preferencias|settings|configuración|font|fuente|color|find|replace|buscar|reemplazar|properties|propiedades|about|acerca de)"#
+    open-floating true
+}
+
+// Subventanas sin título / desplegables de WPS Office y OnlyOffice (XWayland)
+window-rule {
+    match app-id=r#"(?i)^(wps|et|wpp|wpspdf|DesktopEditors|onlyoffice.*)$"# title=r#"^$"#
+    open-floating true
+}
