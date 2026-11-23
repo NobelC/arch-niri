@@ -2,7 +2,11 @@
 set -euo pipefail
 
 ACTION="${1:-status}"
-USER_NAME="${SYS_UPDATE_USER:-${SUDO_USER:-NobelC}}"
+USER_NAME="${SYS_UPDATE_USER:-${SUDO_USER:-}}"
+if [[ -z "$USER_NAME" || "$USER_NAME" == "root" ]]; then
+  echo "✗ Error: define SYS_UPDATE_USER o ejecuta con sudo desde un usuario no-root (SUDO_USER)." >&2
+  exit 1
+fi
 USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
 REPO_DIR="${USER_HOME}/Projects/arch-niri"
 STATE_DIR="${USER_HOME}/.local/state/quickshell"
@@ -77,10 +81,11 @@ write_progress() {
 }
 
 create_pre_snapshot() {
-  local ts snap_name=""
+  local ts root_fs snap_name=""
   ts="$(date '+%Y-%m-%d %H:%M')"
+  root_fs="$(stat -f -c %T / 2>/dev/null || echo "unknown")"
 
-  if [[ "$(stat -f -c %T / 2>/dev/null || true)" == "btrfs" ]] && command -v btrfs >/dev/null 2>&1; then
+  if [[ "$root_fs" == "btrfs" ]] && command -v btrfs >/dev/null 2>&1; then
     local snap_dir="/.snapshots"
     local snap_path="${snap_dir}/pre-update-latest"
 
@@ -99,9 +104,21 @@ create_pre_snapshot() {
     if btrfs subvolume snapshot -r / "$snap_path" >/dev/null 2>&1; then
       snap_name="pre-update-latest (${ts})"
     fi
+  elif command -v timeshift >/dev/null 2>&1; then
+    if timeshift --create --comments "pre-update-latest" --tags O >> "$LOG_FILE" 2>&1; then
+      mapfile -t old_ts < <(timeshift --list 2>/dev/null | awk '/pre-update-latest/ {print $3}' | sort | head -n -1 || true)
+      for old_id in "${old_ts[@]}"; do
+        timeshift --delete --snapshot "$old_id" >> "$LOG_FILE" 2>&1 || true
+      done
+      snap_name="timeshift-rsync (${ts})"
+    fi
   fi
 
-  echo "$snap_name"
+  if [[ -z "$snap_name" ]]; then
+    echo "NONE (${root_fs^^})"
+  else
+    echo "$snap_name"
+  fi
 }
 
 sync_repo_state() {
@@ -112,6 +129,16 @@ sync_repo_state() {
     sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/auto-stow" >/dev/null 2>&1 || true
   fi
 }
+
+
+cleanup_on_exit() {
+  local rc=$?
+  if [[ $rc -ne 0 && -f "$STATE_FILE" ]]; then
+    write_progress "error" "ERROR // UPDATE INTERRUPTED OR FAILED (CODE $rc)" false "$SNAP_CREATED" || true
+  fi
+}
+SNAP_CREATED=""
+trap cleanup_on_exit EXIT
 
 case "$ACTION" in
   upgrade)
@@ -129,14 +156,20 @@ case "$ACTION" in
     fi
 
     eta="$(calc_eta "$AVG_BASE" "$repo_count" "$aur_count")"
-    write_progress "snapshot" "01 // OVERWRITING SYSTEM SNAPSHOT..." true 8 "$eta" ""
+    write_progress "snapshot" "01 // CHECKING SYSTEM SNAPSHOT..." true 8 "$eta" ""
     SNAP_CREATED="$(create_pre_snapshot)"
     T_SNAP_END=$SECONDS
     snap_elapsed=$(( T_SNAP_END - T_START ))
 
     # 1. Actualizar repositorios oficiales
     eta="$(calc_eta 3 "$repo_count" "$aur_count")"
-    write_progress "upgrading" "02 // UPDATING OFFICIAL REPOS (PACMAN)..." true 22 "$eta" "$SNAP_CREATED"
+    if [[ "$SNAP_CREATED" == NONE* ]]; then
+      echo "[sys-update] Sin snapshot disponible: ${SNAP_CREATED}" >> "$LOG_FILE"
+      write_progress "upgrading" "02 // NO SNAPSHOT (${SNAP_CREATED#NONE }) · UPDATING REPOS..." true 22 "$eta" "$SNAP_CREATED"
+    else
+      echo "[sys-update] Snapshot creado: ${SNAP_CREATED}" >> "$LOG_FILE"
+      write_progress "upgrading" "02 // SNAPSHOT OK · UPDATING OFFICIAL REPOS..." true 22 "$eta" "$SNAP_CREATED"
+    fi
     T_REPO_START=$SECONDS
     if ! pacman -Syu --noconfirm --needed >> "$LOG_FILE" 2>&1; then
       write_progress "error" "ERROR // PACMAN UPGRADE FAILED (CHECK LOG)" false 0 0 "$SNAP_CREATED"

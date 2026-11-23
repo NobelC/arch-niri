@@ -68,6 +68,18 @@ if [[ "${1:-}" == "-Qqm" ]]; then
 fi
 MOCK
 
+cat << 'MOCK' > "$MOCK_BIN/sudo"
+#!/usr/bin/env bash
+# Evita bloqueos esperando contraseña interactiva en tests
+if [[ "${1:-}" == "-n" ]]; then
+  shift
+fi
+if [[ "${1:-}" == "-u" ]]; then
+  shift 2
+fi
+exec "$@"
+MOCK
+
 chmod +x "$MOCK_BIN"/*
 
 assert_ok() {
