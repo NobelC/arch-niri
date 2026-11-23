@@ -33,20 +33,21 @@ Singleton {
                 body: notif.body || "",
                 urgency: notif.urgency,
                 time: Qt.formatTime(new Date(), "HH:mm"),
-                notifObj: notif
+                notifObj: notif,
+                isAlive: true
             };
 
-            // Guardar en historial (máximo 30)
             const nextHist = [item].concat(root.history.filter(n => n.id !== item.id));
             root.history = nextHist.slice(0, root.maxHistory);
 
-            // Mostrar toast si no está en DND (o si es crítica)
             if (!root.effectiveDnd || notif.urgency === NotificationUrgency.Critical) {
                 const nextPop = [item].concat(root.popups.filter(n => n.id !== item.id));
                 root.popups = nextPop.slice(0, 4);
             }
 
             notif.closed.connect(() => {
+                item.isAlive = false;
+                item.notifObj = null;
                 root.dismissPopup(item.id);
             });
         }
@@ -56,8 +57,7 @@ Singleton {
         const item = root.popups.find(n => n.id === id) || root.history.find(n => n.id === id);
         if (!item) return;
 
-        // 1. Invocar acción "default" si la app la registró (abre chat/pestaña exacta)
-        if (item.notifObj && item.notifObj.actions) {
+        if (item.isAlive && item.notifObj && item.notifObj.actions) {
             try {
                 const acts = item.notifObj.actions;
                 for (let i = 0; i < acts.length; i++) {
@@ -69,7 +69,6 @@ Singleton {
             } catch (e) {}
         }
 
-        // 2. Enfocar la ventana emisora en Niri (coincidencia por desktopEntry o appName)
         const de = item.desktopEntry || "";
         const app = item.appName === "System" ? "" : (item.appName || "");
         if (de !== "" || app !== "") {
@@ -90,12 +89,11 @@ Singleton {
             ]);
         }
 
-        // 3. Borrar del toast y del historial
         root.removeHistory(id);
         if (Niri.activeBarMenu === "notifications") {
             Niri.closeBarMenu();
         }
-      }
+    }
 
     function dismissPopup(id) {
         root.popups = root.popups.filter(n => n.id !== id);
@@ -103,8 +101,10 @@ Singleton {
 
     function removeHistory(id) {
         const target = root.history.find(n => n.id === id);
-        if (target && target.notifObj) {
+        if (target && target.isAlive && target.notifObj) {
+            target.isAlive = false;
             try { target.notifObj.dismiss(); } catch (e) {}
+            target.notifObj = null;
         }
         root.popups = root.popups.filter(n => n.id !== id);
         root.history = root.history.filter(n => n.id !== id);
@@ -112,9 +112,11 @@ Singleton {
 
     function clearHistory() {
         for (let i = 0; i < root.history.length; i++) {
-            const obj = root.history[i].notifObj;
-            if (obj) {
-                try { obj.dismiss(); } catch (e) {}
+            const item = root.history[i];
+            if (item && item.isAlive && item.notifObj) {
+                item.isAlive = false;
+                try { item.notifObj.dismiss(); } catch (e) {}
+                item.notifObj = null;
             }
         }
         root.popups = [];

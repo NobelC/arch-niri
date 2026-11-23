@@ -2,12 +2,13 @@
 zmodload zsh/complist
 autoload -Uz compinit
 
-# El volcado se regenera como máximo una vez al día (arranque mucho más rápido)
 _zcd="$ZSH_CACHE_DIR/zcompdump"
-if [[ -n $_zcd(#qN.mh+24) ]]; then
+if [[ -n $_zcd(#qN.mh+24) || ! -s "$_zcd" ]]; then
   compinit -d "$_zcd"
+  zcompile "$_zcd" 2>/dev/null || true
 else
   compinit -C -d "$_zcd"
+  [[ ! -s "$_zcd.zwc" || "$_zcd" -nt "$_zcd.zwc" ]] && zcompile "$_zcd" 2>/dev/null || true
 fi
 unset _zcd
 

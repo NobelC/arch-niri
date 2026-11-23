@@ -25,7 +25,34 @@ Item {
     readonly property int typed: LockState.buffer.length
     readonly property string wallpaper: LockState.currentWallpaper
     readonly property bool isError: LockState.status === "error"
-    readonly property color activeStroke: isError ? Theme.warn : (root.typed > 0 || LockState.busy ? Theme.accent : Theme.text)
+    readonly property bool isUnlocking: LockState.unlocking
+    readonly property color activeStroke: isError
+        ? Theme.warn
+        : (isUnlocking || root.typed > 0 || LockState.busy ? Theme.accent : Theme.text)
+
+    // ---------- Progreso animado dentro de passBox ----------
+    property real unlockProgress: 0.0
+    readonly property int litUnlockBlocks: Math.round(unlockProgress * capacity)
+
+    onIsUnlockingChanged: {
+        if (isUnlocking) {
+            unlockProgress = 0.0;
+            unlockAnim.restart();
+        } else {
+            unlockAnim.stop();
+            unlockProgress = 0.0;
+        }
+    }
+
+    NumberAnimation {
+        id: unlockAnim
+        target: root
+        property: "unlockProgress"
+        from: 0.0
+        to: 1.0
+        duration: 1000
+        easing.type: Easing.Linear
+    }
 
     readonly property var jpDays: ["日", "月", "火", "水", "木", "金", "土"]
     readonly property var enDays: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
@@ -252,15 +279,19 @@ Item {
                 height: 8
                 anchors.verticalCenter: parent.verticalCenter
                 radius: root.uiRadius
-                color: root.isError ? Theme.warn : (LockState.busy ? Theme.highlight : Theme.accent)
+                color: root.isError
+                    ? Theme.warn
+                    : (root.isUnlocking ? Theme.accentSoft : (LockState.busy ? Theme.highlight : Theme.accent))
             }
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.isError
                     ? "警告 // ACCESS DENIED"
-                    : (LockState.busy ? "認証処理中 // AUTH" : "端末待機中 // STANDBY")
-                color: root.isError ? Theme.warn : Theme.sub
+                    : (root.isUnlocking
+                        ? "認証完了 // ACCESS GRANTED"
+                        : (LockState.busy ? "認証処理中 // AUTH" : "端末待機中 // STANDBY"))
+                color: root.isError ? Theme.warn : (root.isUnlocking ? Theme.accent : Theme.sub)
                 font.family: root.uiCjkFont
                 font.pixelSize: 12
                 font.bold: true
@@ -369,7 +400,9 @@ Item {
                             anchors.rightMargin: 16
 
                             Text {
-                                text: "認証 // SESSION LOCK"
+                                text: root.isUnlocking
+                                    ? "認証完了 // ACCESS GRANTED"
+                                    : "認証 // SESSION LOCK"
                                 color: Theme.bg
                                 font.family: root.uiCjkFont
                                 font.pixelSize: 12
@@ -380,7 +413,7 @@ Item {
                             Item { Layout.fillWidth: true }
 
                             Text {
-                                text: "SEC-01"
+                                text: root.isUnlocking ? "SEC-OK" : "SEC-01"
                                 color: Theme.bg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
@@ -390,7 +423,7 @@ Item {
                         }
                     }
 
-                    // 2. Bloque de Reloj y Fecha
+                    // 2. Bloque de Reloj y Fecha (se mantiene fijo)
                     Item {
                         Layout.fillWidth: true
                         Layout.preferredHeight: clockCol.implicitHeight + 36
@@ -404,7 +437,6 @@ Item {
                             anchors.rightMargin: 24
                             spacing: 14
 
-                            // Hora principal centrada exactamente en X + segundos a la derecha
                             Item {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: mainTime.implicitHeight
@@ -506,7 +538,7 @@ Item {
                         color: Theme.border
                     }
 
-                    // 3. Identidad y Caja de Contraseña (celdas aleatorias)
+                    // 3. Identidad y Caja de Contraseña / Barra de Carga
                     Item {
                         Layout.fillWidth: true
                         Layout.preferredHeight: authCol.implicitHeight + 36
@@ -528,12 +560,12 @@ Item {
                                     implicitWidth: idTag.implicitWidth + 10
                                     implicitHeight: 20
                                     radius: root.uiRadius
-                                    color: Theme.accentSoft
+                                    color: root.isUnlocking ? Theme.accent : Theme.accentSoft
 
                                     Text {
                                         id: idTag
                                         anchors.centerIn: parent
-                                        text: "ID"
+                                        text: root.isUnlocking ? "OK" : "ID"
                                         color: Theme.bg
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 10
@@ -553,14 +585,19 @@ Item {
                                 Item { Layout.fillWidth: true }
 
                                 Text {
-                                    text: "[ " + String(root.typed).padStart(2, "0") + " / " + root.capacity + " ]"
-                                    color: root.isError ? Theme.warn : (root.typed > 0 ? Theme.accent : Theme.muted)
+                                    text: root.isUnlocking
+                                        ? "[ " + String(Math.round(root.unlockProgress * 100)).padStart(3, "0") + "% ]"
+                                        : "[ " + String(root.typed).padStart(2, "0") + " / " + root.capacity + " ]"
+                                    color: root.isError
+                                        ? Theme.warn
+                                        : (root.isUnlocking || root.typed > 0 ? Theme.accent : Theme.muted)
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
-                                    font.bold: root.typed > 0
+                                    font.bold: root.isUnlocking || root.typed > 0
                                 }
                             }
 
+                            // Recuadro único: celdas aleatorias al escribir -> barra segmentada al validar
                             Rectangle {
                                 id: passBox
                                 Layout.fillWidth: true
@@ -570,13 +607,15 @@ Item {
                                 border.width: root.uiBorder
                                 border.color: root.isError
                                     ? Theme.warn
-                                    : (root.typed > 0 || LockState.busy ? Theme.accent : Theme.border)
+                                    : (root.isUnlocking || root.typed > 0 || LockState.busy ? Theme.accent : Theme.border)
                                 clip: true
 
                                 Behavior on border.color { ColorAnimation { duration: 140 } }
 
+                                // Modo A: Celdas aleatorias de contraseña
                                 Row {
                                     anchors.centerIn: parent
+                                    visible: !root.isUnlocking
 
                                     Repeater {
                                         model: root.capacity
@@ -619,6 +658,26 @@ Item {
                                         }
                                     }
                                 }
+
+                                // Modo B: Barra de carga segmentada al desbloquear
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    spacing: 4
+                                    visible: root.isUnlocking
+
+                                    Repeater {
+                                        model: root.capacity
+
+                                        Rectangle {
+                                            required property int index
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            radius: root.uiRadius
+                                            color: index < root.litUnlockBlocks ? Theme.accent : Theme.cardAlt
+                                        }
+                                    }
+                                }
                             }
 
                             RowLayout {
@@ -626,25 +685,31 @@ Item {
 
                                 Text {
                                     Layout.fillWidth: true
-                                    text: LockState.busy
-                                        ? "検証中 // VERIFYING..."
-                                        : (root.isError
-                                            ? "アクセス拒否 // " + LockState.message.toUpperCase()
-                                            : "入力待機 // ENTER PASSKEY")
-                                    color: root.isError ? Theme.warn : (LockState.busy ? Theme.accent : Theme.muted)
+                                    text: root.isUnlocking
+                                        ? (root.unlockProgress < 0.55
+                                            ? "環境復元中 // RESTORING SESSION..."
+                                            : "起動完了 // WORKSPACE READY")
+                                        : (LockState.busy
+                                            ? "検証中 // VERIFYING..."
+                                            : (root.isError
+                                                ? "アクセス拒否 // " + LockState.message.toUpperCase()
+                                                : "入力待機 // ENTER PASSKEY"))
+                                    color: root.isError
+                                        ? Theme.warn
+                                        : (root.isUnlocking || LockState.busy ? Theme.accent : Theme.muted)
                                     font.family: root.uiCjkFont
                                     font.pixelSize: 11
-                                    font.bold: root.isError || LockState.busy
+                                    font.bold: root.isError || root.isUnlocking || LockState.busy
                                     font.letterSpacing: 1.2
                                     elide: Text.ElideRight
                                 }
 
                                 Text {
-                                    text: "[ ↵ ENTER ]"
-                                    color: root.typed > 0 ? Theme.text : Theme.muted
+                                    text: root.isUnlocking ? "[ OK ]" : "[ ↵ ENTER ]"
+                                    color: root.isUnlocking ? Theme.accent : (root.typed > 0 ? Theme.text : Theme.muted)
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 10
-                                    font.bold: root.typed > 0
+                                    font.bold: root.isUnlocking || root.typed > 0
                                     font.letterSpacing: 1
                                 }
                             }
@@ -667,7 +732,7 @@ Item {
                 radius: root.uiRadius
                 color: Theme.card
                 border.width: root.uiBorder
-                border.color: Theme.border
+                border.color: root.isUnlocking ? Theme.accent : Theme.border
                 clip: true
 
                 Row {
@@ -676,14 +741,16 @@ Item {
                     spacing: 8
 
                     Text {
-                        text: ""
+                        text: root.isUnlocking ? "" : ""
                         color: Theme.accent
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Text {
-                        text: LockState.busy ? "検証中 // BUSY" : "ロック中 // LOCKED"
+                        text: root.isUnlocking
+                            ? "解除中 // UNLOCKING"
+                            : (LockState.busy ? "検証中 // BUSY" : "ロック中 // LOCKED")
                         color: Theme.text
                         font.family: root.uiCjkFont
                         font.pixelSize: 11
@@ -695,7 +762,7 @@ Item {
             }
 
             Rectangle {
-                visible: CapsLock.active
+                visible: CapsLock.active && !root.isUnlocking
                 implicitWidth: capsRow.implicitWidth + 20
                 implicitHeight: 30
                 radius: root.uiRadius

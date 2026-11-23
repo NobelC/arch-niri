@@ -1,23 +1,17 @@
 # ── 00-env: cache, PATH, colores base y variables de entorno ──────────────────
 
-# --- Variables base XDG ---
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 export XDG_STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
-# --- Cache y directorios base ---
 export ZSH_CACHE_DIR="$XDG_CACHE_HOME/zsh"
 [[ -d "$ZSH_CACHE_DIR" ]] || mkdir -p "$ZSH_CACHE_DIR"
 [[ -d "$HOME/.local/bin" ]] || mkdir -p "$HOME/.local/bin"
 
-# Raíz del repo (<repo>/config/zsh/.config/zsh/conf.d/00-env.zsh -> 5 niveles arriba)
 export DOTFILES="${${(%):-%x}:A:h:h:h:h:h}"
-
-# --- Compilación paralela (paru, C++, Rust) ---
 export MAKEFLAGS="-j$(nproc)"
 
-# --- PATH (sin duplicados y solo rutas existentes) ---
 typeset -U path
 for _p in "$HOME/.local/bin" "$HOME/.npm-global/bin" "$HOME/.cargo/bin"; do
   [[ -d "$_p" ]] && path=("$_p" $path)
@@ -25,10 +19,17 @@ done
 unset _p
 export PATH
 
-# --- Colores base para completado y listado ---
-(( $+commands[dircolors] )) && eval "$(dircolors -b)"
+# Cache de dircolors (evita fork en cada terminal)
+if (( $+commands[dircolors] )); then
+  _dc_cache="$ZSH_CACHE_DIR/dircolors.zsh"
+  if [[ ! -s "$_dc_cache" || "$commands[dircolors]" -nt "$_dc_cache" ]]; then
+    dircolors -b >| "$_dc_cache"
+    zcompile "$_dc_cache" 2>/dev/null || true
+  fi
+  source "$_dc_cache"
+  unset _dc_cache
+fi
 
-# --- Editor y Pager ---
 if (( $+commands[nvim] )); then
   export EDITOR=nvim VISUAL=nvim
 else
@@ -38,7 +39,6 @@ fi
 export LESS='-R -i'
 export LESSHISTFILE=-
 
-# bat con tema "ansi": hereda la paleta dinámica de Matugen en Ghostty
 if (( $+commands[bat] )); then
   export BAT_THEME=ansi
   export BAT_STYLE='numbers,changes,header'

@@ -14,9 +14,10 @@ Singleton {
 
     property bool locked: false
     property string buffer: ""
-    property string status: "idle"
+    property string status: "idle" // "idle" | "checking" | "unlocking" | "error"
     property string message: ""
-    readonly property bool busy: status === "checking"
+    readonly property bool busy: status === "checking" || status === "unlocking"
+    readonly property bool unlocking: status === "unlocking"
     signal failed
 
     readonly property string user: Quickshell.env("USER") || "usuario"
@@ -62,8 +63,20 @@ Singleton {
 
     Component.onCompleted: refreshWallpaper()
 
+    Timer {
+        id: unlockTimer
+        interval: 1150
+        repeat: false
+        onTriggered: {
+            root.status = "idle";
+            root.message = "";
+            root.locked = false;
+        }
+    }
+
     function lock() {
         if (locked) return;
+        unlockTimer.stop();
         refreshWallpaper();
         buffer = "";
         status = "idle";
@@ -107,9 +120,9 @@ Singleton {
         onCompleted: result => {
             if (result === PamResult.Success) {
                 root.buffer = "";
-                root.status = "idle";
+                root.status = "unlocking";
                 root.message = "";
-                root.locked = false;
+                unlockTimer.restart();
             } else {
                 root.buffer = "";
                 root.status = "error";

@@ -9,6 +9,7 @@ pake-cli
 paru-bin
 paru-bin-debug
 phinger-cursors
+spicetify-cli
 ttf-ms-win11-auto
 vesktop-bin
 wps-office-mime

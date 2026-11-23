@@ -30,9 +30,39 @@ change_zone_fast() {
     || firewall-cmd --zone="$zone" --change-interface="$iface" >/dev/null 2>&1 || true
 }
 
+get_zone_of_iface_fast() {
+  local iface="$1" raw
+  raw="$(busctl call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1 \
+    org.fedoraproject.FirewallD1.zone getZoneOfInterface s "$iface" 2>/dev/null || true)"
+  if [[ "$raw" =~ \"([^\"]+)\" ]]; then
+    echo "${BASH_REMATCH[1]}"
+  else
+    firewall-cmd --get-zone-of-interface="$iface" 2>/dev/null || echo "trust-low"
+  fi
+}
+
+query_zone_runtime_fast() {
+  local zone="$1"
+  # Consulta servicios y puertos por D-Bus nativo sin levantar Python (firewall-cmd)
+  local raw_svcs raw_ports svcs="" ports=""
+  raw_svcs="$(busctl call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1 \
+    org.fedoraproject.FirewallD1.zone getServices s "$zone" 2>/dev/null || true)"
+  raw_ports="$(busctl call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1 \
+    org.fedoraproject.FirewallD1.zone getPorts s "$zone" 2>/dev/null || true)"
+
+  if [[ -n "$raw_svcs" ]]; then
+    svcs="$(grep -oE '"[^"]+"' <<< "$raw_svcs" | tr -d '"' | paste -sd' ' - || true)"
+  fi
+  if [[ -n "$raw_ports" ]]; then
+    # busctl devuelve pares "puerto" "proto" -> los unimos como puerto/proto
+    ports="$(grep -oE '"[^"]+"' <<< "$raw_ports" | tr -d '"' | paste -d'/' - - | paste -sd' ' - || true)"
+  fi
+  printf '%s\n%s\n' "$svcs" "$ports"
+}
+
 write_state() {
   local con="$1" iface="$2" zone="$3" snitch_override="${4:-}" skip_query="${5:-0}"
-  local profile snitch info services="" ports=""
+  local profile snitch services="" ports=""
   profile="$(zone_to_profile "$zone")"
 
   if [[ -n "$snitch_override" ]]; then
@@ -48,9 +78,10 @@ write_state() {
       ports="22000/tcp 22000/udp 21027/udp 53317/tcp 53317/udp"
     fi
   else
-    info="$(firewall-cmd --zone="$zone" --list-all 2>/dev/null || true)"
-    services="$(awk '/^[[:space:]]*services:/ {sub(/^[[:space:]]*services:[[:space:]]*/, ""); print; exit}' <<< "$info")"
-    ports="$(awk '/^[[:space:]]*ports:/ {sub(/^[[:space:]]*ports:[[:space:]]*/, ""); print; exit}' <<< "$info")"
+    local queried
+    queried="$(query_zone_runtime_fast "$zone")"
+    services="$(sed -n '1p' <<< "$queried")"
+    ports="$(sed -n '2p' <<< "$queried")"
   fi
 
   jq -n \
@@ -130,7 +161,7 @@ case "$ACTION" in
     ACTIVE="$(get_active_con)"
     CON_NAME="${ACTIVE%%|*}"
     IFACE="${ACTIVE##*|}"
-    CUR_ZONE="$(firewall-cmd --get-zone-of-interface="$IFACE" 2>/dev/null || echo "$ZONE")"
+    CUR_ZONE="$(get_zone_of_iface_fast "$IFACE")"
     write_state "$CON_NAME" "$IFACE" "$CUR_ZONE"
     ;;
 

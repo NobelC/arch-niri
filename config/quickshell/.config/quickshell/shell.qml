@@ -1,4 +1,5 @@
 import Quickshell
+import "services"
 import "widgets"
 import "widgets/ribbon"
 import "widgets/osd"
@@ -16,15 +17,19 @@ import "widgets/displays"
 import "widgets/menus"
 
 ShellRoot {
-  Variants {
-    model: Quickshell.screens
+    Variants {
+        model: Quickshell.screens
 
-    delegate: Bar {
-        required property var modelData
-        screen: modelData
+        delegate: Bar {
+            required property var modelData
+            screen: modelData
+        }
     }
-}    
-    DisplayStudio {}
+
+    RibbonDock {}
+    Osd {}
+    NotificationPopups {}
+
     DashboardMenu {}
     MediaMenu {}
     PerformanceMenu {}
@@ -33,12 +38,19 @@ ShellRoot {
     BluetoothMenu {}
     AudioMenu {}
     BatteryMenu {}
-    RibbonDock {}
-    Osd {}
-    Launcher {}
-    LockScreen {}
-    WallpaperPicker {}
-    NotificationPopups {}
     NotificationMenu {}
     DisplayMenu {}
+
+    Launcher {}
+    WallpaperPicker {}
+
+    LazyLoader {
+        active: LockState.locked
+        LockScreen {}
+    }
+
+    LazyLoader {
+        active: Displays.studioOpen
+        DisplayStudio {}
+    }
 }

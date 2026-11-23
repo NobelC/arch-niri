@@ -40,7 +40,7 @@ else
 fi
 
 # 3. Overview blur + limpieza automática de caché huérfana (en segundo plano desacoplado)
-nohup bash -c '
+nohup nice -n 19 ionice -c 3 bash -c '
   img="$1"; cur_hash="$2"; cached_ov="$3"; cache_dir="$4"; state_dir="$5"
 
   if [[ ! -f "$cached_ov" ]]; then

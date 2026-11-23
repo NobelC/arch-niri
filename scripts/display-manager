@@ -335,20 +335,14 @@ cmd_lid_open() {
 }
 
 cmd_watch() {
-  local prev="" cur prev_ext="" cur_ext
-  while true; do
+  local prev="" cur prev_ext="" cur_ext last_snap=0 now
+  check_outputs() {
     cur="$(get_outputs_json | jq -r 'to_entries | map("\(.key)=\(.value.make):\(.value.model):\(.value.serial // "")") | sort | join("|")' 2>/dev/null || true)"
     if [[ -n "$cur" && "$cur" != "$prev" ]]; then
       [[ -n "$prev" ]] && sleep 0.4
-
-      if has_external_output; then
-        cur_ext="1"
-      else
-        cur_ext="0"
-      fi
+      if has_external_output; then cur_ext="1"; else cur_ext="0"; fi
 
       if [[ "$prev_ext" == "1" && "$cur_ext" == "0" ]]; then
-        # Se desconectó el monitor externo: devolver todo al original y al mismo idx en eDP-1
         pkill -x wl-mirror 2>/dev/null || true
         rm -f "$CLAMSHELL_FLAG"
         niri msg output "$INTERNAL" on >/dev/null 2>&1 || true
@@ -359,22 +353,31 @@ cmd_watch() {
       else
         cmd_restore
         if [[ "$cur_ext" != "$prev_ext" ]]; then
-          if [[ "$cur_ext" == "1" ]]; then
-            sync_audio hdmi
-          else
-            sync_audio laptop
-          fi
+          if [[ "$cur_ext" == "1" ]]; then sync_audio hdmi; else sync_audio laptop; fi
         fi
         refresh_quickshell
       fi
-
       prev_ext="$cur_ext"
       prev="$cur"
     fi
+  }
 
-    # Snapshot continuo mientras ambos monitores están encendidos
-    save_window_snapshot
-    sleep 2
+  check_outputs
+  save_window_snapshot
+
+  niri msg --json event-stream 2>/dev/null | while IFS= read -r ev; do
+    case "$ev" in
+      *'"WindowOpenedOrChanged"'*|*'"WindowClosed"'*|*'"WorkspaceActivated"'*|*'"WindowsChanged"'*)
+        now=$EPOCHSECONDS
+        if (( now - last_snap >= 2 )); then
+          save_window_snapshot
+          last_snap=$now
+        fi
+        ;;
+      *'"ConfigLoaded"'*)
+        check_outputs
+        ;;
+    esac
   done
 }
 

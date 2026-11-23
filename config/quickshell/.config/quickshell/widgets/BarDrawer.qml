@@ -49,9 +49,11 @@ PanelWindow {
     FocusScope {
         id: keyScope
         anchors.fill: parent
+        enabled: drawerWindow.visible
         focus: drawerWindow.isOpen
 
         Keys.onEscapePressed: event => {
+            if (!drawerWindow.isOpen) return;
             Niri.closeBarMenu();
             event.accepted = true;
         }
@@ -114,7 +116,6 @@ PanelWindow {
                 radius: Theme.radius
                 color: Theme.bg
 
-                // Borde izquierdo (2px)
                 Rectangle {
                     anchors.left: parent.left
                     anchors.top: parent.top
@@ -123,7 +124,6 @@ PanelWindow {
                     color: Theme.border
                 }
 
-                // Borde derecho (2px)
                 Rectangle {
                     anchors.right: parent.right
                     anchors.top: parent.top
@@ -132,7 +132,6 @@ PanelWindow {
                     color: Theme.border
                 }
 
-                // Borde inferior (2px)
                 Rectangle {
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -146,9 +145,9 @@ PanelWindow {
                 anchors.fill: drawerBody
             }
 
-            // Anclado al borde inferior para extruir suavemente desde la barra
             Item {
                 id: innerContent
+                visible: drawerWindow.visible
                 anchors {
                     bottom: drawerBody.bottom
                     left: drawerBody.left
