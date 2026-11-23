@@ -1,0 +1,13 @@
+[Unit]
+Description=Smart Idle Manager (Wayland / Niri)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/smart-idle daemon
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

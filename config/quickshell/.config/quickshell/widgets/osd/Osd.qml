@@ -155,12 +155,12 @@ PanelWindow {
         transform: Translate {
             y: osdWindow.isShown ? 0 : 14
             Behavior on y {
-                NumberAnimation { duration: 160; easing.type: Easing.OutExpo }
+                NumberAnimation { duration: Theme.animMedium; easing.type: Theme.easeOut }
             }
         }
 
         Behavior on opacity {
-            NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.animMedium; easing.type: Theme.easeSmooth }
         }
 
         // Sombra sólida desplazada (Hard Offset Shadow)
@@ -172,7 +172,7 @@ PanelWindow {
             radius: Theme.radius
             color: osdWindow.osdAccentColor()
 
-            Behavior on color { ColorAnimation { duration: 120 } }
+            Behavior on color { ColorAnimation { duration: Theme.animFast } }
         }
 
         // Cuerpo principal
@@ -188,7 +188,7 @@ PanelWindow {
             border.color: Theme.text
             clip: true
 
-            Behavior on color { ColorAnimation { duration: 140 } }
+            Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
             Row {
                 id: contentRow
@@ -203,7 +203,7 @@ PanelWindow {
                     radius: Theme.radius
                     color: osdWindow.osdAccentColor()
 
-                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                     Row {
                         id: badgeRow
@@ -247,7 +247,7 @@ PanelWindow {
                                 ? osdWindow.osdAccentColor()
                                 : Theme.cardAlt
 
-                            Behavior on color { ColorAnimation { duration: 90 } }
+                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
                         }
                     }
                 }

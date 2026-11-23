@@ -8,6 +8,5 @@ pake-cli
 paru-bin
 paru-bin-debug
 phinger-cursors
-spicetify-cli
 ttf-ms-win11-auto
 xcursor-hackneyed-dark

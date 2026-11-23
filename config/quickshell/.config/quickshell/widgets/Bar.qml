@@ -25,12 +25,13 @@ PanelWindow {
         right: true
     }
 
-    implicitHeight: 34
+    implicitHeight: Theme.barHeight
     color: "transparent"
 
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "quickshell-bar"
     readonly property string screenName: screen ? screen.name : ""
+    readonly property bool drawerOnThisScreen: Niri.activeBarDrawerWidth > 0 && (Niri.activeBarDrawerScreen === "" || Niri.activeBarDrawerScreen === screenName)
     readonly property bool barEnabled: {
         const _p = Displays.primary;
         const _o = Displays.outputs;
@@ -39,7 +40,7 @@ PanelWindow {
     }
 
     visible: barEnabled
-    exclusiveZone: (barEnabled && !Niri.overviewOpen) ? 34 : 0
+    exclusiveZone: (barEnabled && !Niri.overviewOpen) ? Theme.barHeight : 0
 
     Item {
         id: barSlideContainer
@@ -52,13 +53,13 @@ PanelWindow {
 
         Behavior on y {
             NumberAnimation {
-                duration: 210
-                easing.type: Niri.overviewOpen ? Easing.InCubic : Easing.OutCubic
+                duration: Theme.animSlow
+                easing.type: Niri.overviewOpen ? Theme.easeIn : Theme.easeSmooth
             }
         }
 
         Behavior on opacity {
-            NumberAnimation { duration: 150 }
+            NumberAnimation { duration: Theme.animMedium }
         }
 
         // Fondo sólido de la barra
@@ -67,7 +68,7 @@ PanelWindow {
             color: Theme.bg
 
             Behavior on color {
-                ColorAnimation { duration: 150 }
+                ColorAnimation { duration: Theme.animMedium }
             }
 
             // Línea inferior continua (2px) cuando no hay cajón abierto
@@ -77,9 +78,9 @@ PanelWindow {
                 anchors.bottom: parent.bottom
                 height: Theme.borderWidth
                 color: Theme.border
-                visible: Niri.activeBarDrawerWidth <= 0
+                visible: !barWindow.drawerOnThisScreen
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: Theme.animMedium } }
             }
 
             // Segmento izquierdo cuando hay un BarDrawer abierto
@@ -89,7 +90,7 @@ PanelWindow {
                 width: Math.max(0, Niri.activeBarDrawerX)
                 height: Theme.borderWidth
                 color: Theme.border
-                visible: Niri.activeBarDrawerWidth > 0
+                visible: barWindow.drawerOnThisScreen
             }
 
             // Segmento derecho cuando hay un BarDrawer abierto
@@ -100,7 +101,7 @@ PanelWindow {
                 anchors.bottom: parent.bottom
                 height: Theme.borderWidth
                 color: Theme.border
-                visible: Niri.activeBarDrawerWidth > 0
+                visible: barWindow.drawerOnThisScreen
             }
         }
 
@@ -139,11 +140,10 @@ PanelWindow {
             DisplayIcon {}
             NightLight {}
             NotificationIcon {}
-            Privacy {}
-            Battery {}
-            Network {}
             Bluetooth {}
             Audio {}
+            Battery {}
+            Network {}
         }
     }
 }

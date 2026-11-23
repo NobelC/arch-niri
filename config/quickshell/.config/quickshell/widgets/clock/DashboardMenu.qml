@@ -43,7 +43,7 @@ BarDrawer {
                     radius: Theme.radius
                     color: lit ? resBar.barColor : Theme.cardAlt
 
-                    Behavior on color { ColorAnimation { duration: 140 } }
+                    Behavior on color { ColorAnimation { duration: Theme.animMedium } }
                 }
             }
         }
@@ -106,7 +106,8 @@ BarDrawer {
     Item {
         id: root
         width: parent.width
-        implicitHeight: 332
+        implicitHeight: 414
+        readonly property real topHeight: 332
 
         readonly property real gap: 10
         readonly property real colA: 158
@@ -258,7 +259,7 @@ BarDrawer {
             x: 0
             y: clockCard.height + root.gap
             width: root.colA
-            height: root.height - y
+            height: root.topHeight - y
             radius: Theme.radius
             color: Theme.card
             border.width: Theme.borderWidth
@@ -330,7 +331,7 @@ BarDrawer {
             x: root.colA + root.gap
             y: 0
             width: root.colB
-            height: root.height
+            height: root.topHeight
             radius: Theme.radius
             color: Theme.card
             border.width: Theme.borderWidth
@@ -413,7 +414,7 @@ BarDrawer {
                                 border.width: Theme.borderWidth
                                 border.color: navArea.containsMouse ? Theme.accent : Theme.border
 
-                                Behavior on color { ColorAnimation { duration: 100 } }
+                                Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                                 Text {
                                     anchors.centerIn: parent
@@ -514,7 +515,7 @@ BarDrawer {
             x: root.colA + root.colB + root.gap * 2
             y: 0
             width: root.colC
-            height: root.height
+            height: root.topHeight
             radius: Theme.radius
             color: Theme.card
             border.width: Theme.borderWidth
@@ -688,8 +689,8 @@ BarDrawer {
                                         ? Theme.accent
                                         : (lidHover.containsMouse ? Theme.text : Theme.border)
 
-                                    Behavior on color { ColorAnimation { duration: 110 } }
-                                    Behavior on border.color { ColorAnimation { duration: 110 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                                    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                                     Row {
                                         anchors.centerIn: parent
@@ -727,6 +728,190 @@ BarDrawer {
             }
         }
 
+        // ================= Fila Inferior: Clima (Open-Meteo) =================
+        Rectangle {
+            id: weatherCard
+            x: 0
+            y: root.topHeight + root.gap
+            width: root.width
+            height: 72
+            radius: Theme.radius
+            color: Theme.card
+            border.width: Theme.borderWidth
+            border.color: weatherHover.containsMouse ? Theme.accent : Theme.border
+            clip: true
+
+            Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: Theme.borderWidth
+                spacing: 0
+
+                // Bloque izquierdo de acento + glifo
+                Rectangle {
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 118
+                    color: Theme.accent
+
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 2
+
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: "天気 // METEO"
+                            color: Theme.bg
+                            font.family: Theme.cjkFont
+                            font.pixelSize: 9
+                            font.bold: true
+                            font.letterSpacing: 1.2
+                        }
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: Weather.glyph
+                            color: Theme.bg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 24
+                        }
+                    }
+                }
+
+                // Temperatura grande en Anton + condición
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.leftMargin: 14
+                    Layout.rightMargin: 12
+                    spacing: 16
+
+                    Text {
+                        text: Weather.loaded ? (Math.round(Weather.temp) + "°C") : "--°"
+                        color: Theme.text
+                        font.family: Theme.displayFont
+                        font.pixelSize: 40
+                        font.letterSpacing: 1.5
+                        lineHeight: 0.9
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: Weather.loading && !Weather.loaded
+                                ? "SYNCING OPEN-METEO..."
+                                : (Weather.condition + "  ·  " + Weather.locationLabel)
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            font.bold: true
+                            font.letterSpacing: 0.8
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: Weather.loaded
+                                ? ("FEELS " + Math.round(Weather.feelsLike) + "°  //  H " + Math.round(Weather.tempMax) + "° · L " + Math.round(Weather.tempMin) + "°")
+                                : (Weather.errorMsg !== "" ? ("STATUS // " + Weather.errorMsg) : "AWAITING TELEMETRY")
+                            color: Theme.sub
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 9
+                            font.letterSpacing: 0.6
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    // Métricas compactas: Humedad + Viento
+                    Row {
+                        spacing: 14
+
+                        Column {
+                            spacing: 1
+                            Text {
+                                text: "HUM"
+                                color: Theme.muted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 8
+                                font.bold: true
+                                font.letterSpacing: 0.8
+                            }
+                            Text {
+                                text: Weather.loaded ? (Weather.humidity + "%") : "--"
+                                color: Theme.info
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                font.bold: true
+                            }
+                        }
+
+                        Column {
+                            spacing: 1
+                            Text {
+                                text: "WIND"
+                                color: Theme.muted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 8
+                                font.bold: true
+                                font.letterSpacing: 0.8
+                            }
+                            Text {
+                                text: Weather.loaded ? (Math.round(Weather.windSpeed) + " KM/H") : "--"
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                font.bold: true
+                            }
+                        }
+                    }
+
+                    // Botón de refresco manual + hora
+                    Rectangle {
+                        implicitWidth: syncCol.implicitWidth + 16
+                        implicitHeight: 38
+                        radius: Theme.radius
+                        color: weatherHover.containsMouse ? Theme.accent : Theme.cardAlt
+                        border.width: Theme.borderWidth
+                        border.color: weatherHover.containsMouse ? Theme.text : Theme.border
+
+                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+
+                        Column {
+                            id: syncCol
+                            anchors.centerIn: parent
+                            spacing: 1
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: Weather.loading ? "󰑐 ..." : "󰑐 SYNC"
+                                color: weatherHover.containsMouse ? Theme.bg : Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 9
+                                font.bold: true
+                            }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: Weather.updatedAt !== "" ? Weather.updatedAt : "--:--"
+                                color: weatherHover.containsMouse ? Theme.bg : Theme.muted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 8
+                            }
+                        }
+                    }
+                }
+            }
+
+            MouseArea {
+                id: weatherHover
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: Weather.refresh()
+            }
+        }
+
         Connections {
             target: Niri
             function onActiveBarMenuChanged() {
@@ -734,6 +919,7 @@ BarDrawer {
                     cal.reset();
                     SystemStats.refresh();
                     lidModeFile.reload();
+                    if (!Weather.loaded) Weather.refresh();
                 }
             }
         }

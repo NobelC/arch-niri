@@ -84,7 +84,7 @@ BarDrawer {
                     radius: Theme.radius
                     color: index < stat.litCount ? stat.tone : Theme.cardAlt
 
-                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
                 }
             }
         }
@@ -320,8 +320,8 @@ BarDrawer {
                         : (profArea.containsMouse ? Theme.text : Theme.border)
                     opacity: root.busy && !selected ? 0.55 : 1.0
 
-                    Behavior on color { ColorAnimation { duration: 90 } }
-                    Behavior on border.color { ColorAnimation { duration: 90 } }
+                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                     RowLayout {
                         anchors.fill: parent

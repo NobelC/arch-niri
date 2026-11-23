@@ -45,8 +45,8 @@ BarDrawer {
                 ? Theme.accent
                 : (btnArea.containsMouse && btn.usable ? Theme.text : Theme.border)
 
-            Behavior on color { ColorAnimation { duration: 100 } }
-            Behavior on border.color { ColorAnimation { duration: 100 } }
+            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+            Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
         }
 
         Text {

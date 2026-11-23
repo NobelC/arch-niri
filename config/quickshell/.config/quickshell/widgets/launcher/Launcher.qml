@@ -30,6 +30,7 @@ PanelWindow {
     property string searchText: ""
     property int selectedIndex: 0
     property var usageCounts: ({})
+    property bool rootArmed: false
 
     // Estado de la animación en 2 fases
     property real riseProgress: 0.0    // 0 = abajo fuera de pantalla, 1 = centro
@@ -41,6 +42,90 @@ PanelWindow {
         Niri.notifyLauncherState(isOpen);
     }
 
+    // ---------- MODO ROOT (prefijo "sudo " / "root " o Shift+Enter) ----------
+    readonly property bool hasRootPrefix: /^(sudo|root)\s+/i.test(searchText.trim())
+    readonly property bool effectiveRootMode: rootArmed || hasRootPrefix
+    readonly property string cleanQuery: searchText.trim().replace(/^(sudo|root)\s+/i, "").trim()
+
+    // ---------- MODO CALCULADORA ----------
+    readonly property string calcResult: {
+        let raw = searchText.trim();
+        if (raw.length === 0 || hasRootPrefix) return "";
+
+        const explicit = raw.startsWith("=");
+        if (explicit) raw = raw.slice(1).trim();
+        if (raw.length === 0) return "";
+
+        // Requiere al menos un dígito y un operador/función (o prefijo '=')
+        const hasDigit = /\d/.test(raw);
+        const hasOp = /[+\-*/^%()]|\b(sqrt|sin|cos|tan|log|abs|round|floor|ceil|pi)\b/i.test(raw);
+        if (!hasDigit || (!explicit && !hasOp)) return "";
+
+        // Lista blanca estricta: solo números, operadores y funciones Math seguras
+        const stripped = raw
+            .replace(/\b(sqrt|sin|cos|tan|log|abs|round|floor|ceil|pi)\b/gi, "")
+            .replace(/[0-9.+\-*/^%(),\s]/g, "");
+        if (stripped.length > 0) return "";
+
+        const jsExpr = raw
+            .replace(/\^/g, "**")
+            .replace(/\bpi\b/gi, "Math.PI")
+            .replace(/\b(sqrt|sin|cos|tan|log|abs|round|floor|ceil)\b/gi, m => "Math." + m.toLowerCase());
+
+        try {
+            const val = Function('"use strict"; return (' + jsExpr + ');')();
+            if (typeof val !== "number" || !isFinite(val) || isNaN(val)) return "";
+            return String(Number(val.toFixed(10)));
+        } catch (e) {
+            return "";
+        }
+    }
+
+    readonly property bool showCalc: calcResult !== ""
+
+    // ---------- BÚSQUEDA DIFUSA (FUZZY TIPO FZF) ----------
+    function fuzzyScore(text, query) {
+        if (!text || !query) return -1;
+        const t = text.toLowerCase();
+        const q = query.toLowerCase();
+
+        if (t === q) return 10000;
+        if (t.startsWith(q)) return 6000 - (t.length - q.length);
+
+        const subIdx = t.indexOf(q);
+        if (subIdx !== -1) {
+            const boundary = (subIdx === 0 || /[\s\-_./]/.test(t[subIdx - 1])) ? 500 : 0;
+            return 3500 + boundary - (subIdx * 10);
+        }
+
+        // Subsecuencia difusa con bonus por racha y límites de palabra
+        let qi = 0;
+        let score = 0;
+        let streak = 0;
+        let lastMatch = -2;
+
+        for (let ti = 0; ti < t.length && qi < q.length; ti++) {
+            if (t[ti] === q[qi]) {
+                score += 100;
+                if (ti === lastMatch + 1) {
+                    streak += 1;
+                    score += streak * 45;
+                } else {
+                    streak = 0;
+                }
+                if (ti === 0 || /[\s\-_./]/.test(t[ti - 1])) {
+                    score += 120;
+                }
+                lastMatch = ti;
+                qi++;
+            } else if (qi > 0) {
+                score -= 2;
+            }
+        }
+
+        return qi === q.length ? Math.max(1, score - (t.length - q.length)) : -1;
+    }
+
     readonly property int panelWidth: 480
     readonly property int shadowSize: 6
     readonly property real squareSize: 28
@@ -48,11 +133,13 @@ PanelWindow {
     readonly property real targetCenterY: (launcherWindow.height > 0 ? launcherWindow.height : 768) / 2
 
     readonly property int visibleRowCount: topApps.length
+    readonly property real calcBlockHeight: showCalc ? 58 : 0
+    readonly property real rootBannerHeight: effectiveRootMode ? 36 : 0
     readonly property real appsBlockHeight: visibleRowCount > 0
         ? (visibleRowCount * 48) + ((visibleRowCount - 1) * 6) + 12
         : 0
-    // Header (32) + padding (28) + search (42) + borders (4) + apps
-    readonly property real targetPanelHeight: 106 + appsBlockHeight
+    // Header (32) + padding (28) + search (42) + borders (4) + bloques activos
+    readonly property real targetPanelHeight: 106 + appsBlockHeight + calcBlockHeight + rootBannerHeight
 
     property real panelHeight: targetPanelHeight
     Behavior on panelHeight {
@@ -208,55 +295,65 @@ PanelWindow {
 
     readonly property var topApps: {
         const all = Array.from(DesktopEntries.applications.values);
-        const query = searchText.trim().toLowerCase();
+        const query = launcherWindow.cleanQuery.toLowerCase();
         const counts = launcherWindow.usageCounts;
 
         const seenNames = {};
-        const visible = all.filter(app => {
-            if (!app || app.noDisplay) return false;
+        const scored = [];
 
-            const name = (app.name || "").toLowerCase().trim();
-            if (name !== "" && seenNames[name]) return false;
+        for (let i = 0; i < all.length; i++) {
+            const app = all[i];
+            if (!app || app.noDisplay) continue;
 
+            const name = (app.name || "").trim();
+            const nameLower = name.toLowerCase();
+            if (nameLower !== "" && seenNames[nameLower]) continue;
+
+            let score = 0;
             if (query !== "") {
-                const generic = (app.genericName || "").toLowerCase();
-                const comment = (app.comment || "").toLowerCase();
-                const execStr = (app.execString || "").toLowerCase();
-                if (!name.includes(query) && !generic.includes(query) &&
-                    !comment.includes(query) && !execStr.includes(query)) {
-                    return false;
-                }
+                const sName = launcherWindow.fuzzyScore(name, query);
+                const sGen = launcherWindow.fuzzyScore(app.genericName || "", query);
+                const sCom = launcherWindow.fuzzyScore(app.comment || "", query);
+                const sExec = launcherWindow.fuzzyScore(app.execString || "", query);
+
+                const best = Math.max(
+                    sName,
+                    sGen > 0 ? Math.floor(sGen * 0.75) : -1,
+                    sCom > 0 ? Math.floor(sCom * 0.55) : -1,
+                    sExec > 0 ? Math.floor(sExec * 0.65) : -1
+                );
+                if (best < 0) continue;
+                score = best;
             }
 
-            if (name !== "") seenNames[name] = true;
-            return true;
-        });
+            if (nameLower !== "") seenNames[nameLower] = true;
+            const key = app.id || app.name || "";
+            const use = counts[key] || 0;
+            scored.push({ app: app, score: score, use: use, nameLower: nameLower });
+        }
 
-        visible.sort((a, b) => {
-            const nameA = (a.name || "").toLowerCase();
-            const nameB = (b.name || "").toLowerCase();
-
+        scored.sort((a, b) => {
             if (query !== "") {
-                const startsA = nameA.startsWith(query);
-                const startsB = nameB.startsWith(query);
-                if (startsA && !startsB) return -1;
-                if (!startsA && startsB) return 1;
+                const totalA = a.score + Math.min(a.use * 35, 350);
+                const totalB = b.score + Math.min(b.use * 35, 350);
+                if (totalA !== totalB) return totalB - totalA;
+            } else if (a.use !== b.use) {
+                return b.use - a.use;
             }
-
-            const keyA = a.id || a.name || "";
-            const keyB = b.id || b.name || "";
-            const useA = counts[keyA] || 0;
-            const useB = counts[keyB] || 0;
-            if (useA !== useB) return useB - useA;
-
-            return nameA.localeCompare(nameB);
+            return a.nameLower.localeCompare(b.nameLower);
         });
 
-        return visible.slice(0, 5);
+        return scored.slice(0, 5).map(item => item.app);
     }
 
     onTopAppsChanged: {
         selectedIndex = 0;
+    }
+
+    onSearchTextChanged: {
+        if (!hasRootPrefix && rootArmed) {
+            rootArmed = false;
+        }
     }
 
     Region { id: emptyRegion }
@@ -266,6 +363,7 @@ PanelWindow {
         closeAnim.stop();
         launcherWindow.searchText = "";
         launcherWindow.selectedIndex = 0;
+        launcherWindow.rootArmed = false;
         launcherWindow.isClosing = false;
         launcherWindow.riseProgress = 0.0;
         launcherWindow.expandProgress = 0.0;
@@ -280,18 +378,49 @@ PanelWindow {
     function closeLauncher() {
         if (!launcherWindow.isOpen) return;
         openAnim.stop();
+        launcherWindow.rootArmed = false;
         launcherWindow.isClosing = true;
         launcherWindow.isOpen = false;
         closeAnim.restart();
     }
 
-    function launchSelected() {
+    function copyCalcResult() {
+        if (!showCalc) return;
+        Quickshell.execDetached(["wl-copy", "--", calcResult]);
+        launcherWindow.closeLauncher();
+    }
+
+    function stripFieldCodes(execStr) {
+        return (execStr || "").replace(/%[fFuUdDnNickvm]/g, "").trim();
+    }
+
+    function launchSelected(asRoot) {
+        if (showCalc && topApps.length === 0) {
+            copyCalcResult();
+            return;
+        }
         if (topApps.length === 0) return;
         const app = topApps[selectedIndex];
         if (!app) return;
 
+        const runRoot = Boolean(asRoot || effectiveRootMode);
         recordAppUsage(app.id || app.name);
         launcherWindow.closeLauncher();
+
+        if (runRoot) {
+            const cmd = stripFieldCodes(app.execString);
+            if (!cmd) return;
+            if (app.runInTerminal) {
+                Quickshell.execDetached(["ghostty", "-e", "sudo", "bash", "-c", cmd]);
+            } else {
+                Quickshell.execDetached([
+                    "bash", "-c",
+                    'pkexec env DISPLAY="$DISPLAY" WAYLAND_DISPLAY="$WAYLAND_DISPLAY" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" sh -c "$1"',
+                    "bash", cmd
+                ]);
+            }
+            return;
+        }
 
         if (app.runInTerminal) {
             Quickshell.execDetached(["ghostty", "-e", "bash", "-c", app.execString]);
@@ -357,6 +486,8 @@ PanelWindow {
         rotation: launcherWindow.riseProgress * 360
         visible: launcherWindow.animActive
 
+        readonly property color activeAccent: launcherWindow.effectiveRootMode ? Theme.warn : Theme.accent
+
         // Sombra sólida desplazada (aparece al expandirse)
         Rectangle {
             x: launcherWindow.shadowSize * launcherWindow.expandProgress
@@ -364,7 +495,7 @@ PanelWindow {
             width: parent.width
             height: parent.height
             radius: Theme.radius
-            color: Theme.accent
+            color: dockContainer.activeAccent
             opacity: Math.min(1.0, launcherWindow.expandProgress * 1.4)
             visible: launcherWindow.expandProgress > 0.02
         }
@@ -376,7 +507,9 @@ PanelWindow {
             radius: Theme.radius
             color: Theme.bg
             border.width: Theme.borderWidth
-            border.color: launcherWindow.expandProgress > 0.15 ? Theme.text : Theme.accent
+            border.color: launcherWindow.effectiveRootMode
+                ? Theme.warn
+                : (launcherWindow.expandProgress > 0.15 ? Theme.text : Theme.accent)
             clip: true
             antialiasing: launcherWindow.riseProgress < 0.999
 
@@ -411,7 +544,7 @@ PanelWindow {
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 32
-                        color: Theme.accent
+                        color: dockContainer.activeAccent
 
                         RowLayout {
                             anchors.fill: parent
@@ -420,7 +553,9 @@ PanelWindow {
                             spacing: 8
 
                             Text {
-                                text: "起動 // LAUNCH"
+                                text: launcherWindow.effectiveRootMode
+                                    ? "権限 // ROOT LAUNCH"
+                                    : (launcherWindow.showCalc ? "計算 // CALC + LAUNCH" : "起動 // LAUNCH")
                                 color: Theme.bg
                                 font.family: Theme.cjkFont
                                 font.pixelSize: 11
@@ -431,7 +566,9 @@ PanelWindow {
                             Item { Layout.fillWidth: true }
 
                             Text {
-                                text: "[ " + String(launcherWindow.visibleRowCount).padStart(2, "0") + " ]"
+                                text: launcherWindow.effectiveRootMode
+                                    ? "PKEXEC"
+                                    : ("[ " + String(launcherWindow.visibleRowCount).padStart(2, "0") + " ]")
                                 color: Theme.bg
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
@@ -440,12 +577,90 @@ PanelWindow {
                         }
                     }
 
-                    // Contenido interno (Lista + Búsqueda)
+                    // Contenido interno (Banner Root + Calc + Lista + Búsqueda)
                     ColumnLayout {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         Layout.margins: 14
-                        spacing: 12
+                        spacing: 10
+
+                        // 0.5 BANNER DE CONFIRMACIÓN ROOT
+                        Rectangle {
+                            visible: launcherWindow.effectiveRootMode
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 28
+                            radius: Theme.radius
+                            color: Theme.card
+                            border.width: Theme.borderWidth
+                            border.color: Theme.warn
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 8
+
+                                Text {
+                                    text: "⚠ ELEVATED ROOT EXECUTION  ·  ↵ CONFIRM  ·  ESC CANCEL"
+                                    color: Theme.warn
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    font.letterSpacing: 0.6
+                                }
+                            }
+                        }
+
+                        // 0.8 TARJETA DE CALCULADORA
+                        Rectangle {
+                            visible: launcherWindow.showCalc
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 48
+                            radius: Theme.radius
+                            color: calcArea.containsMouse ? Theme.accent : Theme.card
+                            border.width: Theme.borderWidth
+                            border.color: Theme.info
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                spacing: 10
+
+                                Text {
+                                    text: "󰃬"
+                                    color: calcArea.containsMouse ? Theme.bg : Theme.info
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 18
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "= " + launcherWindow.calcResult
+                                    color: calcArea.containsMouse ? Theme.bg : Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 15
+                                    font.bold: true
+                                    elide: Text.ElideRight
+                                }
+
+                                Text {
+                                    text: "[ ↵ COPY ]"
+                                    color: calcArea.containsMouse ? Theme.bg : Theme.info
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                }
+                            }
+
+                            MouseArea {
+                                id: calcArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: launcherWindow.copyCalcResult()
+                            }
+                        }
 
                         // 1. LISTA DE APPS
                         ColumnLayout {
@@ -467,11 +682,11 @@ PanelWindow {
                                     Layout.preferredHeight: 48
                                     radius: Theme.radius
                                     color: isSelected
-                                        ? Theme.accent
+                                        ? dockContainer.activeAccent
                                         : (itemHover.containsMouse ? Theme.cardAlt : Theme.card)
                                     border.width: Theme.borderWidth
                                     border.color: isSelected
-                                        ? Theme.accent
+                                        ? dockContainer.activeAccent
                                         : (itemHover.containsMouse ? Theme.text : Theme.border)
 
                                     Behavior on color { ColorAnimation { duration: 80 } }
@@ -541,7 +756,7 @@ PanelWindow {
 
                                         Text {
                                             visible: appDelegate.isSelected
-                                            text: "[ ↵ ]"
+                                            text: launcherWindow.effectiveRootMode ? "[ ROOT ↵ ]" : "[ ↵ ]"
                                             color: Theme.bg
                                             font.family: Theme.fontFamily
                                             font.pixelSize: 10
@@ -557,7 +772,7 @@ PanelWindow {
                                         onEntered: launcherWindow.selectedIndex = appDelegate.index
                                         onClicked: {
                                             launcherWindow.selectedIndex = appDelegate.index;
-                                            launcherWindow.launchSelected();
+                                            launcherWindow.launchSelected(false);
                                         }
                                     }
                                 }
@@ -571,7 +786,7 @@ PanelWindow {
                             radius: Theme.radius
                             color: Theme.card
                             border.width: Theme.borderWidth
-                            border.color: searchInput.activeFocus ? Theme.accent : Theme.border
+                            border.color: searchInput.activeFocus ? dockContainer.activeAccent : Theme.border
 
                             RowLayout {
                                 anchors {
@@ -582,8 +797,8 @@ PanelWindow {
                                 spacing: 10
 
                                 Text {
-                                    text: "❯"
-                                    color: Theme.accent
+                                    text: launcherWindow.effectiveRootMode ? "#" : "❯"
+                                    color: dockContainer.activeAccent
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 14
                                     font.bold: true
@@ -593,7 +808,7 @@ PanelWindow {
                                     id: searchInput
                                     Layout.fillWidth: true
                                     color: Theme.text
-                                    selectionColor: Theme.accent
+                                    selectionColor: dockContainer.activeAccent
                                     selectedTextColor: Theme.bg
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 13
@@ -605,13 +820,19 @@ PanelWindow {
                                     Text {
                                         anchors.fill: parent
                                         verticalAlignment: Text.AlignVCenter
-                                        text: "SEARCH APPLICATIONS..."
+                                        text: "SEARCH APPS · CALC · SUDO · ⇧↵ ROOT"
                                         color: Theme.muted
                                         font: searchInput.font
                                         visible: searchInput.text.length === 0
                                     }
 
-                                    Keys.onEscapePressed: launcherWindow.closeLauncher()
+                                    Keys.onEscapePressed: {
+                                        if (launcherWindow.rootArmed) {
+                                            launcherWindow.rootArmed = false;
+                                        } else {
+                                            launcherWindow.closeLauncher();
+                                        }
+                                    }
 
                                     Keys.onUpPressed: {
                                         if (launcherWindow.topApps.length > 0) {
@@ -629,8 +850,20 @@ PanelWindow {
                                         }
                                     }
 
-                                    Keys.onReturnPressed: launcherWindow.launchSelected()
-                                    Keys.onEnterPressed: launcherWindow.launchSelected()
+                                    Keys.onReturnPressed: event => {
+                                        if ((event.modifiers & Qt.ShiftModifier) && !launcherWindow.effectiveRootMode) {
+                                            launcherWindow.rootArmed = true;
+                                        } else {
+                                            launcherWindow.launchSelected(false);
+                                        }
+                                    }
+                                    Keys.onEnterPressed: event => {
+                                        if ((event.modifiers & Qt.ShiftModifier) && !launcherWindow.effectiveRootMode) {
+                                            launcherWindow.rootArmed = true;
+                                        } else {
+                                            launcherWindow.launchSelected(false);
+                                        }
+                                    }
                                 }
                             }
                         }

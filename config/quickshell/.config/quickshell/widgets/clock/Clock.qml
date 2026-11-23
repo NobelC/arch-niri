@@ -24,7 +24,7 @@ Item {
         border.color: Theme.accent
         opacity: root.isActive ? 1.0 : 0.0
 
-        Behavior on opacity { NumberAnimation { duration: 100 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
     }
 
     // Cuadro sólido interior separado por gap
@@ -35,7 +35,7 @@ Item {
         color: Theme.accent
         opacity: root.isActive ? 1.0 : 0.0
 
-        Behavior on opacity { NumberAnimation { duration: 100 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
     }
 
     Text {
@@ -48,7 +48,7 @@ Item {
         font.bold: true
         font.letterSpacing: 1.0
 
-        Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast } }
     }
 
     MouseArea {

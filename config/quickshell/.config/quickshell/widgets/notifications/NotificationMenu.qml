@@ -79,8 +79,8 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: clearHover.containsMouse ? Theme.warn : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 100 } }
-                Behavior on border.color { ColorAnimation { duration: 100 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                 Text {
                     id: clearTxt
@@ -112,8 +112,8 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: Notifications.effectiveDnd ? Theme.warn : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 120 } }
-                Behavior on border.color { ColorAnimation { duration: 120 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                 Rectangle {
                     width: 14
@@ -123,7 +123,7 @@ BarDrawer {
                     x: Notifications.effectiveDnd ? 23 : 5
                     color: Notifications.effectiveDnd ? Theme.bg : Theme.sub
 
-                    Behavior on x { NumberAnimation { duration: 130; easing.type: Easing.OutExpo } }
+                    Behavior on x { NumberAnimation { duration: Theme.animFast; easing.type: Theme.easeOut } }
                 }
 
                 MouseArea {
@@ -166,8 +166,8 @@ BarDrawer {
                 border.color: isCritical ? Theme.warn : (rowMouse.containsMouse ? Theme.accent : Theme.border)
                 clip: true
 
-                Behavior on color { ColorAnimation { duration: 100 } }
-                Behavior on border.color { ColorAnimation { duration: 100 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                 MouseArea {
                     id: rowMouse

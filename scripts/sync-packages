@@ -5,7 +5,8 @@ set -euo pipefail
 if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" ]]; then
   REAL_USER="$SUDO_USER"
 elif [[ $EUID -eq 0 ]]; then
-  REAL_USER="NobelC"
+  echo "✗ Error: sync-packages ejecutado como root sin SUDO_USER definido." >&2
+  exit 1
 else
   REAL_USER="$(id -un)"
 fi

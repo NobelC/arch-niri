@@ -7,7 +7,11 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_USER="${SUDO_USER:-NobelC}"
+TARGET_USER="${NET_TRUST_USER:-${SUDO_USER:-}}"
+if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
+  echo "✗ Error: ejecuta con sudo desde un usuario real o define NET_TRUST_USER." >&2
+  exit 1
+fi
 
 echo "==> 1. Habilitando servicios base (systemd-resolved, firewalld)"
 systemctl enable --now systemd-resolved firewalld

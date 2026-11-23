@@ -17,10 +17,10 @@ BarDrawer {
         spacing: 10
 
         readonly property color stateColor: {
-            if (Battery.charging || Battery.full) return Theme.accent;
+            if (Battery.charging || Battery.full) return Theme.success;
             if (Battery.capacity <= 15) return Theme.warn;
             if (Battery.capacity <= 30) return Theme.highlight;
-            return Theme.accentSoft;
+            return Theme.info;
         }
 
         readonly property string statusSubtitle: {
@@ -63,8 +63,8 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: root.stateColor
 
-                Behavior on color { ColorAnimation { duration: 150 } }
-                Behavior on border.color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: Theme.animMedium } }
+                Behavior on border.color { ColorAnimation { duration: Theme.animMedium } }
 
                 Text {
                     anchors.centerIn: parent
@@ -144,7 +144,7 @@ BarDrawer {
                 width: 3
                 color: root.stateColor
 
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: Theme.animMedium } }
             }
 
             ColumnLayout {
@@ -173,7 +173,7 @@ BarDrawer {
                             radius: Theme.radius
                             color: index < root.litSegments ? root.stateColor : Theme.cardAlt
 
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
                         }
                     }
                 }
@@ -265,8 +265,8 @@ BarDrawer {
                             ? Theme.accent
                             : (profHover.containsMouse ? Theme.text : Theme.border)
 
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        Behavior on border.color { ColorAnimation { duration: 100 } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                         Row {
                             anchors.centerIn: parent

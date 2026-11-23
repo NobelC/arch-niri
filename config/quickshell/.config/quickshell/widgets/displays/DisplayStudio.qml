@@ -26,8 +26,8 @@ PanelWindow {
     property real animProgress: Displays.studioOpen ? 1.0 : 0.0
     Behavior on animProgress {
         NumberAnimation {
-            duration: Displays.studioOpen ? 170 : 120
-            easing.type: Displays.studioOpen ? Easing.OutExpo : Easing.InCubic
+            duration: Displays.studioOpen ? Theme.animMedium : Theme.animFast
+            easing.type: Displays.studioOpen ? Theme.easeOut : Theme.easeIn
         }
     }
 

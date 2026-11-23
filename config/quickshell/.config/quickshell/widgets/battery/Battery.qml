@@ -52,8 +52,8 @@ Item {
         border.color: root.activeColor
         opacity: root.isActive ? 1.0 : 0.0
 
-        Behavior on opacity { NumberAnimation { duration: 100 } }
-        Behavior on border.color { ColorAnimation { duration: 100 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
     }
 
     // Cuadro sólido interior separado por gap
@@ -64,8 +64,8 @@ Item {
         color: root.activeColor
         opacity: root.isActive ? 1.0 : 0.0
 
-        Behavior on opacity { NumberAnimation { duration: 100 } }
-        Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast } }
     }
 
     Row {
@@ -80,7 +80,7 @@ Item {
             font.family: Theme.fontFamily
             font.pixelSize: 13
 
-            Behavior on color { ColorAnimation { duration: 100 } }
+            Behavior on color { ColorAnimation { duration: Theme.animFast } }
         }
     }
 

@@ -31,6 +31,7 @@ Singleton {
     }
 
     property string activeBarMenu: ""
+    property string activeBarDrawerScreen: ""
     property real activeBarDrawerX: 0
     property real activeBarDrawerWidth: 0
 
@@ -38,6 +39,7 @@ Singleton {
         if (root.activeBarMenu === name) {
             root.activeBarMenu = "";
             root.activeBarDrawerWidth = 0;
+            root.activeBarDrawerScreen = "";
             notifyLauncherState(false);
         } else {
             root.activeBarMenu = name;
@@ -49,6 +51,7 @@ Singleton {
         if (root.activeBarMenu !== "") {
             root.activeBarMenu = "";
             root.activeBarDrawerWidth = 0;
+            root.activeBarDrawerScreen = "";
             notifyLauncherState(false);
         }
     }
@@ -140,43 +143,61 @@ Singleton {
         running: true
         stdout: SplitParser {
             onRead: line => {
-                if (line.includes("OverviewOpenedOrClosed")) {
-                    try {
-                        const ev = JSON.parse(line);
-                        if (ev.OverviewOpenedOrClosed !== undefined) {
-                            root.overviewOpen = Boolean(ev.OverviewOpenedOrClosed.is_open);
-                            if (root.overviewOpen) root.closeBarMenu();
-                        }
-                    } catch (e) {}
-                } else if (line.includes("KeyboardLayoutsChanged")) {
-                    try {
-                        const ev = JSON.parse(line);
-                        const kl = ev.KeyboardLayoutsChanged.keyboard_layouts;
-                        root.keyboardLayouts = kl.names;
-                        root.currentLayoutIndex = kl.current_idx;
-                    } catch (e) {}
-                } else if (line.includes("KeyboardLayoutSwitched")) {
-                    try {
-                        const ev = JSON.parse(line);
-                        root.currentLayoutIndex = ev.KeyboardLayoutSwitched.idx;
+                const trimmed = line.trim();
+                if (!trimmed) return;
+
+                let ev;
+                try {
+                    ev = JSON.parse(trimmed);
+                } catch (e) {
+                    return;
+                }
+
+                if (!ev || typeof ev !== "object") return;
+                const keys = Object.keys(ev);
+                if (keys.length === 0) return;
+
+                const evType = keys[0];
+                const payload = ev[evType];
+
+                switch (evType) {
+                case "OverviewOpenedOrClosed":
+                    if (payload !== undefined) {
+                        root.overviewOpen = Boolean(payload.is_open);
+                        if (root.overviewOpen) root.closeBarMenu();
+                    }
+                    break;
+                case "KeyboardLayoutsChanged":
+                    if (payload && payload.keyboard_layouts) {
+                        root.keyboardLayouts = payload.keyboard_layouts.names;
+                        root.currentLayoutIndex = payload.keyboard_layouts.current_idx;
+                    }
+                    break;
+                case "KeyboardLayoutSwitched":
+                    if (payload && typeof payload.idx === "number") {
+                        root.currentLayoutIndex = payload.idx;
                         root.keyboardLayoutOsdTriggered();
-                    } catch (e) {}
-                } else if (line.includes("WorkspaceActivated") || line.includes("WorkspacesChanged")) {
+                    }
+                    break;
+                case "WorkspaceActivated":
+                case "WorkspacesChanged":
                     if (!fetchWs.running) fetchWs.running = true;
                     root.triggerRibbonActivity();
-                } else if (line.includes("WindowFocusChanged")) {
+                    break;
+                case "WindowFocusChanged":
                     if (!fetchWin.running) fetchWin.running = true;
-                    try {
-                        const ev = JSON.parse(line);
-                        if (ev.WindowFocusChanged && ev.WindowFocusChanged.id !== null) {
-                            root.triggerRibbonActivity();
-                        }
-                    } catch (e) {}
-                } else if (line.includes("WindowLayoutsChanged")) {
+                    if (payload && payload.id !== null) {
+                        root.triggerRibbonActivity();
+                    }
+                    break;
+                case "WindowLayoutsChanged":
                     if (!fetchWin.running) fetchWin.running = true;
                     root.triggerRibbonActivity();
-                } else if (line.includes("WindowsChanged") || line.includes("WindowOpenedOrClosed")) {
+                    break;
+                case "WindowsChanged":
+                case "WindowOpenedOrClosed":
                     if (!fetchWin.running) fetchWin.running = true;
+                    break;
                 }
             }
         }

@@ -62,3 +62,8 @@ for script in "${TARGETS[@]}"; do
     echo "✗ [$name] Error de sintaxis -> Permisos denegados" >&2
   fi
 done
+
+if [ $# -eq 0 ] && [ -x "$SCRIPTS_DIR/_tests/smoke.sh" ]; then
+  echo "-> Ejecutando smoke tests..."
+  bash "$SCRIPTS_DIR/_tests/smoke.sh"
+fi

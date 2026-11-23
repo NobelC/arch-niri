@@ -200,7 +200,7 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: tuiHover.containsMouse ? Theme.text : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 100 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                 Text {
                     anchors.centerIn: parent
@@ -232,8 +232,8 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: root.adapterOn ? Theme.accent : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 120 } }
-                Behavior on border.color { ColorAnimation { duration: 120 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                 Rectangle {
                     width: 14
@@ -243,7 +243,7 @@ BarDrawer {
                     x: root.adapterOn ? 23 : 5
                     color: root.adapterOn ? Theme.bg : Theme.sub
 
-                    Behavior on x { NumberAnimation { duration: 130; easing.type: Easing.OutExpo } }
+                    Behavior on x { NumberAnimation { duration: Theme.animFast; easing.type: Theme.easeOut } }
                 }
 
                 MouseArea {
@@ -300,7 +300,7 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: root.scanning ? Theme.accent : (scanArea.containsMouse ? Theme.text : Theme.border)
 
-                Behavior on color { ColorAnimation { duration: 100 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                 Text {
                     id: scanText
@@ -463,8 +463,8 @@ BarDrawer {
                         ? (row.dev.connected ? Theme.warn : Theme.accent)
                         : Theme.border
 
-                    Behavior on color { ColorAnimation { duration: 100 } }
-                    Behavior on border.color { ColorAnimation { duration: 100 } }
+                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                     Text {
                         anchors.centerIn: parent

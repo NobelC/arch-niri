@@ -13,8 +13,8 @@ Item {
         if (!root.isConnected) return Theme.muted;
         if (NetTrust.profile === "low") return Theme.warn;
         if (NetTrust.profile === "med") return Theme.highlight;
-        if (Network.connectionType === "ethernet") return Theme.highlight;
-        return Theme.accent;
+        if (NetTrust.profile === "high") return Theme.success;
+        return Theme.info;
     }
 
     function networkIcon() {
@@ -33,8 +33,8 @@ Item {
         if (!root.isConnected) return Theme.muted;
         if (NetTrust.profile === "low") return Theme.warn;
         if (NetTrust.profile === "med") return Theme.highlight;
-        if (Network.connectionType === "ethernet") return Theme.highlight;
-        return Theme.accentSoft;
+        if (NetTrust.profile === "high") return Theme.success;
+        return Theme.info;
     }
 
     // Marco exterior fino (1px)
@@ -46,8 +46,8 @@ Item {
         border.color: root.activeColor
         opacity: root.isActive ? 1.0 : 0.0
 
-        Behavior on opacity { NumberAnimation { duration: 100 } }
-        Behavior on border.color { ColorAnimation { duration: 100 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
     }
 
     // Cuadro sólido interior separado por gap
@@ -58,8 +58,8 @@ Item {
         color: root.activeColor
         opacity: root.isActive ? 1.0 : 0.0
 
-        Behavior on opacity { NumberAnimation { duration: 100 } }
-        Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast } }
     }
 
     Text {
@@ -69,7 +69,7 @@ Item {
         font.family: Theme.fontFamily
         font.pixelSize: 13
 
-        Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast } }
     }
 
     MouseArea {

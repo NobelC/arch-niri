@@ -20,7 +20,7 @@ Item {
         border.color: root.activeColor
         opacity: (root.isActive || SystemUpdate.running) ? 1.0 : 0.75
 
-        Behavior on opacity { NumberAnimation { duration: 100 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
     }
 
     // Cuadro sólido interior separado por gap
@@ -31,7 +31,7 @@ Item {
         color: root.activeColor
         opacity: root.isActive ? 1.0 : 0.0
 
-        Behavior on opacity { NumberAnimation { duration: 100 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
     }
 
     Row {

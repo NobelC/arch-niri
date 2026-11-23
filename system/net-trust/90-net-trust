@@ -5,7 +5,8 @@ EVENT="${2:-}"
 [[ "$EVENT" == "up" ]] || exit 0
 [[ "$IFACE" == "lo" ]] && exit 0
 
-USER_NAME="${NET_TRUST_USER:-NobelC}"
+USER_NAME="${NET_TRUST_USER:-$(loginctl list-sessions --no-legend 2>/dev/null | awk '$3 != "greeter" && $3 != "root" && $3 != "" {print $3; exit}')}"
+[[ -n "$USER_NAME" ]] || exit 0
 export NET_TRUST_USER="$USER_NAME"
 
 /usr/local/bin/net-trust-apply sync

@@ -175,8 +175,8 @@ BarDrawer {
                         border.width: Theme.borderWidth
                         border.color: gearArea.containsMouse ? Theme.accent : Theme.border
 
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        Behavior on border.color { ColorAnimation { duration: 100 } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                         Text {
                             anchors.centerIn: parent

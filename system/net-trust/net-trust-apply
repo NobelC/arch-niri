@@ -2,8 +2,13 @@
 set -euo pipefail
 
 ACTION="${1:-status}"
-USER_NAME="${NET_TRUST_USER:-${SUDO_USER:-NobelC}}"
+USER_NAME="${NET_TRUST_USER:-${SUDO_USER:-}}"
+if [[ -z "$USER_NAME" || "$USER_NAME" == "root" ]]; then
+  echo "✗ Error: define NET_TRUST_USER o ejecuta con sudo desde un usuario no-root (SUDO_USER)." >&2
+  exit 1
+fi
 USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+[[ -n "$USER_HOME" ]] || { echo "✗ Error: usuario '$USER_NAME' no encontrado." >&2; exit 1; }
 STATE_DIR="${USER_HOME}/.local/state/quickshell"
 STATE_FILE="${STATE_DIR}/net-trust.json"
 
@@ -22,12 +27,32 @@ zone_to_profile() {
   esac
 }
 
+assert_zone_exists() {
+  local zone="$1" raw zones=""
+  raw="$(busctl call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1 \
+    org.fedoraproject.FirewallD1.zone getZones 2>/dev/null || true)"
+  if [[ -n "$raw" ]]; then
+    zones="$(grep -oE '"[^"]+"' <<< "$raw" | tr -d '"' | paste -sd' ' - || true)"
+  else
+    zones="$(firewall-cmd --get-zones 2>/dev/null || true)"
+  fi
+
+  if [[ " $zones " != *" $zone "* ]]; then
+    echo "✗ Error: la zona firewalld '$zone' no existe (ejecuta system/net-trust/install.sh)." >&2
+    return 1
+  fi
+}
+
 change_zone_fast() {
   local zone="$1" iface="$2"
   [[ -n "$iface" ]] || return 0
-  busctl call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1 \
-    org.fedoraproject.FirewallD1.zone changeZoneOfInterface ss "$zone" "$iface" >/dev/null 2>&1 \
-    || firewall-cmd --zone="$zone" --change-interface="$iface" >/dev/null 2>&1 || true
+  if ! busctl call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1 \
+    org.fedoraproject.FirewallD1.zone changeZoneOfInterface ss "$zone" "$iface" >/dev/null 2>&1; then
+    if ! firewall-cmd --zone="$zone" --change-interface="$iface" >/dev/null 2>&1; then
+      echo "✗ Error: no se pudo aplicar la zona '$zone' en la interfaz '$iface'." >&2
+      return 1
+    fi
+  fi
 }
 
 get_zone_of_iface_fast() {
@@ -43,7 +68,6 @@ get_zone_of_iface_fast() {
 
 query_zone_runtime_fast() {
   local zone="$1"
-  # Consulta servicios y puertos por D-Bus nativo sin levantar Python (firewall-cmd)
   local raw_svcs raw_ports svcs="" ports=""
   raw_svcs="$(busctl call org.fedoraproject.FirewallD1 /org/fedoraproject/FirewallD1 \
     org.fedoraproject.FirewallD1.zone getServices s "$zone" 2>/dev/null || true)"
@@ -54,7 +78,6 @@ query_zone_runtime_fast() {
     svcs="$(grep -oE '"[^"]+"' <<< "$raw_svcs" | tr -d '"' | paste -sd' ' - || true)"
   fi
   if [[ -n "$raw_ports" ]]; then
-    # busctl devuelve pares "puerto" "proto" -> los unimos como puerto/proto
     ports="$(grep -oE '"[^"]+"' <<< "$raw_ports" | tr -d '"' | paste -d'/' - - | paste -sd' ' - || true)"
   fi
   printf '%s\n%s\n' "$svcs" "$ports"
@@ -94,7 +117,7 @@ write_state() {
     --arg ports "$ports" \
     '{connection: $con, iface: $iface, zone: $zone, profile: $profile, opensnitch: $snitch, services: $services, ports: $ports}' \
     > "$STATE_FILE"
-  chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
+  if [[ $EUID -eq 0 ]]; then chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"; fi
 }
 
 sync_opensnitch() {
@@ -108,7 +131,7 @@ sync_opensnitch() {
 
 case "$ACTION" in
   set)
-    PROFILE="${2:-low}"
+    PROFILE="${2:-}"
     TARGET_CON="${3:-}"
     ACTIVE="$(get_active_con)"
     CON_NAME="${TARGET_CON:-${ACTIVE%%|*}}"
@@ -116,14 +139,16 @@ case "$ACTION" in
     CON_TYPE="${REST%%|*}"
     IFACE="${REST#*|}"
 
-    [[ -n "$CON_NAME" ]] || { echo "No active connection" >&2; exit 1; }
+    [[ -n "$CON_NAME" ]] || { echo "✗ Error: no hay conexión activa." >&2; exit 1; }
 
     case "$PROFILE" in
       high) ZONE="trust-high"; MAC_MODE="permanent"; MDNS="2"; DOT="0"; SNITCH="inactive" ;;
       med)  ZONE="trust-med";  MAC_MODE="stable";    MDNS="0"; DOT="1"; SNITCH="active"   ;;
       low)  ZONE="trust-low";  MAC_MODE="random";    MDNS="0"; DOT="2"; SNITCH="active"   ;;
-      *)    echo "Invalid profile: $PROFILE" >&2; exit 1 ;;
+      *)    echo "✗ Error: perfil inválido '$PROFILE' (usa: high | med | low)." >&2; exit 1 ;;
     esac
+
+    assert_zone_exists "$ZONE"
 
     nm_args=(connection.zone "$ZONE" connection.mdns "$MDNS" connection.dns-over-tls "$DOT")
     [[ "$CON_TYPE" == "802-11-wireless" ]] && nm_args+=(wifi.cloned-mac-address "$MAC_MODE")
@@ -142,6 +167,8 @@ case "$ACTION" in
     SECS="$((MINS * 60))"
     ZONE="trust-med"
 
+    assert_zone_exists "$ZONE"
+
     case "$SVC" in
       ssh)
         firewall-cmd --zone="$ZONE" --add-port=22/tcp --timeout="${SECS}s" >/dev/null
@@ -153,7 +180,7 @@ case "$ACTION" in
         firewall-cmd --zone="$ZONE" --add-port=53317/tcp --add-port=53317/udp --timeout="${SECS}s" >/dev/null
         ;;
       *)
-        echo "Unknown service: $SVC" >&2
+        echo "✗ Error: servicio desconocido '$SVC' (usa: ssh | syncthing | localsend)." >&2
         exit 1
         ;;
     esac
@@ -175,8 +202,18 @@ case "$ACTION" in
     IFACE="${ACTIVE##*|}"
     ZONE="$(nmcli -g connection.zone con show "$CON_NAME" 2>/dev/null || true)"
     [[ -z "$ZONE" ]] && ZONE="trust-low"
+    if ! assert_zone_exists "$ZONE" 2>/dev/null; then
+      echo "⚠ Aviso: zona '$ZONE' no existe en firewalld; aplicando fallback 'trust-low'." >&2
+      ZONE="trust-low"
+      assert_zone_exists "$ZONE"
+    fi
     change_zone_fast "$ZONE" "$IFACE"
     sync_opensnitch "$(zone_to_profile "$ZONE")"
     write_state "$CON_NAME" "$IFACE" "$ZONE"
+    ;;
+
+  *)
+    echo "Uso: net-trust-apply [set <high|med|low> [con]|pass <ssh|syncthing|localsend> [mins]|sync|status]" >&2
+    exit 1
     ;;
 esac

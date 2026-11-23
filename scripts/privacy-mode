@@ -63,11 +63,11 @@ write_niri_rules() {
     cat > "$NIRI_PRIVACY_KDL" <<'EOF'
 // Modo Privacidad ACTIVO: oculta mensajería, correo, notas y gestores al compartir pantalla
 window-rule {
-    match app-id=r#"(?i)^(org\.keepassxc\.KeePassXC|keepassxc|elecwhat|vesktop|discord|telegram|md\.obsidian\.Obsidian|obsidian|org\.localsend\.localsend_app|localsend|thunderbird)$"#
+    match app-id=r#"(?i)^(org\.keepassxc\.KeePassXC|keepassxc|elecwhat|telegram|md\.obsidian\.Obsidian|obsidian|org\.localsend\.localsend_app|localsend|thunderbird)$"#
     block-out-from "screen-capture"
 }
 window-rule {
-    match title=r#"(?i)(WhatsApp|ElecWhat|Discord|Vesktop|Telegram|Gmail|Outlook|Proton Mail|KeePassXC|Bank|Banistmo|Banca)"#
+    match title=r#"(?i)(WhatsApp|ElecWhat|Telegram|Gmail|Outlook|Proton Mail|KeePassXC|Bank|Banistmo|Banca)"#
     block-out-from "screen-capture"
 }
 EOF

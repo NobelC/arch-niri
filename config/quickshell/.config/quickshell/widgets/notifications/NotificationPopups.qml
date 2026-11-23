@@ -79,8 +79,8 @@ PanelWindow {
                     border.color: (toastItem.isCritical || cardHover.containsMouse) ? toastItem.accentCol : Theme.text
                     clip: true
 
-                    Behavior on color { ColorAnimation { duration: 100 } }
-                    Behavior on border.color { ColorAnimation { duration: 100 } }
+                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                    Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                     // Clic izquierdo = ir a la app emisora | Clic derecho = descartar
                     MouseArea {

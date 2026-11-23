@@ -46,7 +46,8 @@ is_inhibited() {
   fi
 
   # 3. Grabaciones, llamadas o compilaciones pesadas en curso
-  if pgrep -x "obs|wf-recorder|wl-screenrec|gpu-screen-recorder|pw-record|makepkg|cargo|rustc|cc1plus|clang|ninja" >/dev/null 2>&1; then
+  if pgrep -x "obs|wf-recorder|wl-screenrec|gpu-screen-reco|pw-record|makepkg|cargo|rustc|cc1plus|clang|ninja" >/dev/null 2>&1 \
+     || pgrep -f '(^|/)(obs|wf-recorder|wl-screenrec|gpu-screen-recorder|pw-record)([[:space:]]|$)' >/dev/null 2>&1; then
     return 0
   fi
 
@@ -135,6 +136,7 @@ run_daemon() {
       fi
     fi
   done
+  return 1
 }
 
 case "${1:-daemon}" in

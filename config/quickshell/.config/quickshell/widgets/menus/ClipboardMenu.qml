@@ -201,8 +201,8 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: wipeArea.containsMouse ? Theme.warn : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 100 } }
-                Behavior on border.color { ColorAnimation { duration: 100 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                 Text {
                     id: wipeTxt
@@ -363,7 +363,7 @@ BarDrawer {
                     ? Theme.text
                     : (rowHover.containsMouse ? Theme.text : Theme.border)
 
-                Behavior on color { ColorAnimation { duration: 80 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                 MouseArea {
                     id: rowHover

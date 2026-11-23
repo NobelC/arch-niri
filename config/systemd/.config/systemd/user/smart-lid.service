@@ -1,0 +1,13 @@
+[Unit]
+Description=Smart Clamshell & Lid Manager (Wayland / Niri)
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/smart-lid
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

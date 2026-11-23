@@ -55,9 +55,9 @@ BarDrawer {
 
                 Behavior on width {
                     enabled: !dragArea.pressed
-                    NumberAnimation { duration: 80; easing.type: Easing.OutCubic }
+                    NumberAnimation { duration: Theme.animFast; easing.type: Theme.easeSmooth }
                 }
-                Behavior on color { ColorAnimation { duration: 120 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
             }
         }
 
@@ -74,7 +74,7 @@ BarDrawer {
 
             Behavior on x {
                 enabled: !dragArea.pressed
-                NumberAnimation { duration: 80; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: Theme.animFast; easing.type: Theme.easeSmooth }
             }
         }
 
@@ -194,7 +194,7 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: root.sinkMuted ? Theme.warn : Theme.accent
 
-                Behavior on color { ColorAnimation { duration: 120 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                 Text {
                     anchors.centerIn: parent
@@ -236,7 +236,7 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: tuiHover.containsMouse ? Theme.text : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 100 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                 Text {
                     anchors.centerIn: parent

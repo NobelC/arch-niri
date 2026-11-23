@@ -232,7 +232,7 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: (root.wifiOn && root.current) ? root.trustColor : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 120 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                 Text {
                     anchors.centerIn: parent
@@ -281,7 +281,7 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: tuiHover.containsMouse ? Theme.text : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 100 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                 Text {
                     anchors.centerIn: parent
@@ -313,8 +313,8 @@ BarDrawer {
                 border.width: Theme.borderWidth
                 border.color: root.wifiOn ? Theme.accent : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 120 } }
-                Behavior on border.color { ColorAnimation { duration: 120 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                 Rectangle {
                     width: 14
@@ -324,7 +324,7 @@ BarDrawer {
                     x: root.wifiOn ? 23 : 5
                     color: root.wifiOn ? Theme.bg : Theme.sub
 
-                    Behavior on x { NumberAnimation { duration: 130; easing.type: Easing.OutExpo } }
+                    Behavior on x { NumberAnimation { duration: Theme.animFast; easing.type: Theme.easeOut } }
                 }
 
                 MouseArea {
@@ -394,7 +394,7 @@ BarDrawer {
             border.color: root.trustColor
             clip: true
 
-            Behavior on border.color { ColorAnimation { duration: 120 } }
+            Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
             readonly property int litSegments: root.current
                 ? Math.max(1, Math.min(10, Math.round(root.current.signalStrength * 10)))
@@ -409,7 +409,7 @@ BarDrawer {
                 width: 3
                 color: root.trustColor
 
-                Behavior on color { ColorAnimation { duration: 120 } }
+                Behavior on color { ColorAnimation { duration: Theme.animFast } }
             }
 
             ColumnLayout {
@@ -461,8 +461,8 @@ BarDrawer {
                         border.width: Theme.borderWidth
                         border.color: dcArea.containsMouse ? Theme.warn : Theme.border
 
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        Behavior on border.color { ColorAnimation { duration: 100 } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                         Text {
                             id: dcText
@@ -595,8 +595,8 @@ BarDrawer {
                                 ? Theme.text
                                 : (tArea.containsMouse ? btnTone : Theme.border)
 
-                            Behavior on color { ColorAnimation { duration: 100 } }
-                            Behavior on border.color { ColorAnimation { duration: 100 } }
+                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                            Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
                             Text {
                                 anchors.centerIn: parent
@@ -668,7 +668,7 @@ BarDrawer {
                                 ? Theme.highlight
                                 : (pArea.containsMouse ? Theme.text : Theme.border)
 
-                            Behavior on color { ColorAnimation { duration: 100 } }
+                            Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                             Text {
                                 anchors.centerIn: parent

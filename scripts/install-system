@@ -31,20 +31,9 @@ read_pkg_list() {
 
 install_pacman_hook() {
   mkdir -p /etc/pacman.d/hooks
-  rm -f /etc/pacman.d/hooks/99-arch-niri-packages.hook
-  cat > /etc/pacman.d/hooks/99-arch-niri-sync.hook <<EOF
-[Trigger]
-Operation = Install
-Operation = Upgrade
-Operation = Remove
-Type = Package
-Target = *
-
-[Action]
-Description = Sincronizando listas de paquetes de arch-niri (pacman.txt / paru.txt)...
-When = PostTransaction
-Exec = /usr/bin/env SUDO_USER=$REAL_USER /usr/bin/bash $SCRIPTS_DIR/sync-packages
-EOF
+  sed "s|/home/NobelC/Projects/arch-niri/scripts/sync-packages|/usr/bin/env SUDO_USER=$REAL_USER /usr/bin/bash $SCRIPTS_DIR/sync-packages|" \
+    "$DOTFILES_DIR/system/pacman-hooks/99-arch-niri-sync.hook" > /etc/pacman.d/hooks/99-arch-niri-sync.hook
+  chmod 644 /etc/pacman.d/hooks/99-arch-niri-sync.hook
 }
 
 install_system_modules() {

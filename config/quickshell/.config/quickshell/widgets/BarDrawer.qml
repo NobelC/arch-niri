@@ -14,7 +14,9 @@ PanelWindow {
 
     readonly property bool isOpen: Niri.activeBarMenu === menuName
     readonly property int shadowSize: 5
-    readonly property real targetHeight: contentHeight + 28
+    readonly property string screenName: screen ? screen.name : ""
+    readonly property real effectiveWidth: width > 0 ? Math.min(panelWidth, Math.max(240, width - shadowSize - 16)) : panelWidth
+    readonly property real targetHeight: height > 0 ? Math.min(contentHeight + 28, Math.max(120, height - shadowSize - 12)) : (contentHeight + 28)
 
     anchors {
         top: true
@@ -24,7 +26,7 @@ PanelWindow {
     }
 
     margins {
-        top: 34
+        top: Theme.barHeight
     }
 
     color: "transparent"
@@ -40,7 +42,17 @@ PanelWindow {
 
     onIsOpenChanged: {
         if (isOpen) {
-            keyScope.forceActiveFocus();
+            Qt.callLater(() => {
+                if (drawerWindow.isOpen) keyScope.forceActiveFocus();
+            });
+        }
+    }
+
+    onVisibleChanged: {
+        if (visible && isOpen) {
+            Qt.callLater(() => {
+                if (drawerWindow.isOpen) keyScope.forceActiveFocus();
+            });
         }
     }
 
@@ -71,24 +83,26 @@ PanelWindow {
             anchors.rightMargin: drawerWindow.centered ? 0 : Math.max(0, drawerWindow.rightOffset - drawerWindow.shadowSize)
             anchors.horizontalCenter: drawerWindow.centered ? parent.horizontalCenter : undefined
 
-            width: drawerWindow.panelWidth + drawerWindow.shadowSize
+            width: drawerWindow.effectiveWidth + drawerWindow.shadowSize
             height: drawerWindow.isOpen ? (drawerWindow.targetHeight + drawerWindow.shadowSize) : 0
             visible: height > 0.5
             clip: true
 
             Behavior on height {
                 NumberAnimation {
-                    duration: drawerWindow.isOpen ? 220 : 160
-                    easing.type: drawerWindow.isOpen ? Easing.OutExpo : Easing.InCubic
+                    duration: drawerWindow.isOpen ? Theme.animSlow : Theme.animMedium
+                    easing.type: drawerWindow.isOpen ? Theme.easeOut : Theme.easeIn
                 }
             }
 
             function syncSeamGap() {
                 if (drawerWindow.isOpen || height > 0.5) {
+                    Niri.activeBarDrawerScreen = drawerWindow.screenName;
                     Niri.activeBarDrawerX = x + Theme.borderWidth;
-                    Niri.activeBarDrawerWidth = drawerWindow.panelWidth - (Theme.borderWidth * 2);
+                    Niri.activeBarDrawerWidth = drawerWindow.effectiveWidth - (Theme.borderWidth * 2);
                 } else if (Niri.activeBarMenu === "") {
                     Niri.activeBarDrawerWidth = 0;
+                    Niri.activeBarDrawerScreen = "";
                 }
             }
 
@@ -100,7 +114,7 @@ PanelWindow {
             Rectangle {
                 x: drawerWindow.shadowSize
                 y: drawerWindow.shadowSize
-                width: drawerWindow.panelWidth
+                width: drawerWindow.effectiveWidth
                 height: Math.max(0, drawerContainer.height - drawerWindow.shadowSize)
                 radius: Theme.radius
                 color: Theme.accent
@@ -111,7 +125,7 @@ PanelWindow {
                 id: drawerBody
                 x: 0
                 y: 0
-                width: drawerWindow.panelWidth
+                width: drawerWindow.effectiveWidth
                 height: Math.max(0, drawerContainer.height - drawerWindow.shadowSize)
                 radius: Theme.radius
                 color: Theme.bg

@@ -102,13 +102,13 @@ PanelWindow {
         Behavior on y {
             NumberAnimation {
                 id: slideAnim
-                duration: 180
-                easing.type: Easing.OutExpo
+                duration: Theme.animMedium
+                easing.type: Theme.easeOut
             }
         }
 
         Behavior on width {
-            NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.animMedium; easing.type: Theme.easeSmooth }
         }
 
         // Sombra sólida desplazada (lado derecho)
@@ -187,8 +187,8 @@ PanelWindow {
                             ? Theme.accent
                             : (tileMouse.containsMouse ? Theme.text : Theme.border)
 
-                        Behavior on color { ColorAnimation { duration: 120 } }
-                        Behavior on border.color { ColorAnimation { duration: 120 } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
                     }
 
                     Text {
@@ -198,7 +198,7 @@ PanelWindow {
                         font.family: Theme.fontFamily
                         font.pixelSize: 15
 
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                        Behavior on color { ColorAnimation { duration: Theme.animFast } }
                     }
 
                     MouseArea {

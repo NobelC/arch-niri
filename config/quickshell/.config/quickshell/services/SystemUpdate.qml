@@ -62,7 +62,7 @@ Singleton {
         root.running = true;
         root.phase = "snapshot";
         root.progress = 5;
-        root.message = "01 // OVERWRITING SYSTEM SNAPSHOT...";
+        root.message = "01 // CHECKING SYSTEM SNAPSHOT...";
         Quickshell.execDetached([root.scriptPath, "upgrade"]);
     }
 

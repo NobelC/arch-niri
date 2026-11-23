@@ -2,15 +2,22 @@
 set -euo pipefail
 
 ACTION="${1:-status}"
-USER_NAME="${SYS_UPDATE_USER:-${SUDO_USER:-NobelC}}"
+USER_NAME="${SYS_UPDATE_USER:-${SUDO_USER:-}}"
+if [[ -z "$USER_NAME" || "$USER_NAME" == "root" ]]; then
+  echo "✗ Error: define SYS_UPDATE_USER o ejecuta con sudo desde un usuario no-root (SUDO_USER)." >&2
+  exit 1
+fi
 USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+[[ -n "$USER_HOME" ]] || { echo "✗ Error: usuario '$USER_NAME' no encontrado." >&2; exit 1; }
 REPO_DIR="${USER_HOME}/Projects/arch-niri"
 STATE_DIR="${USER_HOME}/.local/state/quickshell"
 STATE_FILE="${STATE_DIR}/sys-update.json"
-LOG_FILE="${STATE_DIR}/sys-update.log"
+LOG_LINK="${STATE_DIR}/sys-update.log"
+LOG_FILE="${STATE_DIR}/sys-update-$(date '+%Y%m%d-%H%M%S').log"
+MAX_LOGS="${SYS_UPDATE_MAX_LOGS:-10}"
 
 mkdir -p "$STATE_DIR"
-chown "${USER_NAME}:${USER_NAME}" "$STATE_DIR"
+if [[ $EUID -eq 0 ]]; then chown "${USER_NAME}:${USER_NAME}" "$STATE_DIR"; fi
 
 write_progress() {
   local phase="$1" msg="$2" running="$3" pct="$4" snap="${5:-}"
@@ -27,14 +34,15 @@ write_progress() {
       '{count: 0, packages: [], phase: $phase, message: $msg, running: $running, progress: $pct, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
   fi
   mv "$tmp" "$STATE_FILE"
-  chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
+  if [[ $EUID -eq 0 ]]; then chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"; fi
 }
 
 create_pre_snapshot() {
-  local ts snap_name=""
+  local ts root_fs snap_name=""
   ts="$(date '+%Y-%m-%d %H:%M')"
+  root_fs="$(stat -f -c %T / 2>/dev/null || echo "unknown")"
 
-  if [[ "$(stat -f -c %T / 2>/dev/null || true)" == "btrfs" ]] && command -v btrfs >/dev/null 2>&1; then
+  if [[ "$root_fs" == "btrfs" ]] && command -v btrfs >/dev/null 2>&1; then
     local snap_dir="/.snapshots"
     local snap_path="${snap_dir}/pre-update-latest"
 
@@ -53,9 +61,23 @@ create_pre_snapshot() {
     if btrfs subvolume snapshot -r / "$snap_path" >/dev/null 2>&1; then
       snap_name="pre-update-latest (${ts})"
     fi
+  elif command -v timeshift >/dev/null 2>&1; then
+    # Fallback RSYNC en filesystems no-Btrfs (ext4/xfs) si timeshift está configurado
+    if timeshift --create --comments "pre-update-latest" --tags O >> "$LOG_FILE" 2>&1; then
+      # Mantiene solo el snapshot etiquetado como pre-update-latest más reciente
+      mapfile -t old_ts < <(timeshift --list 2>/dev/null | awk '/pre-update-latest/ {print $3}' | sort | head -n -1 || true)
+      for old_id in "${old_ts[@]}"; do
+        timeshift --delete --snapshot "$old_id" >> "$LOG_FILE" 2>&1 || true
+      done
+      snap_name="timeshift-rsync (${ts})"
+    fi
   fi
 
-  echo "$snap_name"
+  if [[ -z "$snap_name" ]]; then
+    echo "NONE (${root_fs^^})"
+  else
+    echo "$snap_name"
+  fi
 }
 
 sync_repo_state() {
@@ -70,13 +92,29 @@ sync_repo_state() {
 case "$ACTION" in
   upgrade)
     : > "$LOG_FILE"
-    chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
+    ln -sfn "$(basename "$LOG_FILE")" "$LOG_LINK"
+    if [[ $EUID -eq 0 ]]; then
+      chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
+      chown -h "${USER_NAME}:${USER_NAME}" "$LOG_LINK"
+    fi
+    # Mantiene solo los últimos MAX_LOGS archivos con timestamp
+    mapfile -t old_logs < <(ls -1t "${STATE_DIR}"/sys-update-*.log 2>/dev/null | tail -n +"$((MAX_LOGS + 1))" || true)
+    for old_log in "${old_logs[@]}"; do
+      rm -f "$old_log"
+    done
 
-    write_progress "snapshot" "01 // OVERWRITING SYSTEM SNAPSHOT..." true 8 ""
+    write_progress "snapshot" "01 // CHECKING SYSTEM SNAPSHOT..." true 8 ""
     SNAP_CREATED="$(create_pre_snapshot)"
 
+    if [[ "$SNAP_CREATED" == NONE* ]]; then
+      echo "[sys-update] Sin snapshot disponible: ${SNAP_CREATED}" >> "$LOG_FILE"
+      write_progress "upgrading" "01 // NO SNAPSHOT (${SNAP_CREATED#NONE }) · UPDATING REPOS..." true 22 "$SNAP_CREATED"
+    else
+      echo "[sys-update] Snapshot creado: ${SNAP_CREATED}" >> "$LOG_FILE"
+      write_progress "upgrading" "02 // SNAPSHOT OK · UPDATING OFFICIAL REPOS..." true 22 "$SNAP_CREATED"
+    fi
+
     # 1. Actualizar paquetes oficiales de Arch directamente como root
-    write_progress "upgrading" "02 // UPDATING OFFICIAL REPOS (PACMAN)..." true 22 "$SNAP_CREATED"
     if ! pacman -Syu --noconfirm --needed >> "$LOG_FILE" 2>&1; then
       write_progress "error" "ERROR // PACMAN UPGRADE FAILED (CHECK LOG)" false 0 "$SNAP_CREATED"
       exit 1
@@ -95,7 +133,6 @@ case "$ACTION" in
         idx=0
         for pkg in "${aur_pkgs[@]}"; do
           idx=$((idx + 1))
-          # Progreso interpolado entre 30% y 85%
           pct=$(( 30 + (idx * 55) / total_aur ))
           write_progress "upgrading" "02 // AUR [${idx}/${total_aur}]: ${pkg}" true "$pct" "$SNAP_CREATED"
 
@@ -132,7 +169,7 @@ case "$ACTION" in
     jq -n --arg snap "$SNAP_CREATED" --arg ts "$(date '+%Y-%m-%d %H:%M')" \
       '{count: 0, packages: [], phase: "done", message: "05 // INSTALLATION COMPLETE", running: false, progress: 100, lastSnapshot: $snap, updatedAt: $ts}' > "$tmp"
     mv "$tmp" "$STATE_FILE"
-    chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
+    if [[ $EUID -eq 0 ]]; then chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"; fi
     ;;
   *)
     echo "Uso: sys-update-apply upgrade" >&2

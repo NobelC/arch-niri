@@ -10,5 +10,7 @@
   "accent": "{{colors.primary.default.hex}}",
   "accentSoft": "{{colors.secondary.default.hex}}",
   "highlight": "{{colors.tertiary.default.hex}}",
-  "warn": "{{colors.error.default.hex}}"
+  "warn": "{{colors.error.default.hex}}",
+  "success": "{{colors.tertiary.default.hex}}",
+  "info": "{{colors.secondary.default.hex}}"
 }

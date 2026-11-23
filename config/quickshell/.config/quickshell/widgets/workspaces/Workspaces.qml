@@ -32,7 +32,7 @@ Row {
             height: 16
 
             Behavior on width {
-                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: Theme.animMedium; easing.type: Theme.easeSmooth }
             }
 
             Rectangle {
@@ -43,7 +43,7 @@ Row {
                 border.color: Theme.accent
                 opacity: block.isActive ? 1.0 : (wsHover.containsMouse ? 0.55 : 0.0)
 
-                Behavior on opacity { NumberAnimation { duration: 120 } }
+                Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
             }
 
             Rectangle {
@@ -56,8 +56,8 @@ Row {
                 border.width: block.isActive ? 0 : Theme.borderWidth
                 border.color: block.hasWindows ? Theme.sub : Theme.border
 
-                Behavior on color { ColorAnimation { duration: 150 } }
-                Behavior on border.color { ColorAnimation { duration: 150 } }
+                Behavior on color { ColorAnimation { duration: Theme.animMedium } }
+                Behavior on border.color { ColorAnimation { duration: Theme.animMedium } }
             }
 
             MouseArea {

@@ -16,8 +16,7 @@ spawn-sh-at-startup "[ -L \"$HOME/.local/state/quickshell/current-wallpaper\" ] 
 spawn-sh-at-startup "[ -f \"$HOME/.local/state/quickshell/overview-wallpaper.jpg\" ] && swaybg -i \"$HOME/.local/state/quickshell/overview-wallpaper.jpg\" -m fill"
 
 // --- 6. ENERGÍA, TAPA Y MONITORES ---
-spawn-sh-at-startup "pkill -x smart-lid; \"$HOME/.local/bin/smart-lid\""
-spawn-sh-at-startup "\"$HOME/.local/bin/smart-idle\""
+spawn-sh-at-startup "systemctl --user restart smart-lid.service smart-idle.service"
 spawn-sh-at-startup "\"$HOME/.local/bin/display-manager\" watch"
 
 // --- 7. FIREWALL INTERACTIVO (OpenSnitch UI para perfiles MED/LOW) ---

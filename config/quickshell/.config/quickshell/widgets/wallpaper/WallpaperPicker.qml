@@ -346,7 +346,7 @@ PanelWindow {
                                 border.color: Theme.accent
                                 opacity: cardDelegate.isCenter ? 1.0 : 0.0
 
-                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
                             }
 
                             // Tarjeta interior separada por el gap
@@ -358,7 +358,7 @@ PanelWindow {
                                 border.width: cardDelegate.isCenter ? 0 : Theme.borderWidth
                                 border.color: Theme.border
 
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: Theme.animFast } }
 
                                 // Miniatura rectangular sin curvas
                                 Image {
@@ -393,7 +393,7 @@ PanelWindow {
                                     elide: Text.ElideMiddle
                                     horizontalAlignment: Text.AlignHCenter
 
-                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animFast } }
                                 }
                             }
 

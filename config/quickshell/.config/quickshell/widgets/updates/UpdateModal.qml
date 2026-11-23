@@ -292,7 +292,7 @@ PanelWindow {
                     Text {
                         text: SystemUpdate.running
                             ? SystemUpdate.message
-                            : ("[ " + String(SystemUpdate.count).padStart(2, "0") + " ] PACKAGES PENDING  ·  AUTO BTRFS SNAPSHOT")
+                            : ("[ " + String(SystemUpdate.count).padStart(2, "0") + " ] PACKAGES PENDING  ·  " + (SystemUpdate.lastSnapshot.startsWith("NONE") ? "NO SNAPSHOT" : "PRE-UPDATE SNAPSHOT"))
                         color: SystemUpdate.phase === "error" ? Theme.warn : Theme.accentSoft
                         font.family: Theme.fontFamily
                         font.pixelSize: 9
@@ -371,7 +371,7 @@ PanelWindow {
                                 ? SystemUpdate.message
                                 : (SystemUpdate.lastSnapshot !== ""
                                     ? ("LAST SNAPSHOT: " + SystemUpdate.lastSnapshot)
-                                    : "PRE-UPDATE SNAPSHOT ENABLED (ROOT BTRFS)")
+                                    : "PRE-UPDATE SNAPSHOT (BTRFS / TIMESHIFT)")
                             color: SystemUpdate.running ? Theme.text : Theme.sub
                             font.family: Theme.fontFamily
                             font.pixelSize: 9
@@ -432,7 +432,7 @@ PanelWindow {
                         width: 42
                         height: 42
                         radius: Theme.radius
-                        color: SystemUpdate.phase === "done" ? Theme.accent : Theme.cardAlt
+                        color: SystemUpdate.phase === "done" ? Theme.success : Theme.cardAlt
                         border.width: Theme.borderWidth
                         border.color: Theme.text
 
@@ -453,7 +453,7 @@ PanelWindow {
                             : (SystemUpdate.phase === "done"
                                 ? "完了 // INSTALACIÓN COMPLETA"
                                 : "完了 // SYSTEM IS UP TO DATE")
-                        color: SystemUpdate.phase === "done" ? Theme.accent : Theme.text
+                        color: SystemUpdate.phase === "done" ? Theme.success : Theme.text
                         font.family: Theme.cjkFont
                         font.pixelSize: 13
                         font.bold: true
@@ -592,7 +592,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         text: SystemUpdate.running
                             ? "RUNNING SNAPSHOT + UPGRADE..."
-                            : "SNAPSHOT & UPDATE ALL"
+                            : (SystemUpdate.lastSnapshot.startsWith("NONE") ? "UPDATE ALL (NO SNAPSHOT)" : "SNAPSHOT & UPDATE ALL")
                         color: SystemUpdate.running ? Theme.accent : Theme.bg
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
