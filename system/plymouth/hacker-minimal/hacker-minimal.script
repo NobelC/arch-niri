@@ -1,0 +1,73 @@
+// Fondo oscuro sólido (#0e0e14 -> RGB normalizado 0.055, 0.055, 0.078)
+Window.SetBackgroundTopColor(0.055, 0.055, 0.078);
+Window.SetBackgroundBottomColor(0.055, 0.055, 0.078);
+
+screen_w = Window.GetWidth();
+screen_h = Window.GetHeight();
+
+fun make_label(text, r, g, b) {
+  img = Image.Text(text, r, g, b, 1.0, "JetBrainsMono Nerd Font 13");
+  spr = Sprite(img);
+  spr.SetX(screen_w / 2 - img.GetWidth() / 2);
+  return spr;
+}
+
+title_spr = make_label("SYSTEM // CRYPTROOT", 0.651, 0.678, 0.784);
+title_spr.SetY(screen_h / 2 - 44);
+
+prompt_spr = make_label("", 0.804, 0.839, 0.957);
+prompt_spr.SetY(screen_h / 2 - 12);
+
+dots_spr = make_label("", 0.796, 0.651, 0.969);
+dots_spr.SetY(screen_h / 2 + 20);
+
+msg_spr = make_label("", 0.651, 0.678, 0.784);
+msg_spr.SetY(screen_h / 2 + 54);
+
+fun progress_callback(duration, progress) {
+  if (prompt_spr.GetImage().GetWidth() <= 1) {
+    bars = Math.Int(progress * 20);
+    str = "[";
+    for (i = 0; i < 20; i++) {
+      if (i < bars) str += "■";
+      else str += "·";
+    }
+    str += "]";
+    img = Image.Text(str, 0.796, 0.651, 0.969, 1.0, "JetBrainsMono Nerd Font 13");
+    dots_spr.SetImage(img);
+    dots_spr.SetX(screen_w / 2 - img.GetWidth() / 2);
+  }
+}
+Plymouth.SetBootProgressFunction(progress_callback);
+
+fun password_callback(prompt_text, bullets) {
+  p_img = Image.Text("ENTER DISK PASSPHRASE", 0.804, 0.839, 0.957, 1.0, "JetBrainsMono Nerd Font 13");
+  prompt_spr.SetImage(p_img);
+  prompt_spr.SetX(screen_w / 2 - p_img.GetWidth() / 2);
+
+  b_str = "";
+  max_b = bullets;
+  if (max_b > 24) max_b = 24;
+  for (i = 0; i < max_b; i++) {
+    b_str += "■ ";
+  }
+  if (bullets == 0) b_str = "[ _ ]";
+  d_img = Image.Text(b_str, 0.796, 0.651, 0.969, 1.0, "JetBrainsMono Nerd Font 14");
+  dots_spr.SetImage(d_img);
+  dots_spr.SetX(screen_w / 2 - d_img.GetWidth() / 2);
+}
+Plymouth.SetDisplayPasswordFunction(password_callback);
+
+fun normal_callback() {
+  empty = Image.Text("", 1, 1, 1);
+  prompt_spr.SetImage(empty);
+  msg_spr.SetImage(empty);
+}
+Plymouth.SetDisplayNormalFunction(normal_callback);
+
+fun message_callback(text) {
+  m_img = Image.Text(text, 0.651, 0.678, 0.784, 1.0, "JetBrainsMono Nerd Font 11");
+  msg_spr.SetImage(m_img);
+  msg_spr.SetX(screen_w / 2 - m_img.GetWidth() / 2);
+}
+Plymouth.SetMessageFunction(message_callback);

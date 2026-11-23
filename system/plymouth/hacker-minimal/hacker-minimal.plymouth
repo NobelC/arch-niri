@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Hacker Minimal
+Description=Minimal dark boot splash and LUKS prompt
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/hacker-minimal
+ScriptFile=/usr/share/plymouth/themes/hacker-minimal/hacker-minimal.script
