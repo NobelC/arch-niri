@@ -1,6 +1,6 @@
 title-text: ""
 desktop-image: "background.png"
-desktop-color: "#0e0e14"
+desktop-color: "#000000"
 terminal-font: "JetBrainsMono Nerd Font Regular 16"
 terminal-left: "15%"
 terminal-top: "15%"
@@ -13,9 +13,9 @@ terminal-height: "70%"
   width = 520
   height = 326
   item_font = "JetBrainsMono Nerd Font Regular 16"
-  item_color = "#cdd6f4"
+  item_color = "#ffffff"
   selected_item_font = "JetBrainsMono Nerd Font Bold 17"
-  selected_item_color = "#0e0e14"
+  selected_item_color = "#000000"
   item_height = 38
   item_padding = 12
   item_spacing = 6

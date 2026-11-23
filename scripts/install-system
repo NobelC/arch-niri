@@ -36,6 +36,103 @@ install_pacman_hook() {
   chmod 644 /etc/pacman.d/hooks/99-arch-niri-sync.hook
 }
 
+install_grub_theme() {
+  echo "-> Configurando tema GRUB (hacker-box) y soporte grub-btrfs..."
+  if [[ "$(stat -f -c %T / 2>/dev/null || true)" == "btrfs" ]]; then
+    pacman -S --needed --noconfirm grub-btrfs 2>/dev/null || true
+    if [[ -f /etc/default/grub-btrfs/config ]]; then
+      sed -i 's|^#*GRUB_BTRFS_SNAPSHOT_DIR=.*|GRUB_BTRFS_SNAPSHOT_DIR="/.snapshots"|' /etc/default/grub-btrfs/config
+    fi
+  fi
+
+  if [[ -d "$DOTFILES_DIR/system/grub/hacker-box" ]] && [[ -f /etc/default/grub ]]; then
+    mkdir -p /boot/grub/themes
+    rm -rf /boot/grub/themes/hacker-box /boot/grub/themes/CyberGRUB-2077 /boot/grub/themes/neo-brutalist
+    cp -r "$DOTFILES_DIR/system/grub/hacker-box" /boot/grub/themes/
+    chmod -x /etc/grub.d/31_efi_bootnext 2>/dev/null || true
+
+    python3 - << 'PYGRUB'
+from pathlib import Path
+g = Path("/etc/default/grub")
+gtxt = g.read_text()
+updates = {
+    "GRUB_GFXMODE": "1366x768,auto",
+    "GRUB_GFXPAYLOAD_LINUX": "keep",
+    "GRUB_THEME": '"/boot/grub/themes/hacker-box/theme.txt"',
+}
+seen = set()
+out = []
+for line in gtxt.splitlines():
+    s = line.lstrip("#").strip()
+    matched = False
+    for k, v in updates.items():
+        if s.startswith(k + "="):
+            out.append(f"{k}={v}")
+            seen.add(k)
+            matched = True
+            break
+    if not matched:
+        out.append(line)
+for k, v in updates.items():
+    if k not in seen:
+        out.append(f"{k}={v}")
+g.write_text("\n".join(out) + "\n")
+PYGRUB
+  fi
+}
+
+install_plymouth_theme() {
+  echo "-> Configurando splash Plymouth (hacker-minimal)..."
+  pacman -S --needed --noconfirm plymouth 2>/dev/null || true
+
+  if [[ -d "$DOTFILES_DIR/system/plymouth/hacker-minimal" ]]; then
+    mkdir -p /usr/share/plymouth/themes/hacker-minimal
+    cp -rf "$DOTFILES_DIR/system/plymouth/hacker-minimal/"* /usr/share/plymouth/themes/hacker-minimal/
+    plymouth-set-default-theme hacker-minimal 2>/dev/null || true
+  fi
+
+  if [[ -f /etc/mkinitcpio.conf ]]; then
+    python3 - << 'PYMK'
+from pathlib import Path
+import re
+m = Path("/etc/mkinitcpio.conf")
+mtxt = m.read_text()
+def patch(match):
+    hooks = match.group(1).split()
+    if "plymouth" in hooks:
+        return match.group(0)
+    if "sd-encrypt" in hooks:
+        hooks.insert(hooks.index("sd-encrypt"), "plymouth")
+    elif "encrypt" in hooks:
+        hooks.insert(hooks.index("encrypt"), "plymouth")
+    else:
+        hooks.append("plymouth")
+    return f"HOOKS=({' '.join(hooks)})"
+m.write_text(re.sub(r"^HOOKS=\(([^)]+)\)", patch, mtxt, count=1, flags=re.MULTILINE))
+PYMK
+  fi
+
+  if [[ -f /etc/default/grub ]]; then
+    python3 - << 'PYSPLASH'
+from pathlib import Path
+import re
+g = Path("/etc/default/grub")
+gtxt = g.read_text()
+def add_splash(match):
+    val = match.group(1)
+    if "splash" not in val.split():
+        val = (val + " splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0").strip()
+    return f'GRUB_CMDLINE_LINUX_DEFAULT="{val}"'
+g.write_text(re.sub(r'^GRUB_CMDLINE_LINUX_DEFAULT="([^"]*)"', add_splash, gtxt, count=1, flags=re.MULTILINE))
+PYSPLASH
+  fi
+
+  if [[ -d /boot/grub ]]; then
+    mkinitcpio -P
+    grub-mkconfig -o /boot/grub/grub.cfg
+  fi
+}
+
 install_system_modules() {
   echo "-> Instalando módulos del sistema (net-trust + sys-update)..."
   if [[ -f "$DOTFILES_DIR/system/net-trust/install.sh" ]]; then
@@ -130,6 +227,8 @@ run_as_user bash "$SCRIPTS_DIR/sync-packages"
 
 install_neo_login
 install_system_modules
+install_grub_theme
+install_plymouth_theme
 
 # 8. Habilita servicios base del sistema
 systemctl enable --now NetworkManager bluetooth 2>/dev/null || true

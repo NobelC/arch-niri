@@ -31,6 +31,7 @@ gparted
 greetd
 grim
 grub
+grub-btrfs
 hunspell-en_us
 hunspell-es_any
 imagemagick
@@ -63,9 +64,11 @@ openssh
 pipewire
 pipewire-pulse
 playerctl
+plymouth
 polkit-gnome
 power-profiles-daemon
 pyright
+python-pillow
 qemu-desktop
 qt6-imageformats
 quickshell
