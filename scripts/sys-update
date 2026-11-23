@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ACTION="${1:-check}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
+STATE_FILE="${STATE_DIR}/sys-update.json"
+
+mkdir -p "$STATE_DIR"
+
+case "$ACTION" in
+  check)
+    # Sincroniza índices de paquetes de forma ligera si paru está disponible y consulta actualizaciones
+    raw_list=""
+    if command -v paru >/dev/null 2>&1; then
+      raw_list="$(paru -Qu 2>/dev/null || true)"
+    elif command -v pacman >/dev/null 2>&1; then
+      raw_list="$(pacman -Qu 2>/dev/null || true)"
+    fi
+
+    # Detecta cuáles paquetes son externos/AUR para etiquetarlos
+    declare -A foreign_pkgs=()
+    while IFS= read -r fp; do
+      [[ -n "$fp" ]] && foreign_pkgs["$fp"]=1
+    done < <(pacman -Qqm 2>/dev/null || true)
+
+    tmp_lines="$(mktemp)"
+    trap 'rm -f "$tmp_lines"' EXIT
+
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      # Formato típico: "nombre old_ver -> new_ver"
+      pkg="$(awk '{print $1}' <<< "$line")"
+      old_v="$(awk '{print $2}' <<< "$line")"
+      new_v="$(awk '{print $4}' <<< "$line")"
+      [[ -z "$new_v" ]] && new_v="$(awk '{print $3}' <<< "$line")"
+      source_tag="REPO"
+      [[ -n "${foreign_pkgs[$pkg]:-}" ]] && source_tag="AUR"
+      printf '%s\t%s\t%s\t%s\n' "$pkg" "$old_v" "$new_v" "$source_tag" >> "$tmp_lines"
+    done <<< "$raw_list"
+
+    prev_snap=""
+    if [[ -f "$STATE_FILE" ]]; then
+      prev_snap="$(jq -r '.lastSnapshot // ""' "$STATE_FILE" 2>/dev/null || true)"
+    fi
+
+    tmp_json="$(mktemp)"
+    jq -Rn \
+      --arg snap "$prev_snap" \
+      --arg ts "$(date '+%Y-%m-%d %H:%M')" \
+      '[inputs | split("\t") | select(length >= 4) | {name: .[0], oldVer: .[1], newVer: .[2], source: .[3]}] as $pkgs |
+       {
+         count: ($pkgs | length),
+         packages: $pkgs,
+         phase: (if ($pkgs | length) > 0 then "ready" else "idle" end),
+         message: (if ($pkgs | length) > 0 then "UPDATES AVAILABLE" else "SYSTEM UP TO DATE" end),
+         running: false,
+         lastSnapshot: $snap,
+         updatedAt: $ts
+       }' < "$tmp_lines" > "$tmp_json"
+
+    mv "$tmp_json" "$STATE_FILE"
+    ;;
+
+  upgrade)
+    exec sudo /usr/local/bin/sys-update-apply upgrade
+    ;;
+
+  *)
+    echo "Uso: sys-update [check|upgrade]" >&2
+    exit 1
+    ;;
+esac

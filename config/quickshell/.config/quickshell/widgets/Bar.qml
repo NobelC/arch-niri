@@ -6,6 +6,7 @@ import "../services"
 import "./arch"
 import "./workspaces"
 import "./clock"
+import "./updates"
 import "./battery"
 import "./network"
 import "./bluetooth"
@@ -31,15 +32,15 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-bar"
     readonly property string screenName: screen ? screen.name : ""
     readonly property bool barEnabled: {
-      const _p = Displays.primary;
-      const _o = Displays.outputs;
-      const _c = Displays.count;
-      return Displays.shouldShowBar(screenName);
+        const _p = Displays.primary;
+        const _o = Displays.outputs;
+        const _c = Displays.count;
+        return Displays.shouldShowBar(screenName);
     }
 
     visible: barEnabled
-    exclusiveZone: (barEnabled && !Niri.overviewOpen) ? 34 : 0    
-  
+    exclusiveZone: (barEnabled && !Niri.overviewOpen) ? 34 : 0
+
     Item {
         id: barSlideContainer
         anchors.left: parent.left
@@ -115,8 +116,14 @@ PanelWindow {
             Workspaces { screenName: barWindow.screenName }
         }
 
-        // Módulo central: Reloj / Dashboard
+        // Módulo central: Reloj 100% centrado + Icono de actualizaciones anclado a su derecha
+        UpdateIcon {
+            anchors.right: clockWidget.left
+            anchors.rightMargin: 8
+            anchors.verticalCenter: clockWidget.verticalCenter
+        }
         Clock {
+            id: clockWidget
             anchors.centerIn: parent
             anchors.verticalCenterOffset: -1
         }

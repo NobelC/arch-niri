@@ -15,6 +15,7 @@ import "widgets/clock"
 import "widgets/notifications"
 import "widgets/displays"
 import "widgets/menus"
+import "widgets/updates"
 
 ShellRoot {
     Variants {
@@ -43,6 +44,7 @@ ShellRoot {
 
     Launcher {}
     WallpaperPicker {}
+    UpdateModal {}
 
     LazyLoader {
         active: LockState.locked

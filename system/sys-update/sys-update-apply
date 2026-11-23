@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ACTION="${1:-status}"
+USER_NAME="${SYS_UPDATE_USER:-${SUDO_USER:-NobelC}}"
+USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+STATE_DIR="${USER_HOME}/.local/state/quickshell"
+STATE_FILE="${STATE_DIR}/sys-update.json"
+LOG_FILE="${STATE_DIR}/sys-update.log"
+
+mkdir -p "$STATE_DIR"
+chown "${USER_NAME}:${USER_NAME}" "$STATE_DIR"
+
+write_progress() {
+  local phase="$1" msg="$2" running="$3" snap="${4:-}"
+  local tmp
+  tmp="$(mktemp)"
+  if [[ -f "$STATE_FILE" ]]; then
+    jq --arg phase "$phase" --arg msg "$msg" --argjson running "$running" --arg snap "$snap" \
+      '.phase = $phase | .message = $msg | .running = $running | (if $snap != "" then .lastSnapshot = $snap else . end)' \
+      "$STATE_FILE" > "$tmp" 2>/dev/null || \
+    jq -n --arg phase "$phase" --arg msg "$msg" --argjson running "$running" --arg snap "$snap" \
+      '{count: 0, packages: [], phase: $phase, message: $msg, running: $running, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
+  else
+    jq -n --arg phase "$phase" --arg msg "$msg" --argjson running "$running" --arg snap "$snap" \
+      '{count: 0, packages: [], phase: $phase, message: $msg, running: $running, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
+  fi
+  mv "$tmp" "$STATE_FILE"
+  chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
+}
+
+create_pre_snapshot() {
+  local ts snap_name=""
+  ts="$(date '+%Y-%m-%d %H:%M')"
+
+  if [[ "$(stat -f -c %T / 2>/dev/null || true)" == "btrfs" ]] && command -v btrfs >/dev/null 2>&1; then
+    local snap_dir="/.snapshots"
+    local snap_path="${snap_dir}/pre-update-latest"
+
+    if [[ ! -d "$snap_dir" ]]; then
+      btrfs subvolume create "$snap_dir" >/dev/null 2>&1 || mkdir -p "$snap_dir"
+    fi
+
+    # Elimina cualquier snapshot pre-update anterior para mantener siempre 1 solo
+    if btrfs subvolume show "$snap_path" >/dev/null 2>&1; then
+      btrfs subvolume delete "$snap_path" >/dev/null 2>&1 || true
+    fi
+    for old in "${snap_dir}"/pre-update-*; do
+      [[ -e "$old" ]] || continue
+      btrfs subvolume delete "$old" >/dev/null 2>&1 || rm -rf "$old" 2>/dev/null || true
+    done
+
+    if btrfs subvolume snapshot -r / "$snap_path" >/dev/null 2>&1; then
+      snap_name="pre-update-latest (${ts})"
+    fi
+  fi
+
+  echo "$snap_name"
+}
+
+case "$ACTION" in
+  upgrade)
+    : > "$LOG_FILE"
+    chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
+
+    write_progress "snapshot" "01 // OVERWRITING SYSTEM SNAPSHOT..." true ""
+    SNAP_CREATED="$(create_pre_snapshot)"
+
+    if [[ -n "$SNAP_CREATED" ]]; then
+      write_progress "upgrading" "02 // SNAPSHOT [$SNAP_CREATED] OK · UPDATING..." true "$SNAP_CREATED"
+    else
+      write_progress "upgrading" "02 // DOWNLOADING & INSTALLING PACKAGES..." true ""
+    fi
+
+    if sudo -u "$USER_NAME" HOME="$USER_HOME" paru -Syu --noconfirm --needed >> "$LOG_FILE" 2>&1; then
+      if [[ -x "${USER_HOME}/Projects/arch-niri/scripts/sync-packages" ]]; then
+        sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${USER_HOME}/Projects/arch-niri/scripts/sync-packages" >/dev/null 2>&1 || true
+      fi
+
+      tmp="$(mktemp)"
+      jq -n --arg snap "$SNAP_CREATED" --arg ts "$(date '+%Y-%m-%d %H:%M')" \
+        '{count: 0, packages: [], phase: "done", message: "03 // SYSTEM UP TO DATE", running: false, lastSnapshot: $snap, updatedAt: $ts}' > "$tmp"
+      mv "$tmp" "$STATE_FILE"
+      chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
+    else
+      write_progress "error" "ERROR // UPDATE FAILED (CHECK LOG)" false "$SNAP_CREATED"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Uso: sys-update-apply upgrade" >&2
+    exit 1
+    ;;
+esac
