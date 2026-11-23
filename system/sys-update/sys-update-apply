@@ -4,6 +4,7 @@ set -euo pipefail
 ACTION="${1:-status}"
 USER_NAME="${SYS_UPDATE_USER:-${SUDO_USER:-NobelC}}"
 USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+REPO_DIR="${USER_HOME}/Projects/arch-niri"
 STATE_DIR="${USER_HOME}/.local/state/quickshell"
 STATE_FILE="${STATE_DIR}/sys-update.json"
 LOG_FILE="${STATE_DIR}/sys-update.log"
@@ -12,18 +13,18 @@ mkdir -p "$STATE_DIR"
 chown "${USER_NAME}:${USER_NAME}" "$STATE_DIR"
 
 write_progress() {
-  local phase="$1" msg="$2" running="$3" snap="${4:-}"
+  local phase="$1" msg="$2" running="$3" pct="$4" snap="${5:-}"
   local tmp
   tmp="$(mktemp)"
   if [[ -f "$STATE_FILE" ]]; then
-    jq --arg phase "$phase" --arg msg "$msg" --argjson running "$running" --arg snap "$snap" \
-      '.phase = $phase | .message = $msg | .running = $running | (if $snap != "" then .lastSnapshot = $snap else . end)' \
+    jq --arg phase "$phase" --arg msg "$msg" --argjson running "$running" --argjson pct "$pct" --arg snap "$snap" \
+      '.phase = $phase | .message = $msg | .running = $running | .progress = $pct | (if $snap != "" then .lastSnapshot = $snap else . end)' \
       "$STATE_FILE" > "$tmp" 2>/dev/null || \
-    jq -n --arg phase "$phase" --arg msg "$msg" --argjson running "$running" --arg snap "$snap" \
-      '{count: 0, packages: [], phase: $phase, message: $msg, running: $running, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
+    jq -n --arg phase "$phase" --arg msg "$msg" --argjson running "$running" --argjson pct "$pct" --arg snap "$snap" \
+      '{count: 0, packages: [], phase: $phase, message: $msg, running: $running, progress: $pct, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
   else
-    jq -n --arg phase "$phase" --arg msg "$msg" --argjson running "$running" --arg snap "$snap" \
-      '{count: 0, packages: [], phase: $phase, message: $msg, running: $running, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
+    jq -n --arg phase "$phase" --arg msg "$msg" --argjson running "$running" --argjson pct "$pct" --arg snap "$snap" \
+      '{count: 0, packages: [], phase: $phase, message: $msg, running: $running, progress: $pct, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
   fi
   mv "$tmp" "$STATE_FILE"
   chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
@@ -41,7 +42,6 @@ create_pre_snapshot() {
       btrfs subvolume create "$snap_dir" >/dev/null 2>&1 || mkdir -p "$snap_dir"
     fi
 
-    # Elimina cualquier snapshot pre-update anterior para mantener siempre 1 solo
     if btrfs subvolume show "$snap_path" >/dev/null 2>&1; then
       btrfs subvolume delete "$snap_path" >/dev/null 2>&1 || true
     fi
@@ -58,34 +58,81 @@ create_pre_snapshot() {
   echo "$snap_name"
 }
 
+sync_repo_state() {
+  if [[ -x "${REPO_DIR}/scripts/sync-packages" ]]; then
+    sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/sync-packages" >/dev/null 2>&1 || true
+  fi
+  if [[ -x "${REPO_DIR}/scripts/auto-stow" ]]; then
+    sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/auto-stow" >/dev/null 2>&1 || true
+  fi
+}
+
 case "$ACTION" in
   upgrade)
     : > "$LOG_FILE"
     chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
 
-    write_progress "snapshot" "01 // OVERWRITING SYSTEM SNAPSHOT..." true ""
+    write_progress "snapshot" "01 // OVERWRITING SYSTEM SNAPSHOT..." true 8 ""
     SNAP_CREATED="$(create_pre_snapshot)"
 
-    if [[ -n "$SNAP_CREATED" ]]; then
-      write_progress "upgrading" "02 // SNAPSHOT [$SNAP_CREATED] OK · UPDATING..." true "$SNAP_CREATED"
-    else
-      write_progress "upgrading" "02 // DOWNLOADING & INSTALLING PACKAGES..." true ""
-    fi
-
-    if sudo -u "$USER_NAME" HOME="$USER_HOME" paru -Syu --noconfirm --needed >> "$LOG_FILE" 2>&1; then
-      if [[ -x "${USER_HOME}/Projects/arch-niri/scripts/sync-packages" ]]; then
-        sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${USER_HOME}/Projects/arch-niri/scripts/sync-packages" >/dev/null 2>&1 || true
-      fi
-
-      tmp="$(mktemp)"
-      jq -n --arg snap "$SNAP_CREATED" --arg ts "$(date '+%Y-%m-%d %H:%M')" \
-        '{count: 0, packages: [], phase: "done", message: "03 // SYSTEM UP TO DATE", running: false, lastSnapshot: $snap, updatedAt: $ts}' > "$tmp"
-      mv "$tmp" "$STATE_FILE"
-      chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
-    else
-      write_progress "error" "ERROR // UPDATE FAILED (CHECK LOG)" false "$SNAP_CREATED"
+    # 1. Actualizar paquetes oficiales de Arch directamente como root
+    write_progress "upgrading" "02 // UPDATING OFFICIAL REPOS (PACMAN)..." true 22 "$SNAP_CREATED"
+    if ! pacman -Syu --noconfirm --needed >> "$LOG_FILE" 2>&1; then
+      write_progress "error" "ERROR // PACMAN UPGRADE FAILED (CHECK LOG)" false 0 "$SNAP_CREATED"
       exit 1
     fi
+
+    # 2. Detectar y compilar paquetes AUR uno a uno con progreso real
+    if command -v paru >/dev/null 2>&1; then
+      mapfile -t aur_pkgs < <(sudo -u "$USER_NAME" HOME="$USER_HOME" paru -Qua 2>/dev/null | awk '{print $1}' || true)
+      total_aur=${#aur_pkgs[@]}
+      if (( total_aur > 0 )); then
+        build_dir="/tmp/sys-update-aur-${USER_NAME}"
+        rm -rf "$build_dir"
+        mkdir -p "$build_dir"
+        chown "${USER_NAME}:${USER_NAME}" "$build_dir"
+
+        idx=0
+        for pkg in "${aur_pkgs[@]}"; do
+          idx=$((idx + 1))
+          # Progreso interpolado entre 30% y 85%
+          pct=$(( 30 + (idx * 55) / total_aur ))
+          write_progress "upgrading" "02 // AUR [${idx}/${total_aur}]: ${pkg}" true "$pct" "$SNAP_CREATED"
+
+          sudo -u "$USER_NAME" HOME="$USER_HOME" \
+            paru -S --aur --noconfirm --needed --clonedir "$build_dir" --builddir "$build_dir" --sudo /bin/true "$pkg" >> "$LOG_FILE" 2>&1 || true
+        done
+
+        write_progress "upgrading" "03 // INSTALLING BUILT AUR PACKAGES..." true 90 "$SNAP_CREATED"
+        mapfile -t built_files < <(find "$build_dir" -type f -name "*.pkg.tar.*" ! -name "*.sig" 2>/dev/null || true)
+        if (( ${#built_files[@]} > 0 )); then
+          if ! pacman -U --noconfirm --needed "${built_files[@]}" >> "$LOG_FILE" 2>&1; then
+            rm -rf "$build_dir"
+            write_progress "error" "ERROR // AUR INSTALL FAILED (CHECK LOG)" false 0 "$SNAP_CREATED"
+            exit 1
+          fi
+        else
+          still_pending="$(sudo -u "$USER_NAME" HOME="$USER_HOME" paru -Qua 2>/dev/null | wc -l || echo 0)"
+          if (( still_pending > 0 )); then
+            rm -rf "$build_dir"
+            write_progress "error" "ERROR // AUR BUILD FAILED (CHECK LOG)" false 0 "$SNAP_CREATED"
+            exit 1
+          fi
+        fi
+        rm -rf "$build_dir"
+      fi
+    fi
+
+    # 3. Sincronizar listas pacman/paru y enlaces con auto-stow
+    write_progress "syncing" "04 // SYNCING PACKAGES & AUTO-STOW..." true 96 "$SNAP_CREATED"
+    sync_repo_state
+
+    # 4. Completado al 100%
+    tmp="$(mktemp)"
+    jq -n --arg snap "$SNAP_CREATED" --arg ts "$(date '+%Y-%m-%d %H:%M')" \
+      '{count: 0, packages: [], phase: "done", message: "05 // INSTALLATION COMPLETE", running: false, progress: 100, lastSnapshot: $snap, updatedAt: $ts}' > "$tmp"
+    mv "$tmp" "$STATE_FILE"
+    chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
     ;;
   *)
     echo "Uso: sys-update-apply upgrade" >&2

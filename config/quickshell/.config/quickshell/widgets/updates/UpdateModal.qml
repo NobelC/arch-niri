@@ -337,46 +337,77 @@ PanelWindow {
                 color: Theme.border
             }
 
-            // ---------- Banner de estado / Snapshot ----------
+            // ---------- Banner de estado / Snapshot + Barra de progreso persistente ----------
             Rectangle {
                 Layout.fillWidth: true
-                implicitHeight: 32
+                implicitHeight: bannerCol.implicitHeight + 14
                 radius: Theme.radius
                 color: Theme.card
                 border.width: Theme.borderWidth
                 border.color: SystemUpdate.running ? Theme.accent : Theme.border
 
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 10
-                    anchors.rightMargin: 10
-                    spacing: 8
+                ColumnLayout {
+                    id: bannerCol
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 7
+                    spacing: 6
 
-                    Text {
-                        text: SystemUpdate.running ? "▶" : "●"
-                        color: SystemUpdate.phase === "error" ? Theme.warn : Theme.accent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                    }
-
-                    Text {
+                    RowLayout {
                         Layout.fillWidth: true
-                        text: SystemUpdate.lastSnapshot !== ""
-                            ? ("LAST SNAPSHOT: " + SystemUpdate.lastSnapshot)
-                            : "PRE-UPDATE SNAPSHOT ENABLED (ROOT BTRFS)"
-                        color: Theme.sub
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 9
-                        font.bold: true
-                        elide: Text.ElideRight
+                        spacing: 8
+
+                        Text {
+                            text: SystemUpdate.running ? "▶" : "●"
+                            color: SystemUpdate.phase === "error" ? Theme.warn : Theme.accent
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: SystemUpdate.running
+                                ? SystemUpdate.message
+                                : (SystemUpdate.lastSnapshot !== ""
+                                    ? ("LAST SNAPSHOT: " + SystemUpdate.lastSnapshot)
+                                    : "PRE-UPDATE SNAPSHOT ENABLED (ROOT BTRFS)")
+                            color: SystemUpdate.running ? Theme.text : Theme.sub
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 9
+                            font.bold: true
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            text: SystemUpdate.running
+                                ? (String(SystemUpdate.progress).padStart(3, "0") + "%")
+                                : SystemUpdate.updatedAt
+                            color: SystemUpdate.running ? Theme.accent : Theme.muted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 9
+                            font.bold: SystemUpdate.running
+                        }
                     }
 
-                    Text {
-                        visible: SystemUpdate.updatedAt !== ""
-                        text: SystemUpdate.updatedAt
-                        color: Theme.muted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 9
+                    // Barra segmentada general (20 bloques) visible en progreso o al completar
+                    RowLayout {
+                        visible: SystemUpdate.running || SystemUpdate.phase === "done"
+                        Layout.fillWidth: true
+                        spacing: 2
+
+                        Repeater {
+                            model: 20
+
+                            Rectangle {
+                                required property int index
+                                readonly property int lit: Math.round((SystemUpdate.progress / 100.0) * 20)
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 6
+                                radius: Theme.radius
+                                color: index < lit ? Theme.accent : Theme.cardAlt
+                            }
+                        }
                     }
                 }
             }
@@ -391,17 +422,53 @@ PanelWindow {
                 border.color: Theme.border
                 clip: true
 
-                Text {
+                Column {
                     anchors.centerIn: parent
                     visible: SystemUpdate.packages.length === 0
-                    text: SystemUpdate.running
-                        ? SystemUpdate.message
-                        : "完了 // SYSTEM IS UP TO DATE"
-                    color: Theme.sub
-                    font.family: Theme.cjkFont
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 1.2
+                    spacing: 8
+
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: 42
+                        height: 42
+                        radius: Theme.radius
+                        color: SystemUpdate.phase === "done" ? Theme.accent : Theme.cardAlt
+                        border.width: Theme.borderWidth
+                        border.color: Theme.text
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: SystemUpdate.phase === "done" ? "✓" : "󰏗"
+                            color: SystemUpdate.phase === "done" ? Theme.bg : Theme.accent
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 18
+                            font.bold: true
+                        }
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: SystemUpdate.running
+                            ? SystemUpdate.message
+                            : (SystemUpdate.phase === "done"
+                                ? "完了 // INSTALACIÓN COMPLETA"
+                                : "完了 // SYSTEM IS UP TO DATE")
+                        color: SystemUpdate.phase === "done" ? Theme.accent : Theme.text
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 13
+                        font.bold: true
+                        font.letterSpacing: 1.4
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: SystemUpdate.phase === "done" && SystemUpdate.lastSnapshot !== ""
+                        text: "SNAPSHOT SAVED: " + SystemUpdate.lastSnapshot
+                        color: Theme.sub
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 9
+                        font.letterSpacing: 0.8
+                    }
                 }
 
                 ListView {

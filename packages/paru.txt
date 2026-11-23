@@ -12,5 +12,6 @@ phinger-cursors
 spicetify-cli
 ttf-ms-win11-auto
 vesktop-bin
+vesktop-bin-debug
 wps-office-mime
 xcursor-hackneyed-dark

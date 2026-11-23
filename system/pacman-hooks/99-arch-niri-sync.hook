@@ -1,0 +1,11 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Sincronizando listas de paquetes de arch-niri (pacman.txt / paru.txt)...
+When = PostTransaction
+Exec = /home/NobelC/Projects/arch-niri/scripts/sync-packages

@@ -12,9 +12,10 @@ Singleton {
 
     property int count: 0
     property var packages: []
-    property string phase: "idle"      // "idle" | "ready" | "snapshot" | "upgrading" | "done" | "error"
+    property string phase: "idle"      // "idle" | "ready" | "snapshot" | "upgrading" | "syncing" | "done" | "error"
     property string message: ""
     property bool running: false
+    property int progress: 0
     property string lastSnapshot: ""
     property string updatedAt: ""
 
@@ -25,7 +26,6 @@ Singleton {
         precision: SystemClock.Minutes
     }
 
-    // Aparece a partir de las 8:00 PM (20:00) si hay actualizaciones pendientes, o mientras actualiza
     readonly property bool isNightWindow: clock.date.getHours() >= 20
     readonly property bool showBarIcon: (isNightWindow && count > 0) || running || modalOpen
 
@@ -37,6 +37,7 @@ Singleton {
             root.phase = data.phase || "idle";
             root.message = data.message || "";
             root.running = !!data.running;
+            root.progress = data.progress !== undefined ? data.progress : (root.phase === "done" ? 100 : 0);
             root.lastSnapshot = data.lastSnapshot || "";
             root.updatedAt = data.updatedAt || "";
         } catch (e) {}
@@ -60,13 +61,14 @@ Singleton {
         if (root.running || root.count === 0) return;
         root.running = true;
         root.phase = "snapshot";
-        root.message = "01 // CREATING SYSTEM SNAPSHOT...";
+        root.progress = 5;
+        root.message = "01 // OVERWRITING SYSTEM SNAPSHOT...";
         Quickshell.execDetached([root.scriptPath, "upgrade"]);
     }
 
     function openModal() {
         Niri.closeBarMenu();
-        root.check();
+        if (!root.running) root.check();
         root.modalOpen = true;
     }
 
@@ -79,7 +81,6 @@ Singleton {
         else openModal();
     }
 
-    // Revisión automática cada hora
     Timer {
         interval: 3600000
         running: true
