@@ -1,5 +1,4 @@
 # Paquetes explícitos de AUR (generado automáticamente)
-elecwhat-bin
 libtiff5
 localsend-bin
 matugen-bin
@@ -11,7 +10,4 @@ paru-bin-debug
 phinger-cursors
 spicetify-cli
 ttf-ms-win11-auto
-vesktop-bin
-vesktop-bin-debug
-wps-office-mime
 xcursor-hackneyed-dark

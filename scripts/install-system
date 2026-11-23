@@ -31,7 +31,8 @@ read_pkg_list() {
 
 install_pacman_hook() {
   mkdir -p /etc/pacman.d/hooks
-  cat > /etc/pacman.d/hooks/99-arch-niri-packages.hook <<EOF
+  rm -f /etc/pacman.d/hooks/99-arch-niri-packages.hook
+  cat > /etc/pacman.d/hooks/99-arch-niri-sync.hook <<EOF
 [Trigger]
 Operation = Install
 Operation = Upgrade
@@ -40,10 +41,28 @@ Type = Package
 Target = *
 
 [Action]
-Description = Sincronizando listas de paquetes explícitos en arch-niri...
+Description = Sincronizando listas de paquetes de arch-niri (pacman.txt / paru.txt)...
 When = PostTransaction
 Exec = /usr/bin/env SUDO_USER=$REAL_USER /usr/bin/bash $SCRIPTS_DIR/sync-packages
 EOF
+}
+
+install_system_modules() {
+  echo "-> Instalando módulos del sistema (net-trust + sys-update)..."
+  if [[ -f "$DOTFILES_DIR/system/net-trust/install.sh" ]]; then
+    SUDO_USER="$REAL_USER" bash "$DOTFILES_DIR/system/net-trust/install.sh"
+  fi
+
+  if [[ -f "$DOTFILES_DIR/system/mic-led/install.sh" ]]; then
+    bash "$DOTFILES_DIR/system/mic-led/install.sh"
+  fi
+
+  if [[ -f "$DOTFILES_DIR/system/sys-update/sys-update-apply" ]]; then
+    install -o root -g root -m 755 "$DOTFILES_DIR/system/sys-update/sys-update-apply" /usr/local/bin/sys-update-apply
+    printf '%s ALL=(root) NOPASSWD: /usr/local/bin/sys-update-apply\n' "$REAL_USER" > /etc/sudoers.d/zz-sys-update
+    chmod 440 /etc/sudoers.d/zz-sys-update
+    visudo -cf /etc/sudoers.d/zz-sys-update
+  fi
 }
 
 echo "============================================================"
@@ -121,6 +140,7 @@ install_pacman_hook
 run_as_user bash "$SCRIPTS_DIR/sync-packages"
 
 install_neo_login
+install_system_modules
 
 # 8. Habilita servicios base del sistema
 systemctl enable --now NetworkManager bluetooth 2>/dev/null || true

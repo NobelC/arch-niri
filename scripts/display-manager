@@ -119,6 +119,17 @@ relocate_disconnected_windows() {
   echo '{}' > "$HOMES_FILE"
 }
 
+hdmi_has_audio() {
+  local f
+  for f in /proc/asound/card*/eld#*; do
+    [[ -r "$f" ]] || continue
+    if grep -qE '^monitor_present[[:space:]]+1$' "$f"       && grep -qE '^eld_valid[[:space:]]+1$' "$f"       && grep -qE '^sad_count[[:space:]]+[1-9]' "$f"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 sync_audio() {
   local mode="${1:-auto}"
   local raw has_hdmi cur_default target_sink=""
@@ -139,6 +150,7 @@ sync_audio() {
   cur_default="$(pactl get-default-sink 2>/dev/null || true)"
 
   if [[ "$has_hdmi" == "1" ]]; then
+    hdmi_has_audio || return 0
     if pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -qx "$HDMI_SINK"; then
       target_sink="$HDMI_SINK"
     else

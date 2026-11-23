@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="${1:-toggle}"
+
+if [[ "$MODE" != "--sync" ]]; then
+  wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
+fi
+
+# Leer estado real de mute de la fuente por defecto (rnnoise_source / mic-virtual)
+if wpctl get-volume @DEFAULT_AUDIO_SOURCE@ 2>/dev/null | grep -q '\[MUTED\]'; then
+  MUTED=1
+else
+  MUTED=0
+fi
+
+# Sincronizar fuentes físicas ALSA si existen
+while IFS= read -r src; do
+  [[ -n "$src" ]] && pactl set-source-mute "$src" "$MUTED" 2>/dev/null || true
+done < <(pactl list short sources 2>/dev/null | awk '/alsa_input\./ {print $2}')
+
+# Actualizar LED de F4 (1 = muteado/encendido, 0 = activo/apagado)
+LED="/sys/class/leds/platform::micmute/brightness"
+TRIG="/sys/class/leds/platform::micmute/trigger"
+if [[ -w "$LED" ]]; then
+  [[ -w "$TRIG" ]] && echo none > "$TRIG" 2>/dev/null || true
+  echo "$MUTED" > "$LED" 2>/dev/null || true
+fi

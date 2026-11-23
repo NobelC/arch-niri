@@ -1,0 +1,1 @@
+SUBSYSTEM=="leds", KERNEL=="platform::micmute", RUN+="/bin/chmod 0666 /sys/class/leds/platform::micmute/brightness /sys/class/leds/platform::micmute/trigger"

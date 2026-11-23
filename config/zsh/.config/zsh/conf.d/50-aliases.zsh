@@ -45,10 +45,10 @@ alias c='clear'
 alias q='exit'
 alias ping='gping'
 
-# --- Arch / pacman / yay ---
-if (( $+commands[yay] )); then
-  alias update='yay -Syu'
-  alias aur='yay -S --needed'
+# --- Arch / pacman / paru ---
+if (( $+commands[paru] )); then
+  alias update='paru -Syu'
+  alias aur='paru -S --needed'
 else
   alias update='sudo pacman -Syu'
 fi
@@ -57,7 +57,7 @@ alias pacrm='sudo pacman -Rns'
 alias orphans='pacman -Qtdq'
 alias pkgclean='sudo pacman -Sc'
 
-# --- Dotfiles / Hyprland ---
+# --- Dotfiles / Niri ---
 alias dots='cd "$DOTFILES"'
-alias hyprlog='tail -f ${XDG_RUNTIME_DIR}/hypr/${HYPRLAND_INSTANCE_SIGNATURE}/hyprland.log'
+alias nirilog='journalctl --user -u niri -f'
 alias reload='exec zsh'

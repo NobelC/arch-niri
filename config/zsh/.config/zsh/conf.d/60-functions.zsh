@@ -55,19 +55,6 @@ colors() {
   done
 }
 
-# Cambiar de tema de Aether:  theme  (elige con fzf)   |   theme <nombre>
-theme() {
-  local s="$DOTFILES/scripts" t=$1
-  if [[ -z $t ]]; then
-    (( $+commands[fzf] )) || { print -u2 "uso: theme <nombre>"; return 1; }
-    t=$(bash "$s/list-themes.sh" | awk -F'\t' '!/^#ACTIVE/ {print $1}' \
-        | fzf --prompt='tema ❯ ' --header "activo: $(cat ~/.config/aether/theme/.active-theme 2>/dev/null)") || return
-  fi
-  bash "$s/switch-theme.sh" "$t"
-}
-_theme() { compadd -- ${(f)"$(ls ~/.config/aether/themes 2>/dev/null)"}; }
-compdef _theme theme
-
 if (( $+commands[fzf] )); then
   _fd_dirs() { if (( $+commands[fd] )); then fd --type d --hidden --exclude .git "$@"; else find "${1:-.}" -type d -not -path '*/.git/*'; fi }
   _fd_files() { if (( $+commands[fd] )); then fd --type f --hidden --exclude .git "$@"; else find "${1:-.}" -type f -not -path '*/.git/*'; fi }
@@ -104,12 +91,28 @@ fi
 
 # Instalar / desinstalar paquetes con fzf (Tab = varios)
 pacs() {
-  local helper='sudo pacman'; (( $+commands[yay] )) && helper='yay'
+  local helper='sudo pacman'; (( $+commands[paru] )) && helper='paru'
   local -a sel
-  sel=("${(@f)$( { (( $+commands[yay] )) && yay -Slq || pacman -Slq; } 2>/dev/null | sort -u \
-      | fzf -m --prompt='instalar ❯ ' --preview 'pacman -Si {1} 2>/dev/null || yay -Si {1} 2>/dev/null')}")
+  sel=("${(@f)$( { (( $+commands[paru] )) && paru -Slq || pacman -Slq; } 2>/dev/null | sort -u \
+      | fzf -m --prompt='instalar ❯ ' --preview 'pacman -Si {1} 2>/dev/null || paru -Si {1} 2>/dev/null')}")
   [[ -n $sel[1] ]] && ${=helper} -S --needed "${sel[@]}"
 }
 pacr() {
   pacman -Qq | fzf -m --prompt='quitar ❯ ' --preview 'pacman -Qi {1}' | xargs -ro sudo pacman -Rns
+}
+
+# Mapa de enlaces [[nota]] en ~/Notes
+notemap() {
+  local root="${1:-$HOME/Notes}"
+  [[ -d "$root" ]] || { print -u2 "no existe: $root"; return 1; }
+  while IFS= read -r -d '' f; do
+    local rel="${f#$root/}"
+    local refs
+    refs=$(grep -oE '\[\[[^]]+\]\]' "$f" 2>/dev/null | tr '\n' ' ' | sed 's/ *$//')
+    if [[ -n "$refs" ]]; then
+      printf '%s -> %s\n' "$rel" "$refs"
+    else
+      printf '%s\n' "$rel"
+    fi
+  done < <(find "$root" -type f -name '*.md' -not -path '*/.obsidian/*' -print0 | sort -z)
 }

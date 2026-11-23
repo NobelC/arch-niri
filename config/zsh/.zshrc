@@ -20,4 +20,3 @@ unset _f
 
 [[ -n $ZSH_PROF ]] && zprof
 true
-export PATH="$HOME/.local/bin:$PATH"

@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import "../../services"
 import "."
 
@@ -14,6 +15,12 @@ PanelWindow {
 
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
+    mask: isShown ? dockRegion : emptyRegion
+
+    WlrLayershell.namespace: "quickshell-ribbon"
+
+    Region { id: emptyRegion }
+    Region { id: dockRegion; item: dockBody }
 
     readonly property int dockHeight: 44
     readonly property int shadowSize: 5

@@ -27,3 +27,6 @@ spawn-at-startup "opensnitch-ui" "--background"
 spawn-at-startup "wl-clip-persist" "--clipboard" "regular"
 spawn-sh-at-startup "wl-paste --type text --watch cliphist store"
 spawn-sh-at-startup "wl-paste --type image --watch cliphist store"
+
+// --- 9. SINCRONIZACIÓN DE LED DE MICRÓFONO (F4) ---
+spawn-sh-at-startup "\"$HOME/.local/bin/mic-toggle\" --sync"
