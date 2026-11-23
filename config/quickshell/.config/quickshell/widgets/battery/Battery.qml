@@ -5,10 +5,14 @@ import "../../services"
 Item {
     id: root
     visible: Battery.available
-    implicitWidth: Battery.available ? Math.max(26, contentRow.implicitWidth + 12) : 0
+    implicitWidth: Battery.available ? (contentRow.implicitWidth + 16) : 0
     implicitHeight: 24
     Layout.preferredWidth: implicitWidth
     Layout.preferredHeight: implicitHeight
+
+    Behavior on implicitWidth {
+        NumberAnimation { duration: Theme.animMedium; easing.type: Theme.easeOut }
+    }
 
     readonly property bool isActive: mouseArea.containsMouse || Niri.activeBarMenu === "battery"
     readonly property color activeColor: {
@@ -36,49 +40,60 @@ Item {
         return "󰂎";
     }
 
-    function batteryColor() {
-        if (Battery.charging || Battery.full) return Theme.accent;
-        if (Battery.capacity <= 15) return Theme.warn;
-        if (Battery.capacity <= 30) return Theme.highlight;
-        return Theme.accentSoft;
-    }
-
-    // Marco exterior fino (1px)
+    // 1. Marco exterior fino (1px), idéntico a Workspaces y Network
     Rectangle {
         anchors.fill: parent
         radius: Theme.radius
         color: "transparent"
         border.width: 1
         border.color: root.activeColor
-        opacity: root.isActive ? 1.0 : 0.0
+        opacity: root.isActive ? 1.0 : 0.65
 
         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
         Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
     }
 
-    // Cuadro sólido interior separado por gap
+    // 2. Caja interior separada por el gap de 3px
     Rectangle {
         anchors.fill: parent
         anchors.margins: 3
         radius: Theme.radius
-        color: root.activeColor
-        opacity: root.isActive ? 1.0 : 0.0
+        color: root.isActive ? root.activeColor : Theme.card
 
-        Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
         Behavior on color { ColorAnimation { duration: Theme.animFast } }
     }
 
-    Row {
+    RowLayout {
         id: contentRow
         anchors.centerIn: parent
         spacing: 5
 
+        // Icono de batería
         Text {
-            anchors.verticalCenter: parent.verticalCenter
             text: root.batteryIcon()
-            color: root.isActive ? Theme.bg : root.batteryColor()
+            color: root.isActive ? Theme.bg : (Battery.capacity <= 30 && !Battery.charging && !Battery.full ? root.activeColor : Theme.accentSoft)
             font.family: Theme.fontFamily
-            font.pixelSize: 13
+            font.pixelSize: 12
+
+            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+        }
+
+        // Separador vertical
+        Rectangle {
+            Layout.preferredWidth: 1
+            Layout.preferredHeight: 10
+            color: root.isActive ? Theme.bg : Theme.border
+            opacity: 0.75
+        }
+
+        // Porcentaje de carga
+        Text {
+            text: Battery.capacity + "%"
+            color: root.isActive ? Theme.bg : root.activeColor
+            font.family: Theme.fontFamily
+            font.pixelSize: 9
+            font.bold: true
+            font.letterSpacing: 0.5
 
             Behavior on color { ColorAnimation { duration: Theme.animFast } }
         }

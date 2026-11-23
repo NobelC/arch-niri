@@ -14,6 +14,7 @@ import "widgets/media"
 import "widgets/clock"
 import "widgets/notifications"
 import "widgets/displays"
+import "widgets/capture"
 import "widgets/menus"
 import "widgets/updates"
 
@@ -41,6 +42,7 @@ ShellRoot {
     BatteryMenu {}
     NotificationMenu {}
     DisplayMenu {}
+    CaptureMenu {}
 
     Launcher {}
     WallpaperPicker {}

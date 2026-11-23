@@ -71,7 +71,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             visible: SystemUpdate.running || SystemUpdate.count > 0
             text: SystemUpdate.running
-                ? (String(SystemUpdate.progress) + "%")
+                ? (String(SystemUpdate.progress) + "%" + (SystemUpdate.etaText !== "" ? (" · " + SystemUpdate.etaText) : ""))
                 : String(SystemUpdate.count).padStart(2, "0")
             color: root.isActive ? Theme.bg : Theme.text
             font.family: Theme.fontFamily

@@ -5,16 +5,17 @@ import Quickshell.Wayland
 import "../services"
 import "./arch"
 import "./workspaces"
+import "./media"
 import "./clock"
 import "./updates"
 import "./battery"
 import "./network"
 import "./bluetooth"
 import "./audio"
-import "./privacy"
 import "./notifications"
 import "./nightlight"
 import "./displays"
+import "./capture"
 
 PanelWindow {
     id: barWindow
@@ -115,6 +116,7 @@ PanelWindow {
 
             ArchIcon {}
             Workspaces { screenName: barWindow.screenName }
+            NowPlaying {}
         }
 
         // Módulo central: Reloj 100% centrado + Icono de actualizaciones anclado a su derecha
@@ -137,6 +139,7 @@ PanelWindow {
             anchors.verticalCenterOffset: -1
             spacing: 4
 
+            CaptureIcon {}
             DisplayIcon {}
             NightLight {}
             NotificationIcon {}

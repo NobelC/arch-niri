@@ -108,4 +108,10 @@ binds {
     Mod+WheelScrollUp   cooldown-ms=150 { focus-workspace-up; }
     Mod+WheelScrollRight                { focus-column-right; }
     Mod+WheelScrollLeft                 { focus-column-left; }
+
+    // --- CAPTURA Y GRABACIÓN DE PANTALLA (Quickshell Capture) ---
+    Print { spawn "qs" "ipc" "call" "capture" "region"; }
+    Ctrl+Print { spawn "qs" "ipc" "call" "capture" "full"; }
+    Alt+Print { spawn "qs" "ipc" "call" "capture" "window"; }
+    Shift+Print { spawn "qs" "ipc" "call" "capture" "recordRegion"; }
 }

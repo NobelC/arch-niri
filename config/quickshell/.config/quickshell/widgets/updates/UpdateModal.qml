@@ -381,7 +381,7 @@ PanelWindow {
 
                         Text {
                             text: SystemUpdate.running
-                                ? (String(SystemUpdate.progress).padStart(3, "0") + "%")
+                                ? (String(SystemUpdate.progress).padStart(3, "0") + "%" + (SystemUpdate.etaText !== "" ? ("  ·  ETA " + SystemUpdate.etaText) : ""))
                                 : SystemUpdate.updatedAt
                             color: SystemUpdate.running ? Theme.accent : Theme.muted
                             font.family: Theme.fontFamily

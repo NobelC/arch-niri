@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ACTION="${1:-region}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
+STATE_FILE="$STATE_DIR/capture.json"
+PID_FILE="$STATE_DIR/capture-rec.pid"
+SHOT_DIR="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"
+REC_DIR="${XDG_VIDEOS_DIR:-$HOME/Videos}/Recordings"
+
+mkdir -p "$STATE_DIR" "$SHOT_DIR" "$REC_DIR"
+
+write_state() {
+  local recording="$1" mode="$2" file="$3" started="$4"
+  local tmp
+  tmp="$(mktemp)"
+  jq -n --argjson rec "$recording" --arg mode "$mode" --arg file "$file" --argjson st "$started" \
+    '{recording: $rec, mode: $mode, file: $file, startedAt: $st}' > "$tmp"
+  mv -f "$tmp" "$STATE_FILE"
+}
+
+is_recording() {
+  if [[ -f "$PID_FILE" ]]; then
+    local pid
+    pid="$(tr -d '[:space:]' < "$PID_FILE" 2>/dev/null || true)"
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
+    rm -f "$PID_FILE"
+  fi
+  pgrep -x "wf-recorder" >/dev/null 2>&1
+}
+
+notify_shot() {
+  local title="$1" file="$2"
+  notify-send -a "Capture" -i "$file" "$title" "Saved & copied: $(basename "$file")" 2>/dev/null || true
+}
+
+cmd_stop() {
+  local pid=""
+  if [[ -f "$PID_FILE" ]]; then
+    pid="$(tr -d '[:space:]' < "$PID_FILE" 2>/dev/null || true)"
+    rm -f "$PID_FILE"
+  fi
+
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    kill -INT "$pid" 2>/dev/null || true
+    for _ in {1..30}; do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.1
+    done
+  else
+    pkill -INT -x "wf-recorder" 2>/dev/null || true
+  fi
+
+  local last_file=""
+  if [[ -f "$STATE_FILE" ]]; then
+    last_file="$(jq -r '.file // ""' "$STATE_FILE" 2>/dev/null || true)"
+  fi
+
+  write_state false "" "$last_file" 0
+  if [[ -n "$last_file" && -f "$last_file" ]]; then
+    printf 'file://%s\n' "$last_file" | wl-copy --type text/uri-list 2>/dev/null || printf '%s' "$last_file" | wl-copy 2>/dev/null || true
+    notify-send -a "Capture" "Recording Saved" "$(basename "$last_file") (path copied)" 2>/dev/null || true
+  else
+    notify-send -a "Capture" "Recording Stopped" "Video saved to Recordings" 2>/dev/null || true
+  fi
+}
+
+cmd_region() {
+  local geom file
+  geom="$(slurp -d -b '#00000088' -c '#ffffffcc' -s '#ffffff18' 2>/dev/null)" || exit 0
+  [[ -z "$geom" ]] && exit 0
+  sleep 0.08
+  file="$SHOT_DIR/shot-$(date '+%Y%m%d-%H%M%S').png"
+  grim -g "$geom" "$file"
+  wl-copy --type image/png < "$file"
+  write_state false "region" "$file" 0
+  notify_shot "Region Screenshot" "$file"
+}
+
+cmd_full() {
+  local out file
+  out="$(niri msg --json focused-output 2>/dev/null | jq -r '.name // empty' || true)"
+  file="$SHOT_DIR/shot-$(date '+%Y%m%d-%H%M%S').png"
+  if [[ -n "$out" ]]; then
+    grim -o "$out" "$file"
+  else
+    grim "$file"
+  fi
+  wl-copy --type image/png < "$file"
+  write_state false "full" "$file" 0
+  notify_shot "Full Screenshot" "$file"
+}
+
+cmd_window() {
+  local file
+  file="$SHOT_DIR/shot-$(date '+%Y%m%d-%H%M%S').png"
+  # Niri captura la ventana enfocada directo en portapapeles; guardamos también en archivo
+  niri msg action screenshot-window
+  for _ in {1..20}; do
+    if wl-paste --list-types 2>/dev/null | grep -q "image/png"; then
+      wl-paste --type image/png > "$file" 2>/dev/null && break
+    fi
+    sleep 0.05
+  done
+  if [[ -s "$file" ]]; then
+    write_state false "window" "$file" 0
+    notify_shot "Window Screenshot" "$file"
+  fi
+}
+
+cmd_record_region() {
+  if is_recording; then
+    cmd_stop
+    exit 0
+  fi
+  local geom file now
+  geom="$(slurp -d -b '#00000088' -c '#ff4444cc' -s '#ff444418' 2>/dev/null)" || exit 0
+  [[ -z "$geom" ]] && exit 0
+  file="$REC_DIR/rec-$(date '+%Y%m%d-%H%M%S').mp4"
+  now="$(date +%s)"
+  setsid -f wf-recorder -g "$geom" -f "$file" >/dev/null 2>&1 &
+  sleep 0.15
+  local rpid
+  rpid="$(pgrep -n -x wf-recorder || true)"
+  [[ -n "$rpid" ]] && echo "$rpid" > "$PID_FILE"
+  write_state true "region" "$file" "$now"
+  notify-send -a "Capture" "Recording Region" "Click the bar pill to stop" 2>/dev/null || true
+}
+
+cmd_record_full() {
+  if is_recording; then
+    cmd_stop
+    exit 0
+  fi
+  local out file now
+  out="$(niri msg --json focused-output 2>/dev/null | jq -r '.name // empty' || true)"
+  file="$REC_DIR/rec-$(date '+%Y%m%d-%H%M%S').mp4"
+  now="$(date +%s)"
+  if [[ -n "$out" ]]; then
+    setsid -f wf-recorder -o "$out" -f "$file" >/dev/null 2>&1 &
+  else
+    setsid -f wf-recorder -f "$file" >/dev/null 2>&1 &
+  fi
+  sleep 0.15
+  local rpid
+  rpid="$(pgrep -n -x wf-recorder || true)"
+  [[ -n "$rpid" ]] && echo "$rpid" > "$PID_FILE"
+  write_state true "full" "$file" "$now"
+  notify-send -a "Capture" "Recording Screen" "Click the bar pill to stop" 2>/dev/null || true
+}
+
+case "$ACTION" in
+  region)        cmd_region ;;
+  full)          cmd_full ;;
+  window)        cmd_window ;;
+  record-region) cmd_record_region ;;
+  record-full)   cmd_record_full ;;
+  stop)          cmd_stop ;;
+  open-shots)    setsid -f xdg-open "$SHOT_DIR" >/dev/null 2>&1 ;;
+  open-recs)     setsid -f xdg-open "$REC_DIR" >/dev/null 2>&1 ;;
+  status)
+    if is_recording; then
+      [[ -f "$STATE_FILE" ]] && cat "$STATE_FILE" || echo '{"recording":true,"mode":"region","file":"","startedAt":0}'
+    else
+      [[ -f "$STATE_FILE" ]] && jq '.recording = false' "$STATE_FILE" || echo '{"recording":false,"mode":"","file":"","startedAt":0}'
+    fi
+    ;;
+  *)
+    echo "Uso: screen-capture [region|full|window|record-region|record-full|stop|open-shots|open-recs|status]" >&2
+    exit 1
+    ;;
+esac

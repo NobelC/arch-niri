@@ -470,7 +470,14 @@ Item {
                                     }
 
                                     Text {
-                                        text: "UTC-5"
+                                        text: {
+                                            const offsetMin = -clock.date.getTimezoneOffset();
+                                            const sign = offsetMin >= 0 ? "+" : "-";
+                                            const absMin = Math.abs(offsetMin);
+                                            const h = Math.floor(absMin / 60);
+                                            const m = absMin % 60;
+                                            return m === 0 ? ("UTC" + sign + h) : ("UTC" + sign + h + ":" + String(m).padStart(2, "0"));
+                                        }
                                         color: Theme.sub
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 11
@@ -479,11 +486,16 @@ Item {
                                     }
 
                                     Text {
-                                        text: "パナマ時間"
+                                        text: {
+                                            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+                                            const city = tz.includes("/") ? tz.split("/").pop().replace(/_/g, " ") : tz;
+                                            return (city || "LOCAL TIME").toUpperCase();
+                                        }
                                         color: Theme.muted
-                                        font.family: root.uiCjkFont
-                                        font.pixelSize: 10
-                                        font.letterSpacing: 1
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 9
+                                        font.bold: true
+                                        font.letterSpacing: 0.8
                                     }
                                 }
                             }
