@@ -61,6 +61,7 @@ npm
 ntfs-3g
 opensnitch
 openssh
+pacman-contrib
 pipewire
 pipewire-pulse
 playerctl

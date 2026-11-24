@@ -17,6 +17,8 @@ Singleton {
     property int elapsedSeconds: 0
     property string pendingAction: ""
 
+    signal shutterFlash()
+
     readonly property string lastFileName: {
         if (!lastFile) return "";
         const idx = lastFile.lastIndexOf("/");
@@ -130,5 +132,6 @@ Singleton {
         function recordFull(): void { root.toggleRecordFull(); }
         function gif(): void { root.toggleRecordGif(); }
         function stop(): void { root.stopRecording(); }
+        function flash(): void { root.shutterFlash(); }
     }
 }

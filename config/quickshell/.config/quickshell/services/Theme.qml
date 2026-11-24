@@ -37,11 +37,6 @@ Singleton {
     readonly property int borderWidth: 2
     readonly property int shadowOffset: 6
     readonly property color shadowColor: dark ? "#07070c" : "#181825"
-        // ---------- Textura impresa neo-brutalista (opcional) ----------
-    property bool cardNoise: true
-    readonly property url noiseTexture: Qt.resolvedUrl("../assets/noise.png")
-    readonly property real noiseOpacity: dark ? 0.55 : 0.40
-
     readonly property color gridColor: Qt.rgba(text.r, text.g, text.b, dark ? 0.08 : 0.10)
 
     // ---------- Tokens de Animación ----------
@@ -101,8 +96,4 @@ Singleton {
         }
     }
 
-    IpcHandler {
-        target: "theme"
-        function toggleNoise(): void { root.cardNoise = !root.cardNoise; }
-    }
 }

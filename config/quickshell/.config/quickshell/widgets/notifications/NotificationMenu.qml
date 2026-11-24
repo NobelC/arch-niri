@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Services.Notifications
 import "../../services"
+import "../common"
 import "../"
 
 BarDrawer {
@@ -107,83 +108,38 @@ BarDrawer {
             }
 
             // Botón desplegar horario DND
-            Rectangle {
-                implicitWidth: schedBtnRow.implicitWidth + 10
+            ChamferButton {
+                text: "󰃰 SCHED"
                 implicitHeight: 24
-                radius: Theme.radius
-                color: root.scheduleExpanded
+                cut: 5
+                fontSize: 9
+                horizontalPadding: 10
+                fillColor: root.scheduleExpanded
                     ? Theme.accent
                     : (Notifications.scheduleEnabled ? Theme.cardAlt : Theme.card)
-                border.width: Theme.borderWidth
-                border.color: root.scheduleExpanded
-                    ? Theme.accent
-                    : (Notifications.scheduleEnabled ? Theme.accent : Theme.border)
-
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
-
-                Row {
-                    id: schedBtnRow
-                    anchors.centerIn: parent
-                    spacing: 4
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "󰃰"
-                        color: root.scheduleExpanded ? Theme.bg : (Notifications.scheduleEnabled ? Theme.accent : Theme.sub)
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "SCHED"
-                        color: root.scheduleExpanded ? Theme.bg : (Notifications.scheduleEnabled ? Theme.accent : Theme.text)
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 9
-                        font.bold: true
-                        font.letterSpacing: 0.6
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.scheduleExpanded = !root.scheduleExpanded
-                }
+                hoverFillColor: Theme.accent
+                borderColor: (root.scheduleExpanded || Notifications.scheduleEnabled) ? Theme.accent : Theme.border
+                hoverBorderColor: Theme.accent
+                textColor: root.scheduleExpanded ? Theme.bg : (Notifications.scheduleEnabled ? Theme.accent : Theme.text)
+                hoverTextColor: Theme.bg
+                onClicked: root.scheduleExpanded = !root.scheduleExpanded
             }
 
             // Botón limpiar todo
-            Rectangle {
+            ChamferButton {
                 visible: Notifications.unreadCount > 0
-                implicitWidth: clearTxt.implicitWidth + 10
+                text: "CLEAR"
                 implicitHeight: 24
-                radius: Theme.radius
-                color: clearHover.containsMouse ? Theme.warn : Theme.card
-                border.width: Theme.borderWidth
-                border.color: clearHover.containsMouse ? Theme.warn : Theme.border
-
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
-
-                Text {
-                    id: clearTxt
-                    anchors.centerIn: parent
-                    text: "CLEAR"
-                    color: clearHover.containsMouse ? Theme.bg : Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 9
-                    font.bold: true
-                    font.letterSpacing: 0.7
-                }
-
-                MouseArea {
-                    id: clearHover
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Qt.callLater(function() { Notifications.clearHistory(); })
-                }
+                cut: 5
+                fontSize: 9
+                horizontalPadding: 10
+                fillColor: Theme.card
+                hoverFillColor: Theme.warn
+                borderColor: Theme.border
+                hoverBorderColor: Theme.warn
+                textColor: Theme.text
+                hoverTextColor: Theme.bg
+                onClicked: Notifications.clearHistory()
             }
 
             // Switch DND manual rígido

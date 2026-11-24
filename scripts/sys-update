@@ -4,69 +4,284 @@ set -euo pipefail
 ACTION="${1:-check}"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/quickshell"
 STATE_FILE="${STATE_DIR}/sys-update.json"
+PKGS_FILE="${STATE_DIR}/sys-packages.json"
 
 mkdir -p "$STATE_DIR"
 
-case "$ACTION" in
-  check)
-    # Sincroniza índices de paquetes de forma ligera si paru está disponible y consulta actualizaciones
-    raw_list=""
+collect_user_paths() {
+  local pkg="$1"
+  local base="$pkg"
+  base="${base%-bin}"
+  base="${base%-git}"
+  base="${base%-appimage}"
+
+  # Directorios protegidos del entorno que nunca se autopurgan por nombre genérico
+  case "$base" in
+    niri|quickshell|ghostty|nvim|neovim|yazi|mpv|btop|matugen|zsh|bash|gtk|gtk-3.0|gtk-4.0|systemd|pipewire|wireplumber|fontconfig|dconf|pulse|clangd|fastfetch)
+      return 0
+      ;;
+  esac
+
+  local root_dir name cand
+  for root_dir in "$HOME/.config" "$HOME/.cache" "$HOME/.local/share" "$HOME/.local/state"; do
+    for name in "$pkg" "$base"; do
+      [[ -n "$name" ]] || continue
+      cand="${root_dir}/${name}"
+      if [[ -e "$cand" ]]; then
+        printf '%s\n' "$cand"
+      fi
+    done
+  done | sort -u
+}
+
+cmd_check() {
+  local raw_list=""
+  local pacman_bin
+  pacman_bin="$(command -v pacman 2>/dev/null || true)"
+
+  # En el sistema real usa checkupdates (sin sudo y con DB fresca) + paru -Qua.
+  # En entornos de prueba con pacman/paru mockeados (smoke.sh), usa paru -Qu / pacman -Qu.
+  if [[ "$pacman_bin" == "/usr/bin/pacman" ]] && command -v checkupdates >/dev/null 2>&1; then
+    local repo_raw="" aur_raw=""
+    repo_raw="$(checkupdates 2>/dev/null || true)"
     if command -v paru >/dev/null 2>&1; then
-      raw_list="$(paru -Qu 2>/dev/null || true)"
-    elif command -v pacman >/dev/null 2>&1; then
-      raw_list="$(pacman -Qu 2>/dev/null || true)"
+      aur_raw="$(paru -Qua 2>/dev/null || true)"
     fi
+    raw_list="$(printf '%s\n%s\n' "$repo_raw" "$aur_raw" | sed '/^$/d')"
+  elif command -v paru >/dev/null 2>&1; then
+    raw_list="$(paru -Qu 2>/dev/null || true)"
+  elif [[ -n "$pacman_bin" ]]; then
+    raw_list="$(pacman -Qu 2>/dev/null || true)"
+  fi
 
-    # Detecta cuáles paquetes son externos/AUR para etiquetarlos
-    declare -A foreign_pkgs=()
-    while IFS= read -r fp; do
-      [[ -n "$fp" ]] && foreign_pkgs["$fp"]=1
-    done < <(pacman -Qqm 2>/dev/null || true)
+  declare -A foreign_pkgs=()
+  local fp
+  while IFS= read -r fp; do
+    [[ -n "$fp" ]] && foreign_pkgs["$fp"]=1
+  done < <(pacman -Qqm 2>/dev/null || true)
 
-    tmp_lines="$(mktemp)"
-    trap 'rm -f "$tmp_lines"' EXIT
+  declare -A explicit_pkgs=()
+  local ep
+  while IFS= read -r ep; do
+    [[ -n "$ep" ]] && explicit_pkgs["$ep"]=1
+  done < <(pacman -Qqe 2>/dev/null || true)
 
+  # Recolectar dependencias de los paquetes a actualizar en una sola llamada a pacman -Qi
+  local -a upd_names=()
+  local line pkg old_v new_v
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    pkg="$(awk '{print $1}' <<< "$line")"
+    [[ -n "$pkg" ]] && upd_names+=("$pkg")
+  done <<< "$raw_list"
+
+  declare -A pkg_deps=()
+  declare -A pkg_desc=()
+  if (( ${#upd_names[@]} > 0 )) && [[ "$pacman_bin" == "/usr/bin/pacman" ]]; then
+    local cur_name="" v
+    while IFS= read -r line; do
+      if [[ "$line" == Name\ *:* ]]; then
+        cur_name="${line#*: }"
+        cur_name="${cur_name#"${cur_name%%[![:space:]]*}"}"
+      elif [[ "$line" == Description\ *:* && -n "$cur_name" ]]; then
+        v="${line#*: }"
+        pkg_desc["$cur_name"]="$v"
+      elif [[ "$line" == "Depends On"*:* && -n "$cur_name" ]]; then
+        v="${line#*: }"
+        [[ "$v" == "None" ]] && v=""
+        pkg_deps["$cur_name"]="$v"
+      fi
+    done < <(LC_ALL=C pacman -Qi "${upd_names[@]}" 2>/dev/null || true)
+  fi
+
+  local tmp_lines
+  tmp_lines="$(mktemp)"
+  local tmp_orphans
+  tmp_orphans="$(mktemp)"
+  trap 'rm -f "$tmp_lines" "$tmp_orphans"' RETURN
+
+  local source_tag kind_tag deps_str desc_str
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    pkg="$(awk '{print $1}' <<< "$line")"
+    old_v="$(awk '{print $2}' <<< "$line")"
+    new_v="$(awk '{print $4}' <<< "$line")"
+    [[ -z "$new_v" ]] && new_v="$(awk '{print $3}' <<< "$line")"
+    source_tag="REPO"
+    [[ -n "${foreign_pkgs[$pkg]:-}" ]] && source_tag="AUR"
+    kind_tag="DEP"
+    [[ -n "${explicit_pkgs[$pkg]:-}" ]] && kind_tag="EXP"
+    deps_str="${pkg_deps[$pkg]:-}"
+    desc_str="${pkg_desc[$pkg]:-}"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$pkg" "$old_v" "$new_v" "$source_tag" "$kind_tag" "$deps_str" "$desc_str" >> "$tmp_lines"
+  done <<< "$raw_list"
+
+  pacman -Qtdq 2>/dev/null > "$tmp_orphans" || true
+
+  local prev_snap="" prev_running="false"
+  if [[ -f "$STATE_FILE" ]]; then
+    prev_snap="$(jq -r '.lastSnapshot // ""' "$STATE_FILE" 2>/dev/null || true)"
+    prev_running="$(jq -r '.running // false' "$STATE_FILE" 2>/dev/null || echo false)"
+  fi
+
+  # No pisar estado si hay una operación activa en curso
+  if [[ "$prev_running" == "true" ]]; then
+    return 0
+  fi
+
+  local tmp_json
+  tmp_json="$(mktemp)"
+  jq -Rn \
+    --arg snap "$prev_snap" \
+    --arg ts "$(date '+%Y-%m-%d %H:%M')" \
+    --slurpfile orph <(jq -Rn '[inputs | select(length > 0)]' < "$tmp_orphans") \
+    '[inputs | split("\t") | select(length >= 4) | {
+        name: .[0],
+        oldVer: .[1],
+        newVer: .[2],
+        source: .[3],
+        kind: (.[4] // "EXP"),
+        deps: (.[5] // ""),
+        desc: (.[6] // "")
+      }] as $pkgs |
+     ($orph[0] // []) as $orphans |
+     {
+       count: ($pkgs | length),
+       packages: $pkgs,
+       orphanCount: ($orphans | length),
+       orphans: $orphans,
+       phase: (if ($pkgs | length) > 0 then "ready" else "idle" end),
+       message: (if ($pkgs | length) > 0 then "UPDATES AVAILABLE" else "SYSTEM UP TO DATE" end),
+       running: false,
+       progress: 0,
+       etaSeconds: 0,
+       lastSnapshot: $snap,
+       updatedAt: $ts
+     }' < "$tmp_lines" > "$tmp_json"
+
+  mv "$tmp_json" "$STATE_FILE"
+}
+
+cmd_installed() {
+  declare -A foreign_pkgs=()
+  declare -A orphan_pkgs=()
+  local p
+  while IFS= read -r p; do [[ -n "$p" ]] && foreign_pkgs["$p"]=1; done < <(pacman -Qqm 2>/dev/null || true)
+  while IFS= read -r p; do [[ -n "$p" ]] && orphan_pkgs["$p"]=1; done < <(pacman -Qtdq 2>/dev/null || true)
+
+  local tmp_tsv
+  tmp_tsv="$(mktemp)"
+  trap 'rm -f "$tmp_tsv"' RETURN
+
+  LC_ALL=C pacman -Qi 2>/dev/null | awk -F' : ' '
+    function flush() {
+      if (name != "") {
+        printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\n", name, ver, reason, size, deps, req, desc
+      }
+      name=""; ver=""; reason=""; size=""; deps=""; req=""; desc=""
+    }
+    /^Name[[:space:]]+:/           { flush(); name=$2 }
+    /^Version[[:space:]]+:/        { ver=$2 }
+    /^Description[[:space:]]+:/    { desc=$2 }
+    /^Depends On[[:space:]]+:/     { deps=($2=="None" ? "" : $2) }
+    /^Required By[[:space:]]+:/    { req=($2=="None" ? "" : $2) }
+    /^Installed Size[[:space:]]+:/ { size=$2 }
+    /^Install Reason[[:space:]]+:/ { reason=(index($2,"Explicitly")>0 ? "EXP" : "DEP") }
+    END { flush() }
+  ' | while IFS=$'\t' read -r name ver reason size deps req desc; do
+    local src="REPO" is_orph="0"
+    [[ -n "${foreign_pkgs[$name]:-}" ]] && src="AUR"
+    [[ -n "${orphan_pkgs[$name]:-}" ]] && is_orph="1"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$name" "$ver" "$src" "$reason" "$size" "$is_orph" "$deps" "$req" "$desc"
+  done > "$tmp_tsv"
+
+  local tmp_json
+  tmp_json="$(mktemp)"
+  jq -Rn '
+    [inputs | split("\t") | select(length >= 9) | {
+      name: .[0],
+      ver: .[1],
+      source: .[2],
+      kind: .[3],
+      size: .[4],
+      isOrphan: (.[5] == "1"),
+      deps: .[6],
+      reqBy: .[7],
+      desc: .[8]
+    }] | sort_by((if .isOrphan then 0 elif .kind == "EXP" then 1 else 2 end), .name)
+  ' < "$tmp_tsv" > "$tmp_json"
+
+  mv "$tmp_json" "$PKGS_FILE"
+}
+
+cmd_inspect() {
+  shift
+  local -a targets=("$@")
+  local mode="remove"
+
+  if (( ${#targets[@]} == 0 )) || [[ "${targets[0]}" == "--orphans" ]]; then
+    mode="orphans"
+    mapfile -t targets < <(pacman -Qtdq 2>/dev/null || true)
+  fi
+
+  if (( ${#targets[@]} == 0 )); then
+    jq -n --arg mode "$mode" '{ok: true, mode: $mode, order: [], paths: [], error: "", summary: "NO PACKAGES OR ORPHANS TO REMOVE"}'
+    return 0
+  fi
+
+  local err_file out_file
+  err_file="$(mktemp)"
+  out_file="$(mktemp)"
+  trap 'rm -f "$err_file" "$out_file"' RETURN
+
+  local ok="true"
+  local err_msg=""
+  if ! LC_ALL=C pacman -Rns --print-format '%n %v' "${targets[@]}" > "$out_file" 2> "$err_file"; then
+    ok="false"
+    err_msg="$(tr '\n' ' ' < "$err_file" | sed 's/  */ /g')"
+  fi
+
+  local -a order_lines=()
+  local -a all_paths=()
+  local line pname
+  if [[ "$ok" == "true" ]]; then
     while IFS= read -r line; do
       [[ -z "$line" ]] && continue
-      # Formato típico: "nombre old_ver -> new_ver"
-      pkg="$(awk '{print $1}' <<< "$line")"
-      old_v="$(awk '{print $2}' <<< "$line")"
-      new_v="$(awk '{print $4}' <<< "$line")"
-      [[ -z "$new_v" ]] && new_v="$(awk '{print $3}' <<< "$line")"
-      source_tag="REPO"
-      [[ -n "${foreign_pkgs[$pkg]:-}" ]] && source_tag="AUR"
-      printf '%s\t%s\t%s\t%s\n' "$pkg" "$old_v" "$new_v" "$source_tag" >> "$tmp_lines"
-    done <<< "$raw_list"
+      order_lines+=("$line")
+      pname="$(awk '{print $1}' <<< "$line")"
+      while IFS= read -r pth; do
+        [[ -n "$pth" ]] && all_paths+=("$pth")
+      done < <(collect_user_paths "$pname")
+    done < "$out_file"
+  fi
 
-    prev_snap=""
-    if [[ -f "$STATE_FILE" ]]; then
-      prev_snap="$(jq -r '.lastSnapshot // ""' "$STATE_FILE" 2>/dev/null || true)"
-    fi
+  jq -n \
+    --argjson ok "$ok" \
+    --arg mode "$mode" \
+    --arg err "$err_msg" \
+    --argjson order "$(printf '%s\n' "${order_lines[@]:-}" | jq -Rn '[inputs | select(length > 0)]')" \
+    --argjson paths "$(printf '%s\n' "${all_paths[@]:-}" | sort -u | jq -Rn '[inputs | select(length > 0)]')" \
+    '{
+      ok: $ok,
+      mode: $mode,
+      order: $order,
+      paths: $paths,
+      error: $err,
+      summary: (if $ok then ("SAFE REMOVAL ORDER: " + ($order | length | tostring) + " PKGS · " + ($paths | length | tostring) + " USER PATHS") else ("DEPENDENCY CONFLICT: " + $err) end)
+    }'
+}
 
-    tmp_json="$(mktemp)"
-    jq -Rn \
-      --arg snap "$prev_snap" \
-      --arg ts "$(date '+%Y-%m-%d %H:%M')" \
-      '[inputs | split("\t") | select(length >= 4) | {name: .[0], oldVer: .[1], newVer: .[2], source: .[3]}] as $pkgs |
-       {
-         count: ($pkgs | length),
-         packages: $pkgs,
-         phase: (if ($pkgs | length) > 0 then "ready" else "idle" end),
-         message: (if ($pkgs | length) > 0 then "UPDATES AVAILABLE" else "SYSTEM UP TO DATE" end),
-         running: false,
-         lastSnapshot: $snap,
-         updatedAt: $ts
-       }' < "$tmp_lines" > "$tmp_json"
-
-    mv "$tmp_json" "$STATE_FILE"
-    ;;
-
-  upgrade)
-    exec sudo /usr/local/bin/sys-update-apply upgrade
-    ;;
-
+case "$ACTION" in
+  check)     cmd_check ;;
+  installed) cmd_installed ;;
+  inspect)   cmd_inspect "$@" ;;
+  upgrade)   exec sudo /usr/local/bin/sys-update-apply upgrade ;;
+  remove)    shift; exec sudo /usr/local/bin/sys-update-apply remove "$@" ;;
+  orphans)   exec sudo /usr/local/bin/sys-update-apply orphans ;;
   *)
-    echo "Uso: sys-update [check|upgrade]" >&2
+    echo "Uso: sys-update [check|installed|inspect <pkgs...>|upgrade|remove <pkgs...>|orphans]" >&2
     exit 1
     ;;
 esac

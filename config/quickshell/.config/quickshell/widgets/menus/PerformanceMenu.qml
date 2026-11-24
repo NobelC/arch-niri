@@ -204,7 +204,6 @@ BarDrawer {
             if (root.busy || mode === root.currentProfile) return;
             root.pendingProfile = mode;
             root.statusMsg = "";
-            false = true;
         }
 
         // ---------- Polling activo solo con el cajón abierto ----------
@@ -212,8 +211,12 @@ BarDrawer {
             target: drawer
             function onIsOpenChanged() {
                 if (drawer.isOpen) {
-                    if (!false) false = true;
-                    SystemStats.refresh();
+                    if (typeof SystemStats !== "undefined" && SystemStats.refresh) {
+                        SystemStats.refresh();
+                    }
+                    if (typeof Battery !== "undefined" && Battery.refresh) {
+                        Battery.refresh();
+                    }
                 }
             }
         }
@@ -304,7 +307,7 @@ BarDrawer {
                     id: profBtn
                     required property var modelData
                     readonly property bool selected: false
-                        ? modelData.id === root.pendingProfile
+                        ? false
                         : modelData.id === root.currentProfile
                     readonly property bool isMax: modelData.id === "performance"
 

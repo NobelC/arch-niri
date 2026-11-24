@@ -43,6 +43,7 @@ ShellRoot {
     NotificationMenu {}
     DisplayMenu {}
     CaptureMenu {}
+    CaptureFlash {}
 
     Launcher {}
     WallpaperPicker {}

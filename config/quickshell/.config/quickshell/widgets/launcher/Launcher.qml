@@ -4,8 +4,6 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "../../services"
-import "../common"
-
 PanelWindow {
     id: launcherWindow
 
@@ -873,6 +871,27 @@ PanelWindow {
 
                                 TextInput {
                                     id: searchInput
+                                    cursorDelegate: Component {
+                                        Text {
+                                            id: termCursor
+                                            text: "▎"
+                                            color: dockContainer.activeAccent
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 14
+                                            font.bold: true
+                                            verticalAlignment: Text.AlignVCenter
+                                            visible: searchInput.activeFocus
+
+                                            SequentialAnimation on opacity {
+                                                running: searchInput.activeFocus && launcherWindow.isOpen
+                                                loops: Animation.Infinite
+                                                PropertyAction { value: 1.0 }
+                                                PauseAnimation { duration: 530 }
+                                                PropertyAction { value: 0.0 }
+                                                PauseAnimation { duration: 530 }
+                                            }
+                                        }
+                                    }
                                     Layout.fillWidth: true
                                     color: Theme.text
                                     selectionColor: dockContainer.activeAccent
@@ -969,7 +988,6 @@ PanelWindow {
             border.color: Theme.border
             clip: true
 
-            CardNoise {}
 
             ColumnLayout {
                 anchors.fill: parent

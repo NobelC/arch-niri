@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Layouts
 import "../../services"
 import "../common"
-
 Item {
     id: root
 
@@ -75,10 +74,31 @@ Item {
         root.lit = a;
     }
 
+    // ---------- Micro-glitch / Scanline CRT al abrir (3 frames) ----------
+    property int glitchFrame: 0
+
+    Timer {
+        id: glitchTimer
+        interval: 38
+        repeat: true
+        onTriggered: {
+            if (root.glitchFrame >= 3) {
+                root.glitchFrame = 0;
+                stop();
+            } else {
+                root.glitchFrame += 1;
+                glitchOverlay.requestPaint();
+            }
+        }
+    }
+
     focus: true
     Component.onCompleted: {
         forceActiveFocus();
         appear.start();
+        root.glitchFrame = 1;
+        glitchOverlay.requestPaint();
+        glitchTimer.restart();
     }
 
     // ---------- Teclado ----------
@@ -179,6 +199,7 @@ Item {
     Item {
         id: content
         anchors.fill: parent
+        x: root.glitchFrame === 1 ? -4 : (root.glitchFrame === 2 ? 3 : 0)
         opacity: 0
 
         NumberAnimation {
@@ -338,7 +359,6 @@ Item {
             // Contenedor principal
             Rectangle {
                 id: mainCard
-            CardNoise {}
                 width: parent.width
                 implicitHeight: cardCol.implicitHeight + (root.uiBorder * 2)
                 radius: root.uiRadius
@@ -443,16 +463,45 @@ Item {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: mainTime.implicitHeight
 
-                                Text {
+                                Row {
                                     id: mainTime
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text: Qt.formatDateTime(clock.date, "HH:mm")
-                                    color: Theme.text
-                                    font.family: Theme.displayFont
-                                    font.pixelSize: 154
-                                    font.letterSpacing: 6
-                                    lineHeight: 0.85
+                                    spacing: 12
+
+                                    FlipDigit {
+                                        value: Qt.formatDateTime(clock.date, "HH")
+                                        implicitWidth: 146
+                                        implicitHeight: 152
+                                        fontFamily: Theme.displayFont
+                                        fontSize: 124
+                                        letterSpacing: 4
+                                        textColor: Theme.text
+                                        plaqueColor: Theme.bg
+                                        seamColor: Theme.card
+                                        showPlaque: true
+                                    }
+
+                                    Column {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 16
+
+                                        Rectangle { width: 10; height: 10; radius: root.uiRadius; color: Theme.accent }
+                                        Rectangle { width: 10; height: 10; radius: root.uiRadius; color: Theme.accent }
+                                    }
+
+                                    FlipDigit {
+                                        value: Qt.formatDateTime(clock.date, "mm")
+                                        implicitWidth: 146
+                                        implicitHeight: 152
+                                        fontFamily: Theme.displayFont
+                                        fontSize: 124
+                                        letterSpacing: 4
+                                        textColor: Theme.text
+                                        plaqueColor: Theme.bg
+                                        seamColor: Theme.card
+                                        showPlaque: true
+                                    }
                                 }
 
                                 Column {
@@ -867,6 +916,52 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                     }
                 }
+            }
+        }
+    }
+
+    // ---------- Overlay CRT efímero (0% CPU en reposo) ----------
+    Canvas {
+        id: glitchOverlay
+        anchors.fill: parent
+        z: 99
+        visible: root.glitchFrame > 0
+        antialiasing: false
+
+        onPaint: {
+            const ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+            if (root.glitchFrame <= 0) return;
+
+            // 1. Scanlines horizontales finas
+            ctx.fillStyle = Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.35).toString();
+            for (let y = 0; y < height; y += 3) {
+                ctx.fillRect(0, y, width, 1);
+            }
+
+            // 2. Bandas de ruido horizontal tipo terminal CRT
+            const bands = root.glitchFrame === 1
+                ? [
+                    { y: 0.14, h: 3,  x: 0.00, w: 1.00, c: Theme.accent, a: 0.35 },
+                    { y: 0.36, h: 10, x: 0.12, w: 0.72, c: Theme.text,   a: 0.18 },
+                    { y: 0.52, h: 2,  x: 0.00, w: 1.00, c: Theme.accent, a: 0.55 },
+                    { y: 0.68, h: 6,  x: 0.25, w: 0.58, c: Theme.bg,     a: 0.75 },
+                    { y: 0.84, h: 3,  x: 0.05, w: 0.85, c: Theme.text,   a: 0.22 }
+                  ]
+                : (root.glitchFrame === 2
+                    ? [
+                        { y: 0.24, h: 2, x: 0.00, w: 1.00, c: Theme.text,   a: 0.28 },
+                        { y: 0.48, h: 5, x: 0.18, w: 0.64, c: Theme.accent, a: 0.30 },
+                        { y: 0.73, h: 2, x: 0.00, w: 1.00, c: Theme.accent, a: 0.40 }
+                      ]
+                    : [
+                        { y: 0.50, h: 2, x: 0.00, w: 1.00, c: Theme.accent, a: 0.22 }
+                      ]);
+
+            for (let i = 0; i < bands.length; i++) {
+                const b = bands[i];
+                ctx.fillStyle = Qt.rgba(b.c.r, b.c.g, b.c.b, b.a).toString();
+                ctx.fillRect(width * b.x, height * b.y, width * b.w, b.h);
             }
         }
     }

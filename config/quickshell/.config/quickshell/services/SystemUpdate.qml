@@ -9,10 +9,14 @@ Singleton {
     readonly property string home: Quickshell.env("HOME")
     readonly property string scriptPath: home + "/.local/bin/sys-update"
     readonly property string statePath: home + "/.local/state/quickshell/sys-update.json"
+    readonly property string pkgsPath: home + "/.local/state/quickshell/sys-packages.json"
+    readonly property string logPath: home + "/.local/state/quickshell/sys-update.log"
 
     property int count: 0
     property var packages: []
-    property string phase: "idle"      // "idle" | "ready" | "snapshot" | "upgrading" | "syncing" | "done" | "error"
+    property int orphanCount: 0
+    property var orphans: []
+    property string phase: "idle"      // "idle" | "ready" | "snapshot" | "upgrading" | "removing" | "syncing" | "done" | "error"
     property string message: ""
     property bool running: false
     property int progress: 0
@@ -20,7 +24,18 @@ Singleton {
     property string lastSnapshot: ""
     property string updatedAt: ""
 
+    // Gestión de paquetes/dependencias y log en vivo (100% en Quickshell)
+    property var installedPackages: []
+    property bool loadingInstalled: false
+    property string liveLog: ""
+    property bool inspectLoading: false
+    property var inspectResult: ({ ok: true, mode: "", order: [], paths: [], error: "", summary: "" })
+
     property bool modalOpen: false
+
+    // Siempre visible en la barra; se remarca a partir de 20 paquetes pendientes
+    readonly property bool showBarIcon: true
+    readonly property bool highAlert: count >= 20
 
     readonly property string etaText: {
         if (!running || etaSeconds <= 0) return "";
@@ -30,19 +45,13 @@ Singleton {
         return "~" + s + "s";
     }
 
-    SystemClock {
-        id: clock
-        precision: SystemClock.Minutes
-    }
-
-    readonly property bool isNightWindow: clock.date.getHours() >= 20
-    readonly property bool showBarIcon: (isNightWindow && count > 0) || running || modalOpen
-
     function parseState(raw) {
         try {
             const data = JSON.parse(raw);
             root.count = data.count || 0;
             root.packages = data.packages || [];
+            root.orphanCount = data.orphanCount || 0;
+            root.orphans = data.orphans || [];
             root.phase = data.phase || "idle";
             root.message = data.message || "";
             root.running = !!data.running;
@@ -50,9 +59,7 @@ Singleton {
             root.etaSeconds = data.etaSeconds !== undefined ? data.etaSeconds : 0;
             root.lastSnapshot = data.lastSnapshot || "";
             root.updatedAt = data.updatedAt || "";
-        } catch (e) {
-            console.warn("SystemUpdate: error al parsear sys-update.json:", e);
-        }
+        } catch (e) {}
     }
 
     FileView {
@@ -62,6 +69,48 @@ Singleton {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: root.parseState(this.text())
+    }
+
+    FileView {
+        id: pkgsFile
+        path: root.pkgsPath
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const parsed = JSON.parse(this.text());
+                if (Array.isArray(parsed)) root.installedPackages = parsed;
+            } catch (e) {}
+            root.loadingInstalled = false;
+        }
+    }
+
+    FileView {
+        id: logFile
+        path: root.logPath
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            const raw = this.text();
+            const lines = raw.split("\n");
+            root.liveLog = lines.slice(-60).join("\n").trim();
+        }
+    }
+
+    Process {
+        id: inspectProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.inspectLoading = false;
+                try {
+                    const data = JSON.parse(this.text.trim());
+                    root.inspectResult = data;
+                } catch (e) {
+                    root.inspectResult = { ok: false, mode: "error", order: [], paths: [], error: "PARSE ERROR", summary: "INSPECT FAILED" };
+                }
+            }
+        }
+        onExited: root.inspectLoading = false
     }
 
     Timer {
@@ -79,14 +128,58 @@ Singleton {
         Quickshell.execDetached([root.scriptPath, "check"]);
     }
 
+    function loadInstalled() {
+        root.loadingInstalled = true;
+        Quickshell.execDetached([root.scriptPath, "installed"]);
+    }
+
+    function inspectRemoval(pkgList) {
+        if (inspectProc.running) return;
+        root.inspectLoading = true;
+        const args = [root.scriptPath, "inspect"];
+        if (!pkgList || pkgList.length === 0) {
+            args.push("--orphans");
+        } else {
+            for (let i = 0; i < pkgList.length; i++) args.push(pkgList[i]);
+        }
+        inspectProc.command = args;
+        inspectProc.running = true;
+    }
+
+    function clearInspect() {
+        root.inspectResult = { ok: true, mode: "", order: [], paths: [], error: "", summary: "" };
+    }
+
     function startUpgrade() {
         if (root.running || root.count === 0) return;
         root.running = true;
         root.phase = "snapshot";
         root.progress = 5;
         root.etaSeconds = Math.max(10, root.count * 8);
-        root.message = "01 // OVERWRITING SYSTEM SNAPSHOT...";
+        root.message = "01 // CHECKING SYSTEM SNAPSHOT...";
         Quickshell.execDetached([root.scriptPath, "upgrade"]);
+    }
+
+    function removePackages(pkgList) {
+        if (root.running || !pkgList || pkgList.length === 0) return;
+        root.running = true;
+        root.phase = "removing";
+        root.progress = 8;
+        root.etaSeconds = Math.max(5, pkgList.length * 3);
+        root.message = "01 // PREPARING SAFE REMOVAL...";
+        const args = [root.scriptPath, "remove"];
+        for (let i = 0; i < pkgList.length; i++) args.push(pkgList[i]);
+        Quickshell.execDetached(args);
+    }
+
+    function cleanOrphans() {
+        if (root.running || root.orphanCount === 0) return;
+        root.running = true;
+        root.phase = "removing";
+        root.progress = 10;
+        root.etaSeconds = Math.max(4, root.orphanCount * 2);
+        root.message = "01 // CLEANING ORPHANS...";
+        Quickshell.execDetached([root.scriptPath, "orphans"]);
     }
 
     function openModal() {
@@ -104,6 +197,7 @@ Singleton {
         else openModal();
     }
 
+    // Revisión automática cada hora
     Timer {
         interval: 3600000
         running: true

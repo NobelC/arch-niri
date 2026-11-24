@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import "../../services"
+import "../common"
 import "../"
 
 BarDrawer {
@@ -202,13 +203,17 @@ BarDrawer {
                             anchors.horizontalCenter: parent.horizontalCenter
                             spacing: 6
 
-                            Text {
-                                text: Qt.formatDateTime(clock.date, "HH")
-                                color: Theme.text
-                                font.family: Theme.displayFont
-                                font.pixelSize: 44
-                                font.letterSpacing: 2
-                                lineHeight: 0.9
+                            FlipDigit {
+                                value: Qt.formatDateTime(clock.date, "HH")
+                                implicitWidth: 58
+                                implicitHeight: 54
+                                fontFamily: Theme.displayFont
+                                fontSize: 42
+                                letterSpacing: 1.5
+                                textColor: Theme.text
+                                plaqueColor: Theme.bg
+                                seamColor: Theme.card
+                                showPlaque: true
                             }
 
                             Column {
@@ -219,13 +224,17 @@ BarDrawer {
                                 Rectangle { width: 5; height: 5; radius: Theme.radius; color: Theme.accent }
                             }
 
-                            Text {
-                                text: Qt.formatDateTime(clock.date, "mm")
-                                color: Theme.text
-                                font.family: Theme.displayFont
-                                font.pixelSize: 44
-                                font.letterSpacing: 2
-                                lineHeight: 0.9
+                            FlipDigit {
+                                value: Qt.formatDateTime(clock.date, "mm")
+                                implicitWidth: 58
+                                implicitHeight: 54
+                                fontFamily: Theme.displayFont
+                                fontSize: 42
+                                letterSpacing: 1.5
+                                textColor: Theme.text
+                                plaqueColor: Theme.bg
+                                seamColor: Theme.card
+                                showPlaque: true
                             }
                         }
 
@@ -245,9 +254,9 @@ BarDrawer {
                                 ? "FINAL DAY"
                                 : "D-" + String(root.daysLeft).padStart(3, "0") + " // " + clock.date.getFullYear()
                             color: Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 9
-                            font.letterSpacing: 1
+                            font.family: Theme.displayFont
+                            font.pixelSize: 16
+                            font.letterSpacing: 1.0
                         }
                     }
                 }
@@ -768,11 +777,32 @@ BarDrawer {
                             font.letterSpacing: 1.2
                         }
                         Text {
+                            id: weatherGlyph
                             anchors.horizontalCenter: parent.horizontalCenter
                             text: Weather.glyph
                             color: Theme.bg
                             font.family: Theme.fontFamily
                             font.pixelSize: 24
+                            transformOrigin: Item.Center
+                            rotation: weatherHover.containsMouse
+                                ? (4.0 + ((weatherHover.mouseX / Math.max(1, weatherCard.width)) - 0.5) * 3.0)
+                                : 0.0
+                            scale: weatherHover.containsMouse ? 1.06 : 1.0
+
+                            transform: Translate {
+                                x: weatherHover.containsMouse
+                                    ? ((weatherHover.mouseX / Math.max(1, weatherCard.width)) - 0.5) * 4.0
+                                    : 0.0
+                                y: weatherHover.containsMouse
+                                    ? ((weatherHover.mouseY / Math.max(1, weatherCard.height)) - 0.5) * 3.0
+                                    : 0.0
+
+                                Behavior on x { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                Behavior on y { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                            }
+
+                            Behavior on rotation { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                            Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                         }
                     }
                 }

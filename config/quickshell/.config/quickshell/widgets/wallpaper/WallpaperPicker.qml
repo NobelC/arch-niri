@@ -377,6 +377,17 @@ PanelWindow {
                                     clip: true
                                 }
 
+                                // Overlay duotono sutil con el acento activo
+                                Rectangle {
+                                    id: duotoneOverlay
+                                    anchors.fill: thumb
+                                    color: Theme.accent
+                                    opacity: cardDelegate.isCenter ? 0.16 : 0.28
+
+                                    Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+                                    Behavior on color { ColorAnimation { duration: Theme.animMedium } }
+                                }
+
                                 // Pie de foto con nombre de archivo
                                 Text {
                                     anchors.left: parent.left

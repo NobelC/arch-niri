@@ -7,18 +7,21 @@ if [[ -z "$USER_NAME" || "$USER_NAME" == "root" ]]; then
   echo "✗ Error: define SYS_UPDATE_USER o ejecuta con sudo desde un usuario no-root (SUDO_USER)." >&2
   exit 1
 fi
+
 USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
-[[ -n "$USER_HOME" ]] || { echo "✗ Error: usuario '$USER_NAME' no encontrado." >&2; exit 1; }
 REPO_DIR="${USER_HOME}/Projects/arch-niri"
 STATE_DIR="${USER_HOME}/.local/state/quickshell"
 STATE_FILE="${STATE_DIR}/sys-update.json"
 HISTORY_FILE="${STATE_DIR}/sys-update-history.json"
-LOG_LINK="${STATE_DIR}/sys-update.log"
-LOG_FILE="${STATE_DIR}/sys-update-$(date '+%Y%m%d-%H%M%S').log"
-MAX_LOGS="${SYS_UPDATE_MAX_LOGS:-10}"
+LOG_FILE="${STATE_DIR}/sys-update.log"
 
 mkdir -p "$STATE_DIR"
 chown "${USER_NAME}:${USER_NAME}" "$STATE_DIR"
+
+log_line() {
+  printf '[%s] %s\n' "$(date '+%H:%M:%S')" "$*" >> "$LOG_FILE"
+  chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE" 2>/dev/null || true
+}
 
 load_averages() {
   if [[ -f "$HISTORY_FILE" ]]; then
@@ -73,29 +76,28 @@ write_progress() {
       "$STATE_FILE" > "$tmp" 2>/dev/null || \
     jq -n --arg phase "$phase" --arg msg "$msg" --argjson running "$running" \
        --argjson pct "$pct" --argjson eta "$eta" --arg snap "$snap" \
-      '{count: 0, packages: [], phase: $phase, message: $msg, running: $running, progress: $pct, etaSeconds: $eta, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
+      '{count: 0, packages: [], orphanCount: 0, orphans: [], phase: $phase, message: $msg, running: $running, progress: $pct, etaSeconds: $eta, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
   else
     jq -n --arg phase "$phase" --arg msg "$msg" --argjson running "$running" \
        --argjson pct "$pct" --argjson eta "$eta" --arg snap "$snap" \
-      '{count: 0, packages: [], phase: $phase, message: $msg, running: $running, progress: $pct, etaSeconds: $eta, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
+      '{count: 0, packages: [], orphanCount: 0, orphans: [], phase: $phase, message: $msg, running: $running, progress: $pct, etaSeconds: $eta, lastSnapshot: $snap, updatedAt: ""}' > "$tmp"
   fi
   mv "$tmp" "$STATE_FILE"
   chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
 }
 
 create_pre_snapshot() {
-  local ts root_fs snap_name=""
+  local ts fs_type snap_name=""
   ts="$(date '+%Y-%m-%d %H:%M')"
-  root_fs="$(stat -f -c %T / 2>/dev/null || echo "unknown")"
+  fs_type="$(stat -f -c %T / 2>/dev/null || echo "unknown")"
 
-  if [[ "$root_fs" == "btrfs" ]] && command -v btrfs >/dev/null 2>&1; then
+  if [[ "$fs_type" == "btrfs" ]] && command -v btrfs >/dev/null 2>&1; then
     local snap_dir="/.snapshots"
     local snap_path="${snap_dir}/pre-update-latest"
 
     if [[ ! -d "$snap_dir" ]]; then
       btrfs subvolume create "$snap_dir" >/dev/null 2>&1 || mkdir -p "$snap_dir"
     fi
-
     if btrfs subvolume show "$snap_path" >/dev/null 2>&1; then
       btrfs subvolume delete "$snap_path" >/dev/null 2>&1 || true
     fi
@@ -103,25 +105,14 @@ create_pre_snapshot() {
       [[ -e "$old" ]] || continue
       btrfs subvolume delete "$old" >/dev/null 2>&1 || rm -rf "$old" 2>/dev/null || true
     done
-
     if btrfs subvolume snapshot -r / "$snap_path" >/dev/null 2>&1; then
       snap_name="pre-update-latest (${ts})"
     fi
-  elif command -v timeshift >/dev/null 2>&1; then
-    if timeshift --create --comments "pre-update-latest" --tags O >> "$LOG_FILE" 2>&1; then
-      mapfile -t old_ts < <(timeshift --list 2>/dev/null | awk '/pre-update-latest/ {print $3}' | sort | head -n -1 || true)
-      for old_id in "${old_ts[@]}"; do
-        timeshift --delete --snapshot "$old_id" >> "$LOG_FILE" 2>&1 || true
-      done
-      snap_name="timeshift-rsync (${ts})"
-    fi
+  else
+    snap_name="NONE (${fs_type^^})"
   fi
 
-  if [[ -z "$snap_name" ]]; then
-    echo "NONE (${root_fs^^})"
-  else
-    echo "$snap_name"
-  fi
+  echo "$snap_name"
 }
 
 sync_repo_state() {
@@ -133,33 +124,81 @@ sync_repo_state() {
   fi
 }
 
+is_protected_pkg() {
+  case "$1" in
+    base|base-devel|linux|linux-zen|linux-lts|linux-firmware|systemd|systemd-libs|pacman|glibc|bash|sudo|filesystem|niri|quickshell|quickshell-git)
+      return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
-cleanup_on_exit() {
-  local rc=$?
-  if [[ $rc -ne 0 && -f "$STATE_FILE" ]]; then
-    write_progress "error" "ERROR // UPDATE INTERRUPTED OR FAILED (CODE $rc)" false 0 0 "$SNAP_CREATED" || true
+purge_pkg_files() {
+  local pkg="$1"
+  local base="$pkg"
+  base="${base%-bin}"
+  base="${base%-git}"
+  base="${base%-appimage}"
+
+  # Caché de pacman y paru para ese paquete
+  rm -f /var/cache/pacman/pkg/"${pkg}"-[0-9]*.pkg.tar.* 2>/dev/null || true
+  if [[ -d "${USER_HOME}/.cache/paru/clone/${pkg}" ]]; then
+    rm -rf "${USER_HOME}/.cache/paru/clone/${pkg}"
+    log_line "PURGED CACHE: ~/.cache/paru/clone/${pkg}"
+  fi
+
+  # Nunca autopurgar carpetas base del escritorio
+  case "$base" in
+    niri|quickshell|ghostty|nvim|neovim|yazi|mpv|btop|matugen|zsh|bash|gtk|gtk-3.0|gtk-4.0|systemd|pipewire|wireplumber|fontconfig|dconf|pulse|clangd|fastfetch)
+      return 0 ;;
+  esac
+
+  local root_dir name cand
+  for root_dir in "${USER_HOME}/.config" "${USER_HOME}/.cache" "${USER_HOME}/.local/share" "${USER_HOME}/.local/state"; do
+    for name in "$pkg" "$base"; do
+      [[ -n "$name" && "$name" != "." && "$name" != ".." && "$name" != */* ]] || continue
+      cand="${root_dir}/${name}"
+      if [[ -e "$cand" ]]; then
+        rm -rf "$cand"
+        log_line "PURGED PATH: ${cand/#$USER_HOME/\~}"
+      fi
+    done
+  done
+}
+
+clean_orphans_cascade() {
+  local round=1
+  local -a orph=()
+  while mapfile -t orph < <(pacman -Qtdq 2>/dev/null || true) && (( ${#orph[@]} > 0 )); do
+    log_line "ORPHAN PASS #${round}: ${orph[*]}"
+    if ! pacman -Rns --noconfirm "${orph[@]}" >> "$LOG_FILE" 2>&1; then
+      log_line "WARN: pacman -Rns falló en ronda de huérfanos #${round}"
+      break
+    fi
+    local op
+    for op in "${orph[@]}"; do
+      purge_pkg_files "$op"
+    done
+    round=$((round + 1))
+    (( round > 8 )) && break
+  done
+}
+
+refresh_user_views() {
+  if [[ -x "${USER_HOME}/.local/bin/sys-update" ]]; then
+    sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${USER_HOME}/.local/bin/sys-update" installed >/dev/null 2>&1 || true
+    sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${USER_HOME}/.local/bin/sys-update" check >/dev/null 2>&1 || true
   fi
 }
-SNAP_CREATED=""
-trap cleanup_on_exit EXIT
 
 case "$ACTION" in
   upgrade)
     : > "$LOG_FILE"
-    ln -sfn "$(basename "$LOG_FILE")" "$LOG_LINK"
-    if [[ $EUID -eq 0 ]]; then
-      chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
-      chown -h "${USER_NAME}:${USER_NAME}" "$LOG_LINK"
-    fi
-    mapfile -t old_logs < <(ls -1t "${STATE_DIR}"/sys-update-*.log 2>/dev/null | tail -n +"$((MAX_LOGS + 1))" || true)
-    for old_log in "${old_logs[@]}"; do
-      rm -f "$old_log"
-    done
+    chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
+    log_line "=== SYSTEM UPGRADE STARTED ==="
 
     load_averages
     T_START=$SECONDS
 
-    # Contar paquetes pendientes por origen para calcular el ETA inicial
     repo_count="$(pacman -Qu 2>/dev/null | wc -l || echo 0)"
     aur_count=0
     if command -v paru >/dev/null 2>&1; then
@@ -169,27 +208,21 @@ case "$ACTION" in
     eta="$(calc_eta "$AVG_BASE" "$repo_count" "$aur_count")"
     write_progress "snapshot" "01 // CHECKING SYSTEM SNAPSHOT..." true 8 "$eta" ""
     SNAP_CREATED="$(create_pre_snapshot)"
+    log_line "SNAPSHOT: ${SNAP_CREATED}"
     T_SNAP_END=$SECONDS
     snap_elapsed=$(( T_SNAP_END - T_START ))
 
-    # 1. Actualizar repositorios oficiales
     eta="$(calc_eta 3 "$repo_count" "$aur_count")"
-    if [[ "$SNAP_CREATED" == NONE* ]]; then
-      echo "[sys-update] Sin snapshot disponible: ${SNAP_CREATED}" >> "$LOG_FILE"
-      write_progress "upgrading" "02 // NO SNAPSHOT (${SNAP_CREATED#NONE }) · UPDATING REPOS..." true 22 "$eta" "$SNAP_CREATED"
-    else
-      echo "[sys-update] Snapshot creado: ${SNAP_CREATED}" >> "$LOG_FILE"
-      write_progress "upgrading" "02 // SNAPSHOT OK · UPDATING OFFICIAL REPOS..." true 22 "$eta" "$SNAP_CREATED"
-    fi
+    write_progress "upgrading" "02 // UPDATING OFFICIAL REPOS (PACMAN)..." true 22 "$eta" "$SNAP_CREATED"
     T_REPO_START=$SECONDS
     if ! pacman -Syu --noconfirm --needed >> "$LOG_FILE" 2>&1; then
-      write_progress "error" "ERROR // PACMAN UPGRADE FAILED (CHECK LOG)" false 0 0 "$SNAP_CREATED"
+      log_line "ERROR: pacman -Syu failed"
+      write_progress "error" "ERROR // PACMAN UPGRADE FAILED" false 0 0 "$SNAP_CREATED"
       exit 1
     fi
     T_REPO_END=$SECONDS
     repo_elapsed=$(( T_REPO_END - T_REPO_START ))
 
-    # 2. Detectar y compilar paquetes AUR uno a uno actualizando ETA dinámico
     T_AUR_START=$SECONDS
     actual_aur=0
     if command -v paru >/dev/null 2>&1; then
@@ -205,7 +238,6 @@ case "$ACTION" in
         idx=0
         for pkg in "${aur_pkgs[@]}"; do
           rem_aur=$(( total_aur - idx ))
-          # Si ya compilamos al menos 1 paquete en esta corrida, combinar media observada con histórica
           if (( idx > 0 )); then
             obs_aur="$(awk -v el="$(( SECONDS - T_AUR_START ))" -v n="$idx" 'BEGIN { print el / n }')"
             AVG_AUR="$(awk -v obs="$obs_aur" -v hist="$AVG_AUR" 'BEGIN { print (obs * 0.7) + (hist * 0.3) }')"
@@ -213,6 +245,7 @@ case "$ACTION" in
           eta="$(calc_eta 4 0 "$rem_aur")"
           pct=$(( 30 + (idx * 55) / total_aur ))
           write_progress "upgrading" "02 // AUR [$((idx + 1))/${total_aur}]: ${pkg}" true "$pct" "$eta" "$SNAP_CREATED"
+          log_line "BUILDING AUR: ${pkg}"
 
           sudo -u "$USER_NAME" HOME="$USER_HOME" \
             paru -S --aur --noconfirm --needed --clonedir "$build_dir" --builddir "$build_dir" --sudo /bin/true "$pkg" >> "$LOG_FILE" 2>&1 || true
@@ -224,14 +257,16 @@ case "$ACTION" in
         if (( ${#built_files[@]} > 0 )); then
           if ! pacman -U --noconfirm --needed "${built_files[@]}" >> "$LOG_FILE" 2>&1; then
             rm -rf "$build_dir"
-            write_progress "error" "ERROR // AUR INSTALL FAILED (CHECK LOG)" false 0 0 "$SNAP_CREATED"
+            log_line "ERROR: pacman -U failed"
+            write_progress "error" "ERROR // AUR INSTALL FAILED" false 0 0 "$SNAP_CREATED"
             exit 1
           fi
         else
           still_pending="$(sudo -u "$USER_NAME" HOME="$USER_HOME" paru -Qua 2>/dev/null | wc -l || echo 0)"
           if (( still_pending > 0 )); then
             rm -rf "$build_dir"
-            write_progress "error" "ERROR // AUR BUILD FAILED (CHECK LOG)" false 0 0 "$SNAP_CREATED"
+            log_line "ERROR: AUR build failed"
+            write_progress "error" "ERROR // AUR BUILD FAILED" false 0 0 "$SNAP_CREATED"
             exit 1
           fi
         fi
@@ -241,7 +276,6 @@ case "$ACTION" in
     T_AUR_END=$SECONDS
     aur_elapsed=$(( T_AUR_END - T_AUR_START ))
 
-    # 3. Sincronizar listas pacman/paru y enlaces con auto-stow
     write_progress "syncing" "04 // SYNCING PACKAGES & AUTO-STOW..." true 96 2 "$SNAP_CREATED"
     T_SYNC_START=$SECONDS
     sync_repo_state
@@ -252,15 +286,102 @@ case "$ACTION" in
     total_elapsed=$(( T_END - T_START ))
     record_history "$base_total" "$repo_count" "$repo_elapsed" "$actual_aur" "$aur_elapsed" "$total_elapsed"
 
-    # 4. Completado al 100%
+    log_line "=== UPGRADE COMPLETE (${total_elapsed}s) ==="
     tmp="$(mktemp)"
-    jq -n --arg snap "$SNAP_CREATED" --arg ts "$(date '+%Y-%m-%d %H:%M')" \
-      '{count: 0, packages: [], phase: "done", message: "05 // INSTALLATION COMPLETE", running: false, progress: 100, etaSeconds: 0, lastSnapshot: $snap, updatedAt: $ts}' > "$tmp"
+    mapfile -t rem_orph < <(pacman -Qtdq 2>/dev/null || true)
+    jq -n \
+      --arg snap "$SNAP_CREATED" \
+      --arg ts "$(date '+%Y-%m-%d %H:%M')" \
+      --argjson orph "$(printf '%s\n' "${rem_orph[@]:-}" | jq -Rn '[inputs | select(length > 0)]')" \
+      '{count: 0, packages: [], orphanCount: ($orph | length), orphans: $orph, phase: "done", message: "05 // INSTALLATION COMPLETE", running: false, progress: 100, etaSeconds: 0, lastSnapshot: $snap, updatedAt: $ts}' > "$tmp"
     mv "$tmp" "$STATE_FILE"
     chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
     ;;
+
+  remove)
+    shift
+    if (( $# == 0 )); then
+      echo "Uso: sys-update-apply remove <pkg1> [pkg2 ...]" >&2
+      exit 1
+    fi
+
+    : > "$LOG_FILE"
+    chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
+    log_line "=== PACKAGE PURGE STARTED ==="
+
+    local_targets=()
+    for arg in "$@"; do
+      if [[ ! "$arg" =~ ^[a-zA-Z0-9@._+-]+$ ]]; then
+        log_line "ERROR: invalid package name: $arg"
+        write_progress "error" "ERROR // INVALID PACKAGE NAME" false 0 0 ""
+        exit 1
+      fi
+      if is_protected_pkg "$arg"; then
+        log_line "BLOCKED: protected system package: $arg"
+        write_progress "error" "BLOCKED // PROTECTED PACKAGE: ${arg}" false 0 0 ""
+        exit 1
+      fi
+      local_targets+=("$arg")
+    done
+
+    write_progress "snapshot" "01 // PRE-REMOVAL SNAPSHOT..." true 10 8 ""
+    SNAP_CREATED="$(create_pre_snapshot)"
+    log_line "SNAPSHOT: ${SNAP_CREATED}"
+
+    write_progress "removing" "02 // RESOLVING DEPENDENCY ORDER..." true 25 6 "$SNAP_CREATED"
+    mapfile -t ordered_pkgs < <(LC_ALL=C pacman -Rns --print-format '%n' "${local_targets[@]}" 2>> "$LOG_FILE" || true)
+    if (( ${#ordered_pkgs[@]} == 0 )); then
+      log_line "ERROR: dependency resolution failed (required by other packages)"
+      write_progress "error" "ERROR // DEPENDENCY CONFLICT (SEE LOG)" false 0 0 "$SNAP_CREATED"
+      exit 1
+    fi
+    log_line "SAFE REMOVAL ORDER (${#ordered_pkgs[@]}): ${ordered_pkgs[*]}"
+
+    write_progress "removing" "03 // REMOVING ${#ordered_pkgs[@]} PKGS IN ORDER..." true 50 5 "$SNAP_CREATED"
+    if ! pacman -Rns --noconfirm "${local_targets[@]}" >> "$LOG_FILE" 2>&1; then
+      log_line "ERROR: pacman -Rns failed"
+      write_progress "error" "ERROR // REMOVAL FAILED (SEE LOG)" false 0 0 "$SNAP_CREATED"
+      exit 1
+    fi
+
+    write_progress "removing" "04 // PURGING RELATED PATHS & CACHES..." true 72 3 "$SNAP_CREATED"
+    for p in "${ordered_pkgs[@]}"; do
+      purge_pkg_files "$p"
+    done
+
+    write_progress "removing" "05 // CLEANING CASCADING ORPHANS..." true 86 2 "$SNAP_CREATED"
+    clean_orphans_cascade
+
+    write_progress "syncing" "06 // SYNCING PACKAGES..." true 95 1 "$SNAP_CREATED"
+    sync_repo_state
+    log_line "=== PURGE COMPLETE ==="
+
+    write_progress "done" "PURGE COMPLETE (${#ordered_pkgs[@]} PKGS)" false 100 0 "$SNAP_CREATED"
+    refresh_user_views
+    ;;
+
+  orphans)
+    : > "$LOG_FILE"
+    chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
+    log_line "=== ORPHAN CLEANUP STARTED ==="
+
+    write_progress "snapshot" "01 // PRE-CLEANUP SNAPSHOT..." true 15 5 ""
+    SNAP_CREATED="$(create_pre_snapshot)"
+    log_line "SNAPSHOT: ${SNAP_CREATED}"
+
+    write_progress "removing" "02 // REMOVING ORPHANS IN SAFE ORDER..." true 55 3 "$SNAP_CREATED"
+    clean_orphans_cascade
+
+    write_progress "syncing" "03 // SYNCING PACKAGES..." true 90 1 "$SNAP_CREATED"
+    sync_repo_state
+    log_line "=== ORPHAN CLEANUP COMPLETE ==="
+
+    write_progress "done" "ORPHANS PURGED" false 100 0 "$SNAP_CREATED"
+    refresh_user_views
+    ;;
+
   *)
-    echo "Uso: sys-update-apply upgrade" >&2
+    echo "Uso: sys-update-apply [upgrade|remove <pkgs...>|orphans]" >&2
     exit 1
     ;;
 esac

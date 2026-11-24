@@ -3,15 +3,22 @@ import "../../services"
 
 Item {
     id: root
-    visible: SystemUpdate.showBarIcon
-    implicitWidth: visible ? (contentRow.implicitWidth + 14) : 0
+    visible: true
+    implicitWidth: contentRow.implicitWidth + 14
     implicitHeight: 24
 
     readonly property bool isActive: mouseArea.containsMouse || SystemUpdate.modalOpen
-    readonly property color activeColor: SystemUpdate.phase === "error" ? Theme.warn : Theme.accent
-        readonly property string stageKey: {
+    readonly property bool isHighAlert: SystemUpdate.highAlert && !SystemUpdate.running
+    readonly property color activeColor: {
+        if (SystemUpdate.phase === "error") return Theme.warn;
+        if (isHighAlert) return Theme.warn;
+        return Theme.accent;
+    }
+
+    readonly property string stageKey: {
         if (!SystemUpdate.running) return SystemUpdate.phase;
         if (SystemUpdate.phase === "snapshot") return "snapshot";
+        if (SystemUpdate.phase === "removing") return "removing";
         if (SystemUpdate.phase === "syncing") return "sync";
         if (SystemUpdate.message.indexOf("AUR") !== -1) return "aur";
         if (SystemUpdate.phase === "upgrading") return "repos";
@@ -19,7 +26,6 @@ Item {
     }
 
     property real pulseStrength: 0.0
-
     onStageKeyChanged: {
         if (SystemUpdate.running) phasePulse.restart();
     }
@@ -38,27 +44,29 @@ Item {
 
     readonly property int litBlocks: Math.max(0, Math.min(5, Math.round((SystemUpdate.progress / 100.0) * 5)))
 
-    // Marco exterior fino (1px)
+    // Marco exterior fino (1px); siempre nítido si hay >= 20 paquetes o está activo
     Rectangle {
         anchors.fill: parent
         radius: Theme.radius
         color: "transparent"
         border.width: 1
         border.color: root.activeColor
-        opacity: (root.isActive || SystemUpdate.running) ? 1.0 : 0.75
+        opacity: (root.isActive || SystemUpdate.running || root.isHighAlert) ? 1.0 : (SystemUpdate.count > 0 ? 0.75 : 0.35)
 
         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+        Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
     }
 
-    // Cuadro sólido interior separado por gap
+    // Bloque interior sólido: se remarca lleno cuando count >= 20 o hover/abierto
     Rectangle {
         anchors.fill: parent
         anchors.margins: 3
         radius: Theme.radius
         color: root.pulseStrength > 0.05 ? Theme.highlight : root.activeColor
-        opacity: root.isActive ? 1.0 : (root.pulseStrength * 0.45)
+        opacity: (root.isActive || root.isHighAlert) ? 1.0 : (root.pulseStrength * 0.45)
 
         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
+        Behavior on color { ColorAnimation { duration: Theme.animFast } }
     }
 
     Row {
@@ -68,13 +76,12 @@ Item {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: SystemUpdate.running ? "󰑐" : "󰏗"
-            color: root.isActive ? Theme.bg : root.activeColor
+            text: SystemUpdate.running ? "󰑐" : (root.isHighAlert ? "󱍸" : "󰏗")
+            color: (root.isActive || root.isHighAlert) ? Theme.bg : (SystemUpdate.count > 0 ? root.activeColor : Theme.sub)
             font.family: Theme.fontFamily
             font.pixelSize: 12
         }
 
-        // Mini barra de progreso persistente cuando el proceso está corriendo en segundo plano
         Row {
             visible: SystemUpdate.running
             anchors.verticalCenter: parent.verticalCenter
@@ -96,11 +103,10 @@ Item {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            visible: SystemUpdate.running || SystemUpdate.count > 0
             text: SystemUpdate.running
                 ? (String(SystemUpdate.progress) + "%" + (SystemUpdate.etaText !== "" ? (" · " + SystemUpdate.etaText) : ""))
                 : String(SystemUpdate.count).padStart(2, "0")
-            color: root.isActive ? Theme.bg : Theme.text
+            color: (root.isActive || root.isHighAlert) ? Theme.bg : (SystemUpdate.count > 0 ? Theme.text : Theme.muted)
             font.family: Theme.fontFamily
             font.pixelSize: 10
             font.bold: true
