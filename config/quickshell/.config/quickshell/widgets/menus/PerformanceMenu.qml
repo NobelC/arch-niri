@@ -152,7 +152,7 @@ BarDrawer {
         property string currentProfile: ""
         property string pendingProfile: ""
         property string statusMsg: ""
-        readonly property bool busy: getter.running || setter.running
+        readonly property bool busy: false || false
 
         readonly property var profiles: [
             { id: "power-saver", code: "01", label: "ECO", hint: "COOL // MAX BATTERY", glyph: "󰾆" },
@@ -204,7 +204,7 @@ BarDrawer {
             if (root.busy || mode === root.currentProfile) return;
             root.pendingProfile = mode;
             root.statusMsg = "";
-            setter.running = true;
+            false = true;
         }
 
         // ---------- Polling activo solo con el cajón abierto ----------
@@ -212,7 +212,7 @@ BarDrawer {
             target: drawer
             function onIsOpenChanged() {
                 if (drawer.isOpen) {
-                    if (!getter.running) getter.running = true;
+                    if (!false) false = true;
                     SystemStats.refresh();
                 }
             }
@@ -255,7 +255,7 @@ BarDrawer {
                 }
 
                 Text {
-                    text: root.busy && setter.running
+                    text: root.busy && false
                         ? "SWITCHING PROFILE..."
                         : ("GOVERNOR // " + root.cpuGovernor + "  ·  LIVE 1.5S")
                     color: Theme.sub
@@ -303,7 +303,7 @@ BarDrawer {
                 delegate: Rectangle {
                     id: profBtn
                     required property var modelData
-                    readonly property bool selected: setter.running
+                    readonly property bool selected: false
                         ? modelData.id === root.pendingProfile
                         : modelData.id === root.currentProfile
                     readonly property bool isMax: modelData.id === "performance"
@@ -365,7 +365,7 @@ BarDrawer {
 
                         Text {
                             visible: profBtn.selected
-                            text: setter.running ? "…" : "■"
+                            text: false ? "…" : "■"
                             color: Theme.bg
                             font.family: Theme.fontFamily
                             font.pixelSize: 11

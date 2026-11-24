@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "../../services"
+import "../common"
 
 PanelWindow {
     id: osdWindow
@@ -178,6 +179,7 @@ PanelWindow {
         // Cuerpo principal
         Rectangle {
             id: card
+            CardNoise {}
             x: 0
             y: 0
             width: osdWindow.cardWidth

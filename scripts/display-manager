@@ -393,6 +393,74 @@ cmd_watch() {
   done
 }
 
+
+cmd_profile() {
+  local sub="${1:-list}" name="${2:-}" tmp raw cfg prim
+  case "$sub" in
+    list)
+      jq -r '(.profiles // {}) | keys[]' "$CONFIG_FILE"
+      ;;
+    save)
+      [[ -n "$name" ]] || { echo "Uso: display-manager profile save <nombre>" >&2; exit 1; }
+      raw="$(cmd_list)"
+      tmp="$(mktemp)"
+      jq --arg name "$name" --argjson cur "$raw" '
+        .profiles = ((.profiles // {}) + {
+          ($name): {
+            primary: $cur.primary,
+            outputs: (
+              $cur.outputs | map({
+                key: .name,
+                value: {
+                  enabled: .enabled,
+                  mode: .currentMode,
+                  scale: .scale,
+                  transform: .transform,
+                  workMode: .workMode,
+                  position: .position
+                }
+              }) | from_entries
+            )
+          }
+        })
+      ' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
+      echo "✓ Perfil de monitores '$name' guardado."
+      ;;
+    load)
+      [[ -n "$name" ]] || { echo "Uso: display-manager profile load <nombre>" >&2; exit 1; }
+      jq -e --arg n "$name" '(.profiles // {}) | has($n)' "$CONFIG_FILE" >/dev/null 2>&1         || { echo "✗ Perfil '$name' no existe." >&2; exit 1; }
+      prim="$(jq -r --arg n "$name" '.profiles[$n].primary // "eDP-1"' "$CONFIG_FILE")"
+      tmp="$(mktemp)"
+      jq --arg p "$prim" '.primary = $p' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
+
+      local out enabled mode scale tf wm pos
+      while IFS=$'	' read -r out enabled mode scale tf wm pos; do
+        [[ -n "$out" ]] || continue
+        if [[ "$enabled" == "false" ]]; then
+          niri msg output "$out" off >/dev/null 2>&1 || true
+        else
+          apply_output_config "$out" "$mode" "$scale" "$tf" "$wm" "$pos" 0 || true
+        fi
+      done < <(jq -r --arg n "$name" '
+        .profiles[$n].outputs | to_entries[] |
+        "\(.key)	\(.value.enabled)	\(.value.mode // "")	\(.value.scale // 1.0)	\(.value.transform // "normal")	\(.value.workMode // "extend")	\(.value.position // "right")"
+      ' "$CONFIG_FILE")
+      refresh_quickshell
+      echo "✓ Perfil '$name' aplicado."
+      ;;
+    delete)
+      [[ -n "$name" ]] || { echo "Uso: display-manager profile delete <nombre>" >&2; exit 1; }
+      tmp="$(mktemp)"
+      jq --arg n "$name" 'del(.profiles[$n])' "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
+      echo "✓ Perfil '$name' eliminado."
+      ;;
+    *)
+      echo "Uso: display-manager profile [list|save <nombre>|load <nombre>|delete <nombre>]" >&2
+      exit 1
+      ;;
+  esac
+}
+
 case "${1:-list}" in
   list)       cmd_list ;;
   apply)      apply_output_config "${2:?}" "${3:-}" "${4:-1.0}" "${5:-normal}" "${6:-extend}" "${7:-right}" 1; refresh_quickshell ;;
@@ -401,6 +469,7 @@ case "${1:-list}" in
   audio-sync) sync_audio "${2:-auto}" ;;
   lid-close)  cmd_lid_close ;;
   lid-open)   cmd_lid_open ;;
+  profile)    cmd_profile "${2:-list}" "${3:-}" ;;
   watch)      cmd_watch ;;
   *)
     echo "Uso: display-manager [list|apply|primary|restore|audio-sync|lid-close|lid-open|watch]" >&2

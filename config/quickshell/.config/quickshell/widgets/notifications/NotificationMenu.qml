@@ -19,6 +19,40 @@ BarDrawer {
 
         readonly property real maxListHeight: 360
         property bool scheduleExpanded: false
+        property var expandedApps: ({})
+
+        function isAppExpanded(appName) {
+            return Boolean(root.expandedApps[(appName || "System").toLowerCase()]);
+        }
+
+        function toggleAppExpanded(appName) {
+            const k = (appName || "System").toLowerCase();
+            const next = Object.assign({}, root.expandedApps);
+            next[k] = !next[k];
+            root.expandedApps = next;
+        }
+
+        readonly property var groupedHistory: {
+            const map = {};
+            const groups = [];
+            for (let i = 0; i < Notifications.history.length; i++) {
+                const n = Notifications.history[i];
+                const key = (n.appName || "System").toLowerCase();
+                if (!map[key]) {
+                    map[key] = {
+                        appName: n.appName || "System",
+                        items: [],
+                        hasCritical: false
+                    };
+                    groups.push(map[key]);
+                }
+                map[key].items.push(n);
+                if (n.urgency === NotificationUrgency.Critical) {
+                    map[key].hasCritical = true;
+                }
+            }
+            return groups;
+        }
 
         // ---------- Cabecera ----------
         RowLayout {
@@ -417,7 +451,7 @@ BarDrawer {
             color: Theme.border
         }
 
-        // ---------- Lista de historial ----------
+        // ---------- Lista de historial agrupada por app ----------
         ListView {
             id: histList
             visible: Notifications.history.length > 0
@@ -426,61 +460,53 @@ BarDrawer {
             clip: true
             spacing: 8
             boundsBehavior: Flickable.StopAtBounds
-            model: Notifications.history
+            model: root.groupedHistory
 
             delegate: Rectangle {
-                id: row
+                id: groupCard
                 required property var modelData
-                readonly property bool isCritical: modelData.urgency === NotificationUrgency.Critical
+                readonly property var latest: modelData.items[0]
+                readonly property int count: modelData.items.length
+                readonly property bool expanded: count > 1 && root.isAppExpanded(modelData.appName)
+                readonly property var visibleItems: expanded ? modelData.items : [latest]
 
                 width: histList.width
-                implicitHeight: rowCol.implicitHeight + 20
+                implicitHeight: groupCol.implicitHeight + 16
                 radius: Theme.radius
-                color: rowMouse.containsMouse ? Theme.cardAlt : Theme.card
+                color: Theme.card
                 border.width: Theme.borderWidth
-                border.color: isCritical ? Theme.warn : (rowMouse.containsMouse ? Theme.accent : Theme.border)
+                border.color: modelData.hasCritical ? Theme.warn : Theme.border
                 clip: true
 
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
-
-                MouseArea {
-                    id: rowMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: { const nid = row.modelData.id; Qt.callLater(function() { Notifications.activate(nid); }); }
-                }
-
-                // Franja lateral de estado
                 Rectangle {
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     anchors.margins: Theme.borderWidth
                     width: 3
-                    color: row.isCritical ? Theme.warn : Theme.accent
+                    color: groupCard.modelData.hasCritical ? Theme.warn : Theme.accent
                 }
 
                 ColumnLayout {
-                    id: rowCol
+                    id: groupCol
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.topMargin: 10
-                    anchors.bottomMargin: 10
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 12
-                    spacing: 3
+                    anchors.topMargin: 8
+                    anchors.bottomMargin: 8
+                    anchors.leftMargin: 13
+                    anchors.rightMargin: 10
+                    spacing: 6
 
+                    // Cabecera del grupo (app + badge de cantidad + colapsar/expandir + borrar grupo)
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
 
                         Text {
                             Layout.fillWidth: true
-                            text: row.modelData.appName.toUpperCase()
-                            color: row.isCritical ? Theme.warn : Theme.accentSoft
+                            text: groupCard.modelData.appName.toUpperCase()
+                            color: groupCard.modelData.hasCritical ? Theme.warn : Theme.accentSoft
                             font.family: Theme.fontFamily
                             font.pixelSize: 10
                             font.bold: true
@@ -488,8 +514,34 @@ BarDrawer {
                             elide: Text.ElideRight
                         }
 
+                        Rectangle {
+                            visible: groupCard.count > 1
+                            implicitWidth: badgeTxt.implicitWidth + 10
+                            implicitHeight: 18
+                            radius: Theme.radius
+                            color: groupCard.expanded ? Theme.accent : Theme.cardAlt
+                            border.width: 1
+                            border.color: groupCard.expanded ? Theme.accent : Theme.border
+
+                            Text {
+                                id: badgeTxt
+                                anchors.centerIn: parent
+                                text: (groupCard.expanded ? "▾ " : "▸ ") + String(groupCard.count).padStart(2, "0")
+                                color: groupCard.expanded ? Theme.bg : Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 9
+                                font.bold: true
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.toggleAppExpanded(groupCard.modelData.appName)
+                            }
+                        }
+
                         Text {
-                            text: row.modelData.time
+                            text: groupCard.latest.time
                             color: Theme.muted
                             font.family: Theme.fontFamily
                             font.pixelSize: 10
@@ -497,39 +549,144 @@ BarDrawer {
 
                         Text {
                             text: "󰅖"
-                            color: delHover.containsMouse ? Theme.warn : Theme.muted
+                            color: delGroupHover.containsMouse ? Theme.warn : Theme.muted
                             font.family: Theme.fontFamily
                             font.pixelSize: 12
 
                             MouseArea {
-                                id: delHover
+                                id: delGroupHover
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: { const nid = row.modelData.id; Qt.callLater(function() { Notifications.removeHistory(nid); }); }
+                                onClicked: Notifications.removeAppHistory(groupCard.modelData.appName)
                             }
                         }
                     }
 
-                    Text {
-                        visible: text !== ""
-                        Layout.fillWidth: true
-                        text: row.modelData.summary
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                        font.bold: true
-                        wrapMode: Text.Wrap
-                    }
+                    // Entradas del grupo (1 si colapsado, todas si expandido)
+                    Repeater {
+                        model: groupCard.visibleItems
 
-                    Text {
-                        visible: text !== ""
-                        Layout.fillWidth: true
-                        text: row.modelData.body
-                        color: Theme.sub
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                        wrapMode: Text.Wrap
+                        delegate: Rectangle {
+                            id: notifItem
+                            required property var modelData
+                            required property int index
+
+                            Layout.fillWidth: true
+                            implicitHeight: itemCol.implicitHeight + (groupCard.expanded ? 10 : 2)
+                            radius: Theme.radius
+                            color: itemMouse.containsMouse ? Theme.cardAlt : "transparent"
+                            border.width: groupCard.expanded ? 1 : 0
+                            border.color: itemMouse.containsMouse ? Theme.accent : Theme.border
+
+                            MouseArea {
+                                id: itemMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Notifications.activate(notifItem.modelData.id)
+                            }
+
+                            ColumnLayout {
+                                id: itemCol
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: groupCard.expanded ? 5 : 0
+                                spacing: 3
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    Text {
+                                        visible: text !== ""
+                                        Layout.fillWidth: true
+                                        text: notifItem.modelData.summary
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        font.bold: true
+                                        wrapMode: Text.Wrap
+                                    }
+
+                                    Text {
+                                        visible: groupCard.expanded
+                                        text: notifItem.modelData.time
+                                        color: Theme.muted
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 9
+                                    }
+
+                                    Text {
+                                        visible: groupCard.expanded
+                                        text: "󰅖"
+                                        color: delOneHover.containsMouse ? Theme.warn : Theme.muted
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+
+                                        MouseArea {
+                                            id: delOneHover
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: Notifications.removeHistory(notifItem.modelData.id)
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    visible: text !== ""
+                                    Layout.fillWidth: true
+                                    text: notifItem.modelData.body
+                                    color: Theme.sub
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    wrapMode: Text.Wrap
+                                }
+
+                                // Botones de acciones D-Bus inline (Responder, Aceptar, Descartar...)
+                                Flow {
+                                    visible: notifItem.modelData.isAlive && notifItem.modelData.actions && notifItem.modelData.actions.length > 0
+                                    Layout.fillWidth: true
+                                    Layout.topMargin: 4
+                                    spacing: 6
+
+                                    Repeater {
+                                        model: notifItem.modelData.actions || []
+
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            implicitWidth: actTxt.implicitWidth + 14
+                                            implicitHeight: 22
+                                            radius: Theme.radius
+                                            color: actMouse.containsMouse ? Theme.accent : Theme.bg
+                                            border.width: 1
+                                            border.color: actMouse.containsMouse ? Theme.accent : Theme.border
+
+                                            Text {
+                                                id: actTxt
+                                                anchors.centerIn: parent
+                                                text: modelData.text.toUpperCase()
+                                                color: actMouse.containsMouse ? Theme.bg : Theme.text
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 9
+                                                font.bold: true
+                                                font.letterSpacing: 0.6
+                                            }
+
+                                            MouseArea {
+                                                id: actMouse
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: Notifications.invokeAction(notifItem.modelData.id, modelData.identifier)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

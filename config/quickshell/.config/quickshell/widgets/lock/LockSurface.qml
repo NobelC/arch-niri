@@ -3,6 +3,7 @@ import Quickshell.Services.UPower
 import QtQuick
 import QtQuick.Layouts
 import "../../services"
+import "../common"
 
 Item {
     id: root
@@ -337,6 +338,7 @@ Item {
             // Contenedor principal
             Rectangle {
                 id: mainCard
+            CardNoise {}
                 width: parent.width
                 implicitHeight: cardCol.implicitHeight + (root.uiBorder * 2)
                 radius: root.uiRadius

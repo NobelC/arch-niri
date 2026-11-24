@@ -98,6 +98,10 @@ Singleton {
         if (root.recording) stopRecording();
         else runDelayed("record-full");
     }
+    function toggleRecordGif() {
+        if (root.recording) stopRecording();
+        else runDelayed("gif");
+    }
     function stopRecording() {
         Quickshell.execDetached([root.scriptPath, "stop"]);
     }
@@ -124,6 +128,7 @@ Singleton {
         function window(): void { root.captureWindow(); }
         function recordRegion(): void { root.toggleRecordRegion(); }
         function recordFull(): void { root.toggleRecordFull(); }
+        function gif(): void { root.toggleRecordGif(); }
         function stop(): void { root.stopRecording(); }
     }
 }

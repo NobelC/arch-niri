@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "../../services"
+import "../common"
 
 PanelWindow {
     id: launcherWindow
@@ -24,6 +25,41 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-launcher"
     WlrLayershell.keyboardFocus: isOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+    property var hoveredToplevel: null
+    property string hoveredAppName: ""
+
+
+    function findRunningToplevel(app) {
+        if (!app || !ToplevelManager.toplevels || !ToplevelManager.toplevels.values)
+            return null;
+        const list = ToplevelManager.toplevels.values;
+        const candidates = [];
+        if (app.startupClass) candidates.push(String(app.startupClass).toLowerCase());
+        if (app.id) {
+            const cleanId = String(app.id).toLowerCase().replace(/\.desktop$/, "");
+            candidates.push(cleanId);
+            const lastSeg = cleanId.split(".").pop();
+            if (lastSeg && lastSeg.length > 2) candidates.push(lastSeg);
+        }
+        if (app.name) candidates.push(String(app.name).toLowerCase());
+
+        for (let i = 0; i < list.length; i++) {
+            const tl = list[i];
+            if (!tl) continue;
+            const aid = String(tl.appId || "").toLowerCase();
+            const title = String(tl.title || "").toLowerCase();
+            for (let j = 0; j < candidates.length; j++) {
+                const c = candidates[j];
+                if (!c) continue;
+                if (aid === c || (aid.length > 0 && (aid.indexOf(c) !== -1 || c.indexOf(aid) !== -1)))
+                    return tl;
+                if (c.length >= 4 && title.indexOf(c) !== -1)
+                    return tl;
+            }
+        }
+        return null;
+    }
+
     property bool isOpen: false
     property bool animActive: false
     property bool isClosing: false
@@ -40,6 +76,10 @@ PanelWindow {
 
     onIsOpenChanged: {
         Niri.notifyLauncherState(isOpen);
+        if (!isOpen) {
+            hoveredToplevel = null;
+            hoveredAppName = "";
+        }
     }
 
     // ---------- MODO ROOT (prefijo "sudo " / "root " o Shift+Enter) ----------
@@ -677,6 +717,33 @@ PanelWindow {
                                     required property int index
 
                                     readonly property bool isSelected: index === launcherWindow.selectedIndex
+                                    readonly property var runningToplevel: launcherWindow.isOpen
+                                        ? launcherWindow.findRunningToplevel(appDelegate.modelData)
+                                        : null
+
+                                    Connections {
+                                        target: itemHover
+                                        function onContainsMouseChanged() {
+                                            if (itemHover.containsMouse && appDelegate.runningToplevel) {
+                                                launcherWindow.hoveredToplevel = appDelegate.runningToplevel;
+                                                launcherWindow.hoveredAppName = appDelegate.modelData.name || "";
+                                            } else if (!itemHover.containsMouse && launcherWindow.hoveredToplevel === appDelegate.runningToplevel) {
+                                                launcherWindow.hoveredToplevel = null;
+                                                launcherWindow.hoveredAppName = "";
+                                            }
+                                        }
+                                    }
+
+                                    // Indicador lateral de app ya abierta (preview disponible en hover)
+                                    Rectangle {
+                                        visible: appDelegate.runningToplevel !== null
+                                        anchors.left: parent.left
+                                        anchors.top: parent.top
+                                        anchors.bottom: parent.bottom
+                                        anchors.margins: Theme.borderWidth
+                                        width: 3
+                                        color: appDelegate.isSelected ? Theme.bg : Theme.accent
+                                    }
 
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 48
@@ -867,6 +934,131 @@ PanelWindow {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // ---------- Previsualización en vivo al hacer hover sobre una app abierta ----------
+    Item {
+        id: windowPreviewCard
+        visible: launcherWindow.isOpen && launcherWindow.hoveredToplevel !== null
+        width: 286
+        height: 204
+        anchors.left: dockContainer.right
+        anchors.leftMargin: 14
+        anchors.verticalCenter: dockContainer.verticalCenter
+        z: 50
+
+        // Sombra dura neo-brutalista
+        Rectangle {
+            x: 5
+            y: 5
+            width: parent.width
+            height: parent.height
+            radius: Theme.radius
+            color: Theme.accent
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: Theme.radius
+            color: Theme.bg
+            border.width: Theme.borderWidth
+            border.color: Theme.border
+            clip: true
+
+            CardNoise {}
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: Theme.borderWidth
+                spacing: 0
+
+                // Cabecera técnica
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 26
+                    color: Theme.cardAlt
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        spacing: 6
+
+                        Rectangle {
+                            width: 6
+                            height: 6
+                            color: Theme.success
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: ("LIVE // " + (launcherWindow.hoveredAppName || (launcherWindow.hoveredToplevel ? launcherWindow.hoveredToplevel.appId : ""))).toUpperCase()
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            font.bold: true
+                            font.letterSpacing: 0.8
+                            elide: Text.ElideRight
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: Theme.borderWidth
+                        color: Theme.border
+                    }
+                }
+
+                // Feed Wayland en vivo con proporción preservada
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    color: Theme.card
+                    clip: true
+
+                    ScreencopyView {
+                        anchors.centerIn: parent
+                        captureSource: launcherWindow.hoveredToplevel
+                        live: windowPreviewCard.visible
+                        paintCursor: false
+                        readonly property real srcAspect: (implicitWidth > 0 && implicitHeight > 0)
+                            ? (implicitWidth / implicitHeight) : (16 / 9)
+                        readonly property real boxAspect: parent.width / Math.max(1, parent.height)
+                        width: srcAspect > boxAspect ? parent.width : parent.height * srcAspect
+                        height: srcAspect > boxAspect ? parent.width / srcAspect : parent.height
+                    }
+                }
+
+                // Pie con título de la ventana
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 22
+                    color: Theme.bg
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        height: 1
+                        color: Theme.border
+                    }
+
+                    Text {
+                        anchors.fill: parent
+                        anchors.leftMargin: 8
+                        anchors.rightMargin: 8
+                        verticalAlignment: Text.AlignVCenter
+                        text: launcherWindow.hoveredToplevel ? (launcherWindow.hoveredToplevel.title || "") : ""
+                        color: Theme.sub
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 9
+                        elide: Text.ElideRight
                     }
                 }
             }

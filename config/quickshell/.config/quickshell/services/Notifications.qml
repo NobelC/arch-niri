@@ -175,6 +175,7 @@ Singleton {
                                 urgency: n.urgency !== undefined ? n.urgency : NotificationUrgency.Normal,
                                 timestamp: ts,
                                 time: root.formatStamp(ts),
+                                actions: [],
                                 notifObj: null,
                                 isAlive: false
                             };
@@ -227,8 +228,22 @@ Singleton {
             root.evaluateSchedule();
             const nowMs = Date.now();
 
+            const actionList = [];
+            if (notif.actions) {
+                for (let i = 0; i < notif.actions.length; i++) {
+                    const a = notif.actions[i];
+                    if (a && a.identifier !== "default") {
+                        actionList.push({
+                            identifier: String(a.identifier),
+                            text: String(a.text || a.identifier)
+                        });
+                    }
+                }
+            }
+
             const item = {
                 id: notif.id,
+                actions: actionList,
                 appName: (notif.appName && notif.appName.trim() !== "") ? notif.appName : "System",
                 desktopEntry: (notif.desktopEntry && notif.desktopEntry.trim() !== "") ? notif.desktopEntry : "",
                 summary: notif.summary || "",
@@ -297,6 +312,38 @@ Singleton {
         if (Niri.activeBarMenu === "notifications") {
             Niri.closeBarMenu();
         }
+    }
+
+    function invokeAction(id, identifier) {
+        const item = root.popups.find(n => n.id === id) || root.history.find(n => n.id === id);
+        if (!item) return;
+        if (item.isAlive && item.notifObj && item.notifObj.actions) {
+            try {
+                const acts = item.notifObj.actions;
+                for (let i = 0; i < acts.length; i++) {
+                    if (String(acts[i].identifier) === String(identifier)) {
+                        acts[i].invoke();
+                        break;
+                    }
+                }
+            } catch (e) {}
+        }
+        root.removeHistory(id);
+    }
+
+    function removeAppHistory(appName) {
+        const key = (appName || "System").toLowerCase();
+        for (let i = 0; i < root.history.length; i++) {
+            const item = root.history[i];
+            if ((item.appName || "System").toLowerCase() === key && item.isAlive && item.notifObj) {
+                item.isAlive = false;
+                try { item.notifObj.dismiss(); } catch (e) {}
+                item.notifObj = null;
+            }
+        }
+        root.popups = root.popups.filter(n => (n.appName || "System").toLowerCase() !== key);
+        root.history = root.history.filter(n => (n.appName || "System").toLowerCase() !== key);
+        root.saveHistory();
     }
 
     function dismissPopup(id) {

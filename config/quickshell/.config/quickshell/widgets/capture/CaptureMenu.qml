@@ -199,6 +199,14 @@ BarDrawer {
         }
 
         ActionTile {
+            visible: !Capture.recording
+            glyph: "󰵸"
+            title: "RECORD GIF (8S)"
+            sub: "SELECT AREA  ·  PALETTE GIF + CLIPBOARD"
+            onTriggered: Capture.toggleRecordGif()
+        }
+
+        ActionTile {
             visible: Capture.recording
             danger: true
             glyph: "󰓛"

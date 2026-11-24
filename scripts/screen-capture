@@ -31,9 +31,24 @@ is_recording() {
   pgrep -x "wf-recorder" >/dev/null 2>&1
 }
 
+notify_with_open() {
+  local title="$1" body="$2" file="$3" icon="${4:-}"
+  (
+    local act=""
+    if [[ -n "$icon" && -f "$icon" ]]; then
+      act="$(notify-send -a "Capture" -i "$icon" -A "open=Abrir carpeta" "$title" "$body" 2>/dev/null || true)"
+    else
+      act="$(notify-send -a "Capture" -A "open=Abrir carpeta" "$title" "$body" 2>/dev/null || true)"
+    fi
+    if [[ "$act" == "open" && -n "$file" ]]; then
+      setsid -f xdg-open "$(dirname "$file")" >/dev/null 2>&1
+    fi
+  ) >/dev/null 2>&1 &
+}
+
 notify_shot() {
   local title="$1" file="$2"
-  notify-send -a "Capture" -i "$file" "$title" "Saved & copied: $(basename "$file")" 2>/dev/null || true
+  notify_with_open "$title" "Saved & copied: $(basename "$file")" "$file" "$file"
 }
 
 cmd_stop() {
@@ -61,7 +76,7 @@ cmd_stop() {
   write_state false "" "$last_file" 0
   if [[ -n "$last_file" && -f "$last_file" ]]; then
     printf 'file://%s\n' "$last_file" | wl-copy --type text/uri-list 2>/dev/null || printf '%s' "$last_file" | wl-copy 2>/dev/null || true
-    notify-send -a "Capture" "Recording Saved" "$(basename "$last_file") (path copied)" 2>/dev/null || true
+    notify_with_open "Recording Saved" "$(basename "$last_file") (path copied)" "$last_file"
   else
     notify-send -a "Capture" "Recording Stopped" "Video saved to Recordings" 2>/dev/null || true
   fi
@@ -151,12 +166,53 @@ cmd_record_full() {
   notify-send -a "Capture" "Recording Screen" "Click the bar pill to stop" 2>/dev/null || true
 }
 
+
+cmd_record_gif() {
+  if is_recording; then
+    cmd_stop
+    exit 0
+  fi
+  local max_sec="${1:-8}" geom ts raw_mp4 gif_file now
+  geom="$(slurp -d -b '#00000088' -c '#f9e2afcc' -s '#f9e2af18' 2>/dev/null)" || exit 0
+  [[ -z "$geom" ]] && exit 0
+  ts="$(date '+%Y%m%d-%H%M%S')"
+  raw_mp4="/tmp/capture-gif-${ts}.mp4"
+  gif_file="$REC_DIR/clip-${ts}.gif"
+  now="$(date +%s)"
+
+  (
+    timeout -s INT "${max_sec}s" wf-recorder -g "$geom" -f "$raw_mp4" >/dev/null 2>&1 || true
+    rm -f "$PID_FILE"
+    if [[ -s "$raw_mp4" ]]; then
+      write_state true "gif-encode" "$gif_file" "$now"
+      ffmpeg -y -i "$raw_mp4"         -vf "fps=15,scale='min(960,iw)':-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer"         "$gif_file" >/dev/null 2>&1 || true
+      rm -f "$raw_mp4"
+    fi
+    write_state false "gif" "$gif_file" 0
+    if [[ -s "$gif_file" ]]; then
+      printf 'file://%s
+' "$gif_file" | wl-copy --type text/uri-list 2>/dev/null || printf '%s' "$gif_file" | wl-copy 2>/dev/null || true
+      notify_with_open "GIF Saved" "$(basename "$gif_file") (copied)" "$gif_file" "$gif_file"
+    else
+      notify-send -a "Capture" "GIF Failed" "No se pudo generar el GIF" 2>/dev/null || true
+    fi
+  ) >/dev/null 2>&1 &
+
+  sleep 0.15
+  local rpid
+  rpid="$(pgrep -n -x wf-recorder || true)"
+  [[ -n "$rpid" ]] && echo "$rpid" > "$PID_FILE"
+  write_state true "gif" "$gif_file" "$now"
+  notify-send -a "Capture" "Recording GIF (${max_sec}s)" "Click the bar pill to stop early" 2>/dev/null || true
+}
+
 case "$ACTION" in
   region)        cmd_region ;;
   full)          cmd_full ;;
   window)        cmd_window ;;
   record-region) cmd_record_region ;;
   record-full)   cmd_record_full ;;
+  gif)           cmd_record_gif "${2:-8}" ;;
   stop)          cmd_stop ;;
   open-shots)    setsid -f xdg-open "$SHOT_DIR" >/dev/null 2>&1 ;;
   open-recs)     setsid -f xdg-open "$REC_DIR" >/dev/null 2>&1 ;;
@@ -168,7 +224,7 @@ case "$ACTION" in
     fi
     ;;
   *)
-    echo "Uso: screen-capture [region|full|window|record-region|record-full|stop|open-shots|open-recs|status]" >&2
+    echo "Uso: screen-capture [region|full|window|record-region|record-full|gif|stop|open-shots|open-recs|status]" >&2
     exit 1
     ;;
 esac

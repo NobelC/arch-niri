@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import "../../services"
+import "../common"
 
 PanelWindow {
     id: updateWindow
@@ -229,6 +230,7 @@ PanelWindow {
     // Contenedor principal neo-brutalista
     Rectangle {
         id: box
+            CardNoise {}
         x: updateWindow.currentX
         y: updateWindow.currentY
         width: updateWindow.currentWidth
