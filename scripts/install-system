@@ -17,7 +17,6 @@ REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
 DOTFILES_DIR="$REAL_HOME/Projects/arch-niri"
 PACKAGES_DIR="$DOTFILES_DIR/packages"
 SCRIPTS_DIR="$DOTFILES_DIR/scripts"
-ICONS_DIR="$REAL_HOME/Pictures/WebAppIcons"
 
 run_as_user() {
   sudo -u "$REAL_USER" HOME="$REAL_HOME" "$@"
@@ -37,7 +36,20 @@ install_pacman_hook() {
 }
 
 install_grub_theme() {
-  echo "-> Configurando tema GRUB (hacker-box) y soporte grub-btrfs..."
+  echo "-> Configurando bootstrap UEFI de GRUB, tema hacker-box y grub-btrfs..."
+  pacman -S --needed --noconfirm grub efibootmgr 2>/dev/null || true
+
+  local esp
+  esp="$(findmnt -n -o TARGET /boot/efi 2>/dev/null || findmnt -n -o TARGET /boot 2>/dev/null || true)"
+  if [[ -n "$esp" && -d /sys/firmware/efi ]]; then
+    if [[ ! -f /boot/grub/grub.cfg ]] || ! efibootmgr 2>/dev/null | grep -q "GRUB"; then
+      grub-install --target=x86_64-efi --efi-directory="$esp" --bootloader-id=GRUB
+    fi
+    local grub_num
+    grub_num="$(efibootmgr 2>/dev/null | awk -F'[* ]' '/GRUB/ {sub(/^Boot/,"",$1); print $1; exit}')"
+    [[ -n "$grub_num" ]] && efibootmgr -o "$grub_num" >/dev/null 2>&1 || true
+  fi
+
   if [[ "$(stat -f -c %T / 2>/dev/null || true)" == "btrfs" ]]; then
     pacman -S --needed --noconfirm grub-btrfs 2>/dev/null || true
     if [[ -f /etc/default/grub-btrfs/config ]]; then
@@ -51,13 +63,17 @@ install_grub_theme() {
     cp -r "$DOTFILES_DIR/system/grub/hacker-box" /boot/grub/themes/
     chmod -x /etc/grub.d/31_efi_bootnext 2>/dev/null || true
 
+    sed -i '/gettext_printf "Loading Linux/ s/^/#/' /etc/grub.d/10_linux 2>/dev/null || true
+    sed -i '/gettext_printf "Loading initial ramdisk/ s/^/#/' /etc/grub.d/10_linux 2>/dev/null || true
+    sed -i '/echo.*\$(echo "\$message"/ s/^/#/' /etc/grub.d/10_linux 2>/dev/null || true
+
     python3 - << 'PYGRUB'
 from pathlib import Path
 g = Path("/etc/default/grub")
 gtxt = g.read_text()
 updates = {
     "GRUB_GFXMODE": "1366x768,auto",
-    "GRUB_GFXPAYLOAD_LINUX": "keep",
+    "GRUB_GFXPAYLOAD_LINUX": "text",
     "GRUB_THEME": '"/boot/grub/themes/hacker-box/theme.txt"',
 }
 seen = set()
@@ -82,7 +98,7 @@ PYGRUB
 }
 
 install_plymouth_theme() {
-  echo "-> Configurando splash Plymouth (hacker-minimal)..."
+  echo "-> Configurando splash Plymouth (hacker-minimal) y transición limpia a greetd..."
   pacman -S --needed --noconfirm plymouth 2>/dev/null || true
 
   if [[ -d "$DOTFILES_DIR/system/plymouth/hacker-minimal" ]]; then
@@ -118,14 +134,29 @@ from pathlib import Path
 import re
 g = Path("/etc/default/grub")
 gtxt = g.read_text()
-def add_splash(match):
-    val = match.group(1)
-    if "splash" not in val.split():
-        val = (val + " splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0").strip()
-    return f'GRUB_CMDLINE_LINUX_DEFAULT="{val}"'
-g.write_text(re.sub(r'^GRUB_CMDLINE_LINUX_DEFAULT="([^"]*)"', add_splash, gtxt, count=1, flags=re.MULTILINE))
+required = [
+    "quiet", "splash", "loglevel=3", "rd.udev.log_level=3",
+    "rd.systemd.show_status=false", "systemd.show_status=false",
+    "vt.global_cursor_default=0"
+]
+def add_flags(match):
+    tokens = match.group(1).split()
+    for flag in required:
+        if flag not in tokens:
+            tokens.append(flag)
+    return f'GRUB_CMDLINE_LINUX_DEFAULT="{" ".join(tokens)}"'
+g.write_text(re.sub(r'^GRUB_CMDLINE_LINUX_DEFAULT="([^"]*)"', add_flags, gtxt, count=1, flags=re.MULTILINE))
 PYSPLASH
   fi
+
+  mkdir -p /etc/systemd/system/plymouth-quit.service.d
+  cat << 'EOF' > /etc/systemd/system/plymouth-quit.service.d/retain-splash.conf
+[Service]
+ExecStart=
+ExecStart=-/usr/bin/plymouth quit --retain-splash
+EOF
+  systemctl disable getty@tty1.service 2>/dev/null || true
+  systemctl daemon-reload 2>/dev/null || true
 
   if [[ -d /boot/grub ]]; then
     mkinitcpio -P
@@ -155,19 +186,17 @@ echo "============================================================"
 echo "  Despliegue completo arch-niri (Usuario: $REAL_USER)"
 echo "============================================================"
 
-# 1. Crea carpeta de iconos de WebApps en Pictures
-run_as_user mkdir -p "$ICONS_DIR"
 
 # 2. Actualiza repositorios e instala paquetes oficiales (pacman)
 mapfile -t PACMAN_PKGS < <(read_pkg_list "$PACKAGES_DIR/pacman.txt")
 if [[ ${#PACMAN_PKGS[@]} -gt 0 ]]; then
-  echo "-> [1/5] Instalando paquetes de pacman (${#PACMAN_PKGS[@]})..."
+  echo "-> [1/4] Instalando paquetes de pacman (${#PACMAN_PKGS[@]})..."
   pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"
 fi
 
 # 3. Verifica o compila 'paru' si aún no está instalado
 if ! command -v paru &>/dev/null; then
-  echo "-> [2/5] Instalando paru desde AUR..."
+  echo "-> [2/4] Instalando paru desde AUR..."
   pacman -S --needed --noconfirm base-devel git
   TMP_PARU="/tmp/paru-build-$REAL_USER"
   rm -rf "$TMP_PARU"
@@ -182,44 +211,36 @@ fi
 # 4. Instala paquetes de AUR con paru (ejecutado como usuario real)
 mapfile -t PARU_PKGS < <(read_pkg_list "$PACKAGES_DIR/paru.txt")
 if [[ ${#PARU_PKGS[@]} -gt 0 ]]; then
-  echo "-> [3/5] Instalando paquetes de AUR con paru (${#PARU_PKGS[@]})..."
+  echo "-> [3/4] Instalando paquetes de AUR con paru (${#PARU_PKGS[@]})..."
   run_as_user paru -S --needed --noconfirm "${PARU_PKGS[@]}"
 fi
 
-NEO_LOGIN_REPO="https://github.com/Darsh-A/neologin-greetd"
 
 install_neo_login() {
   echo "-> Instalando y configurando greetd + neo-login..."
-  pacman -S --needed --noconfirm greetd cage noto-fonts-cjk
+  pacman -S --needed --noconfirm greetd cage quickshell 2>/dev/null || true
 
-  if [[ ! -d /usr/share/neo-login ]]; then
-    local tmp_neo="/tmp/neo-login-$REAL_USER"
-    rm -rf "$tmp_neo"
-    run_as_user git clone "${NEO_LOGIN_REPO}.git" "$tmp_neo"
-    (
-      cd "$tmp_neo"
-      sed -i -E "s|https://github\.com/YOURUSER/[^\"' )]+|$NEO_LOGIN_REPO|g" PKGBUILD
-      sed -i 's|source=("git+\$url.git")|source=("neo-login::git+$url.git")|' PKGBUILD
-      run_as_user makepkg -si --noconfirm
-    )
-    rm -rf "$tmp_neo"
+  if ! pacman -Qq neo-login-git >/dev/null 2>&1 && [[ ! -d /usr/share/neo-login ]]; then
+    run_as_user paru -S --needed --noconfirm neo-login-git
   fi
 
-  mkdir -p /etc/greetd /etc/neo-login
-  cp -f "$DOTFILES_DIR/system/greetd/config.toml" /etc/greetd/config.toml
-  cp -f "$DOTFILES_DIR/system/neo-login/config.json" /etc/neo-login/config.json
+  if [[ -f "$DOTFILES_DIR/system/greetd/config.toml" ]]; then
+    mkdir -p /etc/greetd
+    install -o root -g root -m 644 "$DOTFILES_DIR/system/greetd/config.toml" /etc/greetd/config.toml
+  fi
 
-  systemctl disable ly.service 2>/dev/null || systemctl disable ly@tty2.service 2>/dev/null || true
-  systemctl enable greetd.service
+  if [[ -f "$DOTFILES_DIR/system/neo-login/config.json" ]]; then
+    mkdir -p /etc/neo-login
+    install -o root -g root -m 644 "$DOTFILES_DIR/system/neo-login/config.json" /etc/neo-login/config.json
+  fi
+
+  systemctl enable greetd.service 2>/dev/null || true
 }
 
 # 5. Ejecuta auto-stow (enlaza dotfiles + valida y enlaza scripts)
-echo "-> [4/5] Enlazando dotfiles y scripts con auto-stow..."
+echo "-> [4/4] Enlazando dotfiles y scripts con auto-stow..."
 run_as_user bash "$SCRIPTS_DIR/auto-stow"
 
-# 6. Sincroniza e instala todas las WebApps declaradas con Pake
-echo "-> [5/5] Sincronizando WebApps de Pake..."
-run_as_user bash "$SCRIPTS_DIR/webapp" sync
 
 # 7. Instala el hook de pacman para mantener pacman.txt y paru.txt siempre al día
 install_pacman_hook

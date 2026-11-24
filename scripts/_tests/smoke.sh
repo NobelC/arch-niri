@@ -12,10 +12,9 @@ MOCK_BIN="$TMP_ROOT/bin"
 FAKE_HOME="$TMP_ROOT/home/tester"
 mkdir -p "$MOCK_BIN" "$FAKE_HOME/.local/state/quickshell"
 
-# --- Mocks ligeros para aislar red, firewall, systemctl y paru ---
+# --- Mocks ligeros para aislar red, firewall, systemctl, sudo y paru ---
 cat << 'MOCK' > "$MOCK_BIN/nmcli"
 #!/usr/bin/env bash
-# Simula equipo desconectado por defecto
 exit 0
 MOCK
 
@@ -70,7 +69,6 @@ MOCK
 
 cat << 'MOCK' > "$MOCK_BIN/sudo"
 #!/usr/bin/env bash
-# Evita bloqueos esperando contraseña interactiva en tests
 if [[ "${1:-}" == "-n" ]]; then
   shift
 fi
@@ -104,6 +102,19 @@ assert_fail() {
   fi
 }
 
+assert_fail_msg() {
+  local name="$1" expected="$2"; shift 2
+  local out rc=0
+  out="$("$@" 2>&1)" || rc=$?
+  if (( rc != 0 )) && [[ "$out" == *"$expected"* ]]; then
+    echo "  ✓ [test] $name"
+    PASS=$((PASS + 1))
+  else
+    echo "  ✗ [test] $name (rc=$rc, salida: ${out:-vacía})" >&2
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 # 1. net-trust-apply status sin red no debe tronar y debe escribir JSON válido
 assert_ok "net-trust-apply status sin red" \
   env PATH="$MOCK_BIN:$PATH" FAKE_HOME="$FAKE_HOME" NET_TRUST_USER=tester \
@@ -118,18 +129,18 @@ else
   FAIL=$((FAIL + 1))
 fi
 
-# 2. net-trust-apply debe rechazar perfil inválido y ausencia de usuario
+# 2. net-trust-apply rechaza perfil inválido y aborta por guard sin usuario
 assert_fail "net-trust-apply rechaza perfil inválido" \
   env PATH="$MOCK_BIN:$PATH" FAKE_HOME="$FAKE_HOME" NET_TRUST_USER=tester \
   bash "$REPO_DIR/system/net-trust/net-trust-apply" set invalid-profile
 
-assert_fail "net-trust-apply aborta sin NET_TRUST_USER/SUDO_USER" \
+assert_fail_msg "net-trust-apply aborta por guard de NET_TRUST_USER/SUDO_USER" "NET_TRUST_USER" \
   env -u SUDO_USER -u NET_TRUST_USER PATH="$MOCK_BIN:$PATH" \
   bash "$REPO_DIR/system/net-trust/net-trust-apply" status
 
-# 3. sys-update-apply aborta sin SYS_UPDATE_USER/SUDO_USER
-assert_fail "sys-update-apply aborta sin SYS_UPDATE_USER/SUDO_USER" \
-  env -u SUDO_USER -u SYS_UPDATE_USER PATH="$MOCK_BIN:$PATH" \
+# 3. sys-update-apply aborta por guard sin usuario (verificando mensaje real, no permisos)
+assert_fail_msg "sys-update-apply aborta por guard de SYS_UPDATE_USER/SUDO_USER" "SYS_UPDATE_USER" \
+  env -u SUDO_USER -u SYS_UPDATE_USER HOME="$FAKE_HOME" PATH="$MOCK_BIN:$PATH" \
   bash "$REPO_DIR/system/sys-update/sys-update-apply" upgrade
 
 # 4. sys-update check genera JSON estructurado con REPO y AUR

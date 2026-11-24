@@ -14,21 +14,9 @@ fi
 REAL_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
 DOTFILES_DIR="$REAL_HOME/Projects/arch-niri"
 PACKAGES_DIR="$DOTFILES_DIR/packages"
-WEBAPPS_FILE="$PACKAGES_DIR/webapps.tsv"
 
 [[ -d "$DOTFILES_DIR" ]] || exit 0
 mkdir -p "$PACKAGES_DIR"
-
-# Construye lista de slugs de webapps para excluirlos de paru.txt (ya viven en webapps.tsv)
-declare -A WEBAPP_SLUGS=()
-if [[ -f "$WEBAPPS_FILE" ]]; then
-  while IFS=$'\t' read -r name _rest; do
-    [[ -z "$name" || "$name" =~ ^# ]] && continue
-    slug=$(echo "$name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
-    WEBAPP_SLUGS["$slug"]=1
-    WEBAPP_SLUGS["webapp-$slug"]=1
-  done < "$WEBAPPS_FILE"
-fi
 
 # 1. Paquetes explícitos de repositorios oficiales (sin dependencias)
 TMP_PAC="$(mktemp)"
@@ -37,16 +25,11 @@ TMP_PAC="$(mktemp)"
   pacman -Qqen | sort -u
 } > "$TMP_PAC"
 
-# 2. Paquetes explícitos de AUR / externos (sin dependencias ni webapps de Pake)
+# 2. Paquetes explícitos de AUR / externos (sin dependencias)
 TMP_AUR="$(mktemp)"
 {
   echo "# Paquetes explícitos de AUR (generado automáticamente)"
-  while IFS= read -r pkg; do
-    [[ -z "$pkg" ]] && continue
-    if [[ -z "${WEBAPP_SLUGS[$pkg]:-}" ]]; then
-      echo "$pkg"
-    fi
-  done < <(pacman -Qqem | sort -u)
+  pacman -Qqem | sort -u
 } > "$TMP_AUR"
 
 mv "$TMP_PAC" "$PACKAGES_DIR/pacman.txt"

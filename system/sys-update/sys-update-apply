@@ -8,11 +8,14 @@ if [[ -z "$USER_NAME" || "$USER_NAME" == "root" ]]; then
   exit 1
 fi
 USER_HOME="$(getent passwd "$USER_NAME" | cut -d: -f6)"
+[[ -n "$USER_HOME" ]] || { echo "✗ Error: usuario '$USER_NAME' no encontrado." >&2; exit 1; }
 REPO_DIR="${USER_HOME}/Projects/arch-niri"
 STATE_DIR="${USER_HOME}/.local/state/quickshell"
 STATE_FILE="${STATE_DIR}/sys-update.json"
 HISTORY_FILE="${STATE_DIR}/sys-update-history.json"
-LOG_FILE="${STATE_DIR}/sys-update.log"
+LOG_LINK="${STATE_DIR}/sys-update.log"
+LOG_FILE="${STATE_DIR}/sys-update-$(date '+%Y%m%d-%H%M%S').log"
+MAX_LOGS="${SYS_UPDATE_MAX_LOGS:-10}"
 
 mkdir -p "$STATE_DIR"
 chown "${USER_NAME}:${USER_NAME}" "$STATE_DIR"
@@ -134,7 +137,7 @@ sync_repo_state() {
 cleanup_on_exit() {
   local rc=$?
   if [[ $rc -ne 0 && -f "$STATE_FILE" ]]; then
-    write_progress "error" "ERROR // UPDATE INTERRUPTED OR FAILED (CODE $rc)" false "$SNAP_CREATED" || true
+    write_progress "error" "ERROR // UPDATE INTERRUPTED OR FAILED (CODE $rc)" false 0 0 "$SNAP_CREATED" || true
   fi
 }
 SNAP_CREATED=""
@@ -143,7 +146,15 @@ trap cleanup_on_exit EXIT
 case "$ACTION" in
   upgrade)
     : > "$LOG_FILE"
-    chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
+    ln -sfn "$(basename "$LOG_FILE")" "$LOG_LINK"
+    if [[ $EUID -eq 0 ]]; then
+      chown "${USER_NAME}:${USER_NAME}" "$LOG_FILE"
+      chown -h "${USER_NAME}:${USER_NAME}" "$LOG_LINK"
+    fi
+    mapfile -t old_logs < <(ls -1t "${STATE_DIR}"/sys-update-*.log 2>/dev/null | tail -n +"$((MAX_LOGS + 1))" || true)
+    for old_log in "${old_logs[@]}"; do
+      rm -f "$old_log"
+    done
 
     load_averages
     T_START=$SECONDS

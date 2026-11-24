@@ -47,30 +47,18 @@ Singleton {
         "mpv": "",
         "obs": "󰑋",
 
-        // WebApps creadas con Pake (StartupWMClass = <slug> / pake-<slug>)
         "whatsapp": "",
-        "pake-whatsapp": "",
         "youtube-music": "󰎆",
-        "pake-youtube-music": "󰎆",
         "youtube": "",
-        "pake-youtube": "",
         "spotify": "",
-        "pake-spotify": "",
         "simpmusic": "󰎆",
         "github": "",
-        "pake-github": "",
         "telegram": "",
-        "pake-telegram": "",
         "gemini": "󰚩",
-        "pake-gemini": "󰚩",
         "chatgpt": "󰚩",
-        "pake-chatgpt": "󰚩",
         "claude": "󰚩",
-        "pake-claude": "󰚩",
         "gmail": "󰊫",
-        "pake-gmail": "󰊫",
         "notion": "󰈙",
-        "pake-notion": "󰈙",
 
         // Respaldo Chromium/Brave --app=...
         "chrome-music.youtube.com__-default": "󰎆",
@@ -81,7 +69,7 @@ Singleton {
         "chrome-gemini.google.com__app-default": "󰚩"
     })
 
-    // 2. Respaldo por palabras clave en título o app_id (TUIs en Ghostty y WebApps dinámicas)
+    // 2. Respaldo por palabras clave en título o app_id (TUIs en Ghostty)
     readonly property var keywordRules: [
         { keys: ["nvim", "neovim"], glyph: "" },
         { keys: ["keepass"], glyph: "󰌋" },
@@ -102,8 +90,7 @@ Singleton {
         { keys: ["git", "lazygit"], glyph: "󰊢" },
         { keys: [".pdf", "zathura"], glyph: "" },
         { keys: ["ghostty", "kitty", "terminal"], glyph: "󰆍" },
-        { keys: ["zen", "firefox"], glyph: "󰈹" },
-        { keys: ["pake-", "webapp-"], glyph: "󰖟" }
+        { keys: ["zen", "firefox"], glyph: "󰈹" }
     ]
 
     function resolve(appId, title) {
@@ -115,11 +102,7 @@ Singleton {
             return exactMap[id];
         }
 
-        // 2. Coincidencia sin prefijo "pake-" o "webapp-"
-        const strippedId = id.replace(/^(pake|webapp)-/, "");
-        if (strippedId !== id && exactMap[strippedId] !== undefined) {
-            return exactMap[strippedId];
-        }
+
 
         // 3. Reglas por palabra clave en título o app_id
         for (let i = 0; i < keywordRules.length; i++) {

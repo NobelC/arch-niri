@@ -36,3 +36,14 @@ post_hook = 'ln -sf "$HOME/.local/state/matugen/yazi-theme.toml" "$HOME/.config/
 [templates.opensnitch]
 input_path = "~/.config/matugen/templates/opensnitch.qss"
 output_path = "~/.config/opensnitch/themes/neo-brutal.qss"
+post_hook = 'if pgrep -x opensnitch-ui >/dev/null 2>&1; then pkill -x opensnitch-ui; setsid -f opensnitch-ui --background >/dev/null 2>&1; fi'
+
+[templates.gtk]
+input_path = "~/.config/matugen/templates/gtk-colors.css"
+output_path = "~/.local/state/matugen/gtk-colors.css"
+post_hook = 'mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0" && ln -sf "$HOME/.local/state/matugen/gtk-colors.css" "$HOME/.config/gtk-3.0/colors.css" && ln -sf "$HOME/.local/state/matugen/gtk-colors.css" "$HOME/.config/gtk-4.0/colors.css" && (command -v gsettings >/dev/null 2>&1 && gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" || true)'
+
+[templates.qt6ct]
+input_path = "~/.config/matugen/templates/qt6ct-colors.conf"
+output_path = "~/.local/state/matugen/qt6ct-colors.conf"
+post_hook = 'mkdir -p "$HOME/.config/qt6ct/colors" && ln -sf "$HOME/.local/state/matugen/qt6ct-colors.conf" "$HOME/.config/qt6ct/colors/matugen.conf"'

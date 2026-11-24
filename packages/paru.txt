@@ -4,7 +4,6 @@ localsend-bin
 matugen-bin
 neo-login-git
 onlyoffice-bin
-pake-cli
 paru-bin
 paru-bin-debug
 phinger-cursors

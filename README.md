@@ -23,7 +23,6 @@ Entorno de escritorio personal, modular y declarativo para **Arch Linux** constr
 │   ├── appimages.tsv        # Registro de AppImages integradas al sistema
 │   ├── pacman.txt           # Paquetes explícitos de repositorios oficiales
 │   ├── paru.txt             # Paquetes explícitos de AUR
-│   └── webapps.tsv          # WebApps empaquetadas con Pake
 └── scripts/                 # Herramientas ejecutables enlazadas en ~/.local/bin/
     ├── appimage             # Instala, actualiza y elimina AppImages en ~/Applications
     ├── auto-permission-add  # Valida sintaxis, otorga +x y enlaza scripts en ~/.local/bin
@@ -31,7 +30,6 @@ Entorno de escritorio personal, modular y declarativo para **Arch Linux** constr
     ├── install-system       # Despliegue integral automatizado para instalaciones limpias
     ├── set-wallpaper        # Aplica wallpaper (awww + swaybg blur) y regenera paleta (Matugen)
     ├── sync-packages        # Extrae paquetes explícitos hacia pacman.txt y paru.txt
-    └── webapp               # Crea, instala, sincroniza y elimina WebApps con Pake
 ```
 
 ---
@@ -67,9 +65,8 @@ cd ~/Projects/arch-niri
 Ejecuta `install-system` con `sudo` desde tu usuario normal (no como `root` directo). El script:
 1. Instala todos los paquetes oficiales listados en `packages/pacman.txt`.
 2. Compila e instala `paru` automáticamente si no está presente.
-3. Instala los paquetes de AUR listados en `packages/paru.txt` (incluyendo `pake-cli`).
+3. Instala los paquetes de AUR listados en `packages/paru.txt`.
 4. Ejecuta `auto-stow` para enlazar todos los dotfiles en `$HOME` y registrar los scripts en `~/.local/bin`.
-5. Compila e instala las WebApps declaradas en `packages/webapps.tsv`.
 6. Instala un **Pacman Hook** (`/etc/pacman.d/hooks/99-arch-niri-packages.hook`) para mantener las listas de paquetes sincronizadas automáticamente.
 7. Habilita los servicios base (`NetworkManager`, `bluetooth`, `power-profiles-daemon`).
 
@@ -109,31 +106,12 @@ Integra archivos `.AppImage` dentro de `~/Applications/`, extrae automáticament
 | `appimage remove <slug>` | Elimina el binario, el icono, el lanzador `.desktop` y su registro en `packages/appimages.tsv`. |
 | `appimage list` | Muestra en tabla las AppImages gestionadas actualmente. |
 
-### Gestión de WebApps (`webapp` + Pake)
-
-Las WebApps se compilan como paquetes nativos aislados de Arch (`webapp-<slug>.pkg.tar.zst`) usando **Pake**, quedan registradas en `packages/webapps.tsv` y toman sus iconos de `~/Pictures/WebAppIcons/`.
-
-| Comando | Descripción |
-| :--- | :--- |
-| `webapp add "<Nombre>" "<URL>" [icono] [flags]` | Compila, instala y registra una nueva WebApp. Si omites `[icono]`, busca automáticamente `<slug>.png/.svg/.ico` en `~/Pictures/WebAppIcons/`. |
-| `webapp remove "<Nombre>"` | Desinstala el paquete de la WebApp del sistema y la elimina de `packages/webapps.tsv`. |
-| `webapp sync` | Instala todas las WebApps declaradas en `packages/webapps.tsv` que aún no estén en el sistema. |
-| `webapp list` | Muestra en tabla las WebApps registradas en el repositorio. |
-
-**Ejemplos:**
-```bash
-# Coloca previamente ~/Pictures/WebAppIcons/gemini.png y ejecuta:
-webapp add "Gemini" "https://gemini.google.com"
-
-# Con dimensiones de ventana personalizadas:
-webapp add "Spotify" "https://open.spotify.com" "" "--width 1280 --height 820"
-```
 
 ### Paquetes y Sincronización
 
 | Comando | Descripción |
 | :--- | :--- |
-| `sync-packages` | Extrae todos los paquetes instalados explícitamente (sin dependencias) hacia `packages/pacman.txt` y `packages/paru.txt`. Se ejecuta también automáticamente tras cada operación de `pacman`/`paru`/`webapp`. |
+| `sync-packages` | Extrae todos los paquetes instalados explícitamente (sin dependencias) hacia `packages/pacman.txt` y `packages/paru.txt`. Se ejecuta también automáticamente tras cada operación de `pacman`/`paru`. |
 
 ### Apariencia y Wallpapers
 
