@@ -117,10 +117,10 @@ create_pre_snapshot() {
 
 sync_repo_state() {
   if [[ -x "${REPO_DIR}/scripts/sync-packages" ]]; then
-    sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/sync-packages" >/dev/null 2>&1 || true
+    timeout 25 sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/sync-packages" >> "$LOG_FILE" 2>&1 || true
   fi
   if [[ -x "${REPO_DIR}/scripts/auto-stow" ]]; then
-    sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/auto-stow" >/dev/null 2>&1 || true
+    timeout 45 sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/auto-stow" >> "$LOG_FILE" 2>&1 || true
   fi
 }
 
