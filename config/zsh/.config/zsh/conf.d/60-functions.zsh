@@ -116,3 +116,20 @@ notemap() {
     fi
   done < <(find "$root" -type f -name '*.md' -not -path '*/.obsidian/*' -print0 | sort -z)
 }
+
+git() {
+    # Interceptar solo si el subcomando principal es 'add'
+    if [[ "$1" == "add" ]]; then
+        # Obtener la raíz exacta del repositorio Git actual
+        local repo_root
+        repo_root=$(command git rev-parse --show-toplevel 2>/dev/null)
+
+        # Si estamos dentro de un repositorio válido, limpiar recursivamente
+        if [[ -n "$repo_root" ]]; then
+            find "$repo_root" -type f -name "repomix-output*.xml" -delete
+        fi
+    fi
+
+    # Ejecutar el binario real de git con todos los argumentos originales
+    command git "$@"
+}
