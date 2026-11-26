@@ -29,3 +29,6 @@ spawn-sh-at-startup "wl-paste --type image --watch cliphist store"
 
 // --- 9. SINCRONIZACIÓN DE LED DE MICRÓFONO (F4) ---
 spawn-sh-at-startup "\"$HOME/.local/bin/mic-toggle\" --sync"
+
+// --- 10. AUTOMONTADO DE DISCOS Y USB (udiskie + UDisks2) ---
+spawn-at-startup "udiskie" "--automount" "--notify" "--no-tray" "--no-file-manager"

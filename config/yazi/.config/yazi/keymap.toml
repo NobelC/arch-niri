@@ -16,3 +16,19 @@ desc = "Abrir carpeta en Neovim"
 on   = [ "E" ]
 run  = 'shell --block -- nvim "${0:-.}"'
 desc = "Abrir carpeta en Neovim (alternativo)"
+
+# 3. Discos externos y USB (/run/media/NobelC)
+[[mgr.prepend_keymap]]
+on   = [ "g", "m" ]
+run  = 'cd /run/media/NobelC'
+desc = "Ir a discos externos y USB montados"
+
+[[mgr.prepend_keymap]]
+on   = [ "M" ]
+run  = 'shell -- udiskie-mount -a'
+desc = "Montar todos los discos/USB conectados"
+
+[[mgr.prepend_keymap]]
+on   = [ "U" ]
+run  = 'shell --block -- udiskie-umount --detach "$0"'
+desc = "Desmontar y expulsar disco seleccionado de forma segura"

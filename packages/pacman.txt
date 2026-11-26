@@ -86,6 +86,7 @@ swayidle
 tree
 tree-sitter-cli
 ttf-jetbrains-mono-nerd
+udiskie
 unzip
 vulkan-intel
 webkit2gtk-4.1
