@@ -36,9 +36,12 @@ restore_mic() {
   if command -v wpctl >/dev/null 2>&1; then
     local prev="1"
     [[ -f "$MIC_STATE_FILE" ]] && prev="$(tr -d '[:space:]' < "$MIC_STATE_FILE" 2>/dev/null || echo 1)"
-    if [[ "$prev" == "0" ]]; then
-      wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0 2>/dev/null || true
-    fi
+    [[ "$prev" == "0" ]] && wpctl set-mute @DEFAULT_AUDIO_SOURCE@ 0 2>/dev/null || true
+  fi
+  if command -v pactl >/dev/null 2>&1; then
+    while IFS= read -r src; do
+      [[ -n "$src" ]] && pactl set-source-mute "$src" 0 2>/dev/null || true
+    done < <(pactl list short sources 2>/dev/null | awk '!/\.monitor/ {print $1}')
   fi
 }
 

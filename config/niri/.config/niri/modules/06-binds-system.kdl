@@ -18,9 +18,10 @@ binds {
     XF86AudioNext  allow-when-locked=true { spawn "playerctl" "next"; }
 
     // --- CAPTURAS DE PANTALLA ---
-    Print      { screenshot; }
-    Ctrl+Print { screenshot-screen; }
-    Alt+Print  { screenshot-window; }
+    // Movidas a 07-binds-user.kdl (Quickshell Capture): Print / Ctrl+Print /
+    // Alt+Print / Shift+Print. No se duplican aquí para evitar que estas
+    // definiciones queden "muertas" (07 se incluye después de 06 y siempre
+    // gana en el mismo atajo).
 
     // --- ENERGÍA Y BLOQUEO DE PANTALLA ---
     // Apaga el panel al instante (se enciende al mover el ratón o pulsar cualquier tecla)
