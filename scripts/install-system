@@ -155,7 +155,18 @@ PYSPLASH
 ExecStart=
 ExecStart=-/usr/bin/plymouth quit --retain-splash
 EOF
-  systemctl disable getty@tty1.service 2>/dev/null || true
+
+  # "disable" solo quita el symlink estático: systemd-logind puede seguir
+  # generando un getty en una VT libre vía su mecanismo autovt. Con "mask"
+  # queda bloqueado de verdad, y con NAutoVTs=0 evitamos que logind reactive
+  # cualquier VT durante el handoff plymouth -> greetd -> niri.
+  systemctl mask getty@tty1.service 2>/dev/null || true
+  mkdir -p /etc/systemd/logind.conf.d
+  cat << 'EOF' > /etc/systemd/logind.conf.d/00-no-autovt.conf
+[Login]
+NAutoVTs=0
+ReserveVT=0
+EOF
   systemctl daemon-reload 2>/dev/null || true
 
   if [[ -d /boot/grub ]]; then

@@ -89,7 +89,6 @@ cmd_region() {
   sleep 0.08
   file="$SHOT_DIR/shot-$(date '+%Y%m%d-%H%M%S').png"
   grim -g "$geom" "$file"
-  qs ipc call capture flash >/dev/null 2>&1 &
   wl-copy --type image/png < "$file"
   write_state false "region" "$file" 0
   notify_shot "Region Screenshot" "$file"
@@ -104,7 +103,6 @@ cmd_full() {
   else
     grim "$file"
   fi
-  qs ipc call capture flash >/dev/null 2>&1 &
   wl-copy --type image/png < "$file"
   write_state false "full" "$file" 0
   notify_shot "Full Screenshot" "$file"
@@ -122,7 +120,6 @@ cmd_window() {
     sleep 0.05
   done
   if [[ -s "$file" ]]; then
-    qs ipc call capture flash >/dev/null 2>&1 &
     write_state false "window" "$file" 0
     notify_shot "Window Screenshot" "$file"
   fi

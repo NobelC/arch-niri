@@ -30,6 +30,7 @@ Singleton {
     property string liveLog: ""
     property bool inspectLoading: false
     property var inspectResult: ({ ok: true, mode: "", order: [], paths: [], error: "", summary: "" })
+    property var pendingInspectList: null
 
     property bool modalOpen: false
 
@@ -38,7 +39,8 @@ Singleton {
     readonly property bool highAlert: count >= 20
 
     readonly property string etaText: {
-        if (!running || etaSeconds <= 0) return "";
+        if (!running) return "";
+        if (etaSeconds <= 0) return "WORKING...";
         const m = Math.floor(etaSeconds / 60);
         const s = etaSeconds % 60;
         if (m > 0) return "~" + m + "m " + String(s).padStart(2, "0") + "s";
@@ -101,7 +103,6 @@ Singleton {
         id: inspectProc
         stdout: StdioCollector {
             onStreamFinished: {
-                root.inspectLoading = false;
                 try {
                     const data = JSON.parse(this.text.trim());
                     root.inspectResult = data;
@@ -110,7 +111,16 @@ Singleton {
                 }
             }
         }
-        onExited: root.inspectLoading = false
+        onExited: {
+            root.inspectLoading = false;
+            // Si llegó una selección nueva mientras esta inspección corría, no se
+            // pierde: se relanza de inmediato con la selección más reciente.
+            if (root.pendingInspectList !== null) {
+                const next = root.pendingInspectList;
+                root.pendingInspectList = null;
+                root.inspectRemoval(next);
+            }
+        }
     }
 
     Timer {
@@ -134,7 +144,11 @@ Singleton {
     }
 
     function inspectRemoval(pkgList) {
-        if (inspectProc.running) return;
+        if (inspectProc.running) {
+            root.pendingInspectList = pkgList && pkgList.length > 0 ? pkgList.slice() : [];
+            return;
+        }
+        root.pendingInspectList = null;
         root.inspectLoading = true;
         const args = [root.scriptPath, "inspect"];
         if (!pkgList || pkgList.length === 0) {
@@ -147,6 +161,7 @@ Singleton {
     }
 
     function clearInspect() {
+        root.pendingInspectList = null;
         root.inspectResult = { ok: true, mode: "", order: [], paths: [], error: "", summary: "" };
     }
 

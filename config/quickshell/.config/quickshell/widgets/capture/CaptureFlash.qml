@@ -45,14 +45,14 @@ Variants {
 
         SequentialAnimation {
             id: shutterAnim
-            PropertyAction { target: flashRect; property: "opacity"; value: 0.72 }
-            PauseAnimation { duration: 32 }
+            PropertyAction { target: flashRect; property: "opacity"; value: 0.78 }
+            PauseAnimation { duration: 45 }
             NumberAnimation {
                 target: flashRect
                 property: "opacity"
                 to: 0.0
-                duration: 75
-                easing.type: Easing.OutCubic
+                duration: 130
+                easing.type: Easing.OutQuad
             }
         }
     }

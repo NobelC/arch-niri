@@ -238,7 +238,7 @@ cmd_inspect() {
 
   local ok="true"
   local err_msg=""
-  if ! LC_ALL=C pacman -Rns --print-format '%n %v' "${targets[@]}" > "$out_file" 2> "$err_file"; then
+  if ! LC_ALL=C pacman -Rs --print-format '%n %v' "${targets[@]}" > "$out_file" 2> "$err_file"; then
     ok="false"
     err_msg="$(tr '\n' ' ' < "$err_file" | sed 's/  */ /g')"
   fi

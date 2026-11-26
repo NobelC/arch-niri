@@ -51,10 +51,13 @@ BarDrawer {
 
         function copyItem(item) {
             if (!item) return;
+            // Re-consulta cliphist por id en el momento en vez de reconstruir la
+            // línea original: evita desajustes de contenido que hacían fallar
+            // la operación en silencio.
             Quickshell.execDetached([
                 "bash", "-c",
-                "printf '%s\\n' \"$1\" | cliphist decode | wl-copy",
-                "bash", item.raw
+                "cliphist list | awk -F'\\t' -v id=\"$1\" '$1==id {print; exit}' | cliphist decode | wl-copy",
+                "bash", item.id
             ]);
             Niri.closeBarMenu();
         }
@@ -63,8 +66,8 @@ BarDrawer {
             if (!item) return;
             deleteProc.command = [
                 "bash", "-c",
-                "printf '%s\\n' \"$1\" | cliphist delete; rm -f \"/tmp/qs-cliphist-thumbs/$2.img\"",
-                "bash", item.raw, item.id
+                "cliphist list | awk -F'\\t' -v id=\"$1\" '$1==id {print; exit}' | cliphist delete; rm -f \"/tmp/qs-cliphist-thumbs/$1.img\"",
+                "bash", item.id
             ];
             deleteProc.running = true;
         }

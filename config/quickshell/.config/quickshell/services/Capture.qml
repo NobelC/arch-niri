@@ -34,6 +34,8 @@ Singleton {
     function parseState(raw) {
         try {
             const d = JSON.parse(raw);
+            const prevFile = root.lastFile;
+            const prevRecording = root.recording;
             root.recording = !!d.recording;
             root.mode = d.mode || "";
             root.lastFile = d.file || "";
@@ -42,6 +44,11 @@ Singleton {
                 root.elapsedSeconds = Math.max(0, Math.floor(Date.now() / 1000) - root.startedAt);
             } else if (!root.recording) {
                 root.elapsedSeconds = 0;
+            }
+            // Dispara el flash exactamente cuando aparece un screenshot nuevo
+            // (no cuando solo cambia el estado de grabación con el mismo archivo).
+            if (!root.recording && !prevRecording && root.lastFile !== "" && root.lastFile !== prevFile) {
+                root.shutterFlash();
             }
         } catch (e) {
             console.warn("Capture: error al parsear capture.json:", e);

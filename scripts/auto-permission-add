@@ -63,7 +63,11 @@ for script in "${TARGETS[@]}"; do
   fi
 done
 
-if [ $# -eq 0 ] && [ -x "$SCRIPTS_DIR/_tests/smoke.sh" ]; then
+# Los smoke tests ya NO corren automáticamente en cada auto-stow/actualización real:
+# añaden tiempo impredecible (shellcheck + forks de prueba) justo durante la fase
+# de sync del actualizador, y su salida contaminaba el log en vivo del modal.
+# Para correrlos a propósito: AUTO_STOW_RUN_TESTS=1 bash scripts/auto-stow
+if [ $# -eq 0 ] && [ -x "$SCRIPTS_DIR/_tests/smoke.sh" ] && [ "${AUTO_STOW_RUN_TESTS:-0}" = "1" ]; then
   echo "-> Ejecutando smoke tests..."
   bash "$SCRIPTS_DIR/_tests/smoke.sh"
 fi

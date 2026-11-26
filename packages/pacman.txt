@@ -59,6 +59,7 @@ noise-suppression-for-voice
 noto-fonts-cjk
 npm
 ntfs-3g
+obsidian
 opensnitch
 openssh
 pacman-contrib

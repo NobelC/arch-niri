@@ -117,10 +117,16 @@ create_pre_snapshot() {
 
 sync_repo_state() {
   if [[ -x "${REPO_DIR}/scripts/sync-packages" ]]; then
-    timeout 25 sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/sync-packages" >> "$LOG_FILE" 2>&1 || true
+    write_progress "syncing" "04 // SYNCING PACKAGE LISTS..." true 96 6 "$SNAP_CREATED"
+    log_line "SYNC: sync-packages start"
+    timeout -k 5 25 sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/sync-packages" </dev/null >> "$LOG_FILE" 2>&1 || true
+    log_line "SYNC: sync-packages done"
   fi
   if [[ -x "${REPO_DIR}/scripts/auto-stow" ]]; then
-    timeout 45 sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/auto-stow" >> "$LOG_FILE" 2>&1 || true
+    write_progress "syncing" "05 // RELINKING DOTFILES (AUTO-STOW)..." true 98 8 "$SNAP_CREATED"
+    log_line "SYNC: auto-stow start"
+    timeout -k 5 45 sudo -u "$USER_NAME" HOME="$USER_HOME" bash "${REPO_DIR}/scripts/auto-stow" </dev/null >> "$LOG_FILE" 2>&1 || true
+    log_line "SYNC: auto-stow done"
   fi
 }
 
@@ -276,11 +282,9 @@ case "$ACTION" in
     T_AUR_END=$SECONDS
     aur_elapsed=$(( T_AUR_END - T_AUR_START ))
 
-    write_progress "syncing" "04 // SYNCING PACKAGES & AUTO-STOW..." true 96 2 "$SNAP_CREATED"
-    T_SYNC_START=$SECONDS
     sync_repo_state
     T_END=$SECONDS
-    sync_elapsed=$(( T_END - T_SYNC_START ))
+    sync_elapsed=$(( T_END - T_AUR_END ))
 
     base_total=$(( snap_elapsed + sync_elapsed ))
     total_elapsed=$(( T_END - T_START ))
@@ -293,7 +297,7 @@ case "$ACTION" in
       --arg snap "$SNAP_CREATED" \
       --arg ts "$(date '+%Y-%m-%d %H:%M')" \
       --argjson orph "$(printf '%s\n' "${rem_orph[@]:-}" | jq -Rn '[inputs | select(length > 0)]')" \
-      '{count: 0, packages: [], orphanCount: ($orph | length), orphans: $orph, phase: "done", message: "05 // INSTALLATION COMPLETE", running: false, progress: 100, etaSeconds: 0, lastSnapshot: $snap, updatedAt: $ts}' > "$tmp"
+      '{count: 0, packages: [], orphanCount: ($orph | length), orphans: $orph, phase: "done", message: "06 // INSTALLATION COMPLETE", running: false, progress: 100, etaSeconds: 0, lastSnapshot: $snap, updatedAt: $ts}' > "$tmp"
     mv "$tmp" "$STATE_FILE"
     chown "${USER_NAME}:${USER_NAME}" "$STATE_FILE"
     ;;
