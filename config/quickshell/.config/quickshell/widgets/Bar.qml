@@ -120,12 +120,7 @@ PanelWindow {
         }
 
         // Módulo central: Reloj 100% centrado + Icono de actualizaciones anclado a su derecha
-        UpdateIcon {
-            anchors.right: clockWidget.left
-            anchors.rightMargin: 8
-            anchors.verticalCenter: clockWidget.verticalCenter
-        }
-        Clock {
+Clock {
             id: clockWidget
             anchors.centerIn: parent
             anchors.verticalCenterOffset: -1

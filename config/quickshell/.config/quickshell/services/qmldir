@@ -13,6 +13,5 @@ singleton Notifications 1.0 Notifications.qml
 singleton NightLight 1.0 NightLight.qml
 singleton Displays 1.0 Displays.qml
 singleton NetTrust 1.0 NetTrust.qml
-singleton SystemUpdate 1.0 SystemUpdate.qml
 singleton Weather 1.0 Weather.qml
 singleton Capture 1.0 Capture.qml

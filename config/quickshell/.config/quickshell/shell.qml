@@ -16,8 +16,6 @@ import "widgets/notifications"
 import "widgets/displays"
 import "widgets/capture"
 import "widgets/menus"
-import "widgets/updates"
-
 ShellRoot {
     Variants {
         model: Quickshell.screens
@@ -47,8 +45,6 @@ ShellRoot {
 
     Launcher {}
     WallpaperPicker {}
-    UpdateModal {}
-
     LazyLoader {
         active: LockState.locked
         LockScreen {}

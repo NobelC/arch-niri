@@ -53,20 +53,6 @@ fi
 /usr/bin/getent "$@"
 MOCK
 
-cat << 'MOCK' > "$MOCK_BIN/paru"
-#!/usr/bin/env bash
-if [[ "${1:-}" == "-Qu" ]]; then
-  printf 'linux 6.12.1-arch1-1 -> 6.12.2-arch1-1\nparu-bin 2.2.0-1 -> 2.2.1-1\n'
-fi
-MOCK
-
-cat << 'MOCK' > "$MOCK_BIN/pacman"
-#!/usr/bin/env bash
-if [[ "${1:-}" == "-Qqm" ]]; then
-  echo "paru-bin"
-fi
-MOCK
-
 cat << 'MOCK' > "$MOCK_BIN/sudo"
 #!/usr/bin/env bash
 if [[ "${1:-}" == "-n" ]]; then
@@ -138,26 +124,7 @@ assert_fail_msg "net-trust-apply aborta por guard de NET_TRUST_USER/SUDO_USER" "
   env -u SUDO_USER -u NET_TRUST_USER PATH="$MOCK_BIN:$PATH" \
   bash "$REPO_DIR/system/net-trust/net-trust-apply" status
 
-# 3. sys-update-apply aborta por guard sin usuario (verificando mensaje real, no permisos)
-assert_fail_msg "sys-update-apply aborta por guard de SYS_UPDATE_USER/SUDO_USER" "SYS_UPDATE_USER" \
-  env -u SUDO_USER -u SYS_UPDATE_USER HOME="$FAKE_HOME" PATH="$MOCK_BIN:$PATH" \
-  bash "$REPO_DIR/system/sys-update/sys-update-apply" upgrade
-
-# 4. sys-update check genera JSON estructurado con REPO y AUR
-assert_ok "sys-update check genera JSON con paquetes REPO/AUR" \
-  env PATH="$MOCK_BIN:$PATH" HOME="$FAKE_HOME" XDG_STATE_HOME="$FAKE_HOME/.local/state" \
-  bash "$REPO_DIR/scripts/sys-update" check
-
-if jq -e '.count == 2 and .packages[0].source == "REPO" and .packages[1].source == "AUR"' \
-  "$FAKE_HOME/.local/state/quickshell/sys-update.json" >/dev/null 2>&1; then
-  echo "  ✓ [test] sys-update.json clasifica REPO y AUR correctamente"
-  PASS=$((PASS + 1))
-else
-  echo "  ✗ [test] sys-update.json no tiene el formato esperado" >&2
-  FAIL=$((FAIL + 1))
-fi
-
-# 5. night-light y privacy-mode status en estado limpio
+# 3. night-light y privacy-mode status en estado limpio
 assert_ok "night-light status inicializa estado limpio" \
   env HOME="$FAKE_HOME" XDG_STATE_HOME="$FAKE_HOME/.local/state" \
   bash "$REPO_DIR/scripts/night-light" status
