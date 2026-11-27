@@ -25,10 +25,10 @@ desc = "Ir a discos externos y USB montados"
 
 [[mgr.prepend_keymap]]
 on   = [ "M" ]
-run  = 'shell -- udiskie-mount -a'
+run  = '''shell --block -- bash -c 'udiskie-mount -a; sleep 0.5' '''
 desc = "Montar todos los discos/USB conectados"
 
 [[mgr.prepend_keymap]]
 on   = [ "U" ]
-run  = 'shell --block -- udiskie-umount --detach "$0"'
+run  = '''shell --block -- bash -c 't="${1:-.}"; mp="$(findmnt -n -o TARGET --target "$t" 2>/dev/null || echo "$t")"; udiskie-umount --detach "$mp" || udiskie-umount "$mp" || { echo; read -rp "Error al desmontar (Enter para volver)..."; }' -- "$1"'''
 desc = "Desmontar y expulsar disco seleccionado de forma segura"

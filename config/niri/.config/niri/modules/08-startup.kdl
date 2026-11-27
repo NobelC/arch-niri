@@ -32,3 +32,6 @@ spawn-sh-at-startup "\"$HOME/.local/bin/mic-toggle\" --sync"
 
 // --- 10. AUTOMONTADO DE DISCOS Y USB (udiskie + UDisks2) ---
 spawn-at-startup "udiskie" "--automount" "--notify" "--no-tray" "--no-file-manager"
+
+// --- 11. DESBLOQUEO DE ALTAVOCES INTERNOS (ALC3204 / pro-audio) ---
+spawn-sh-at-startup "sleep 1 && amixer -c 0 sset Master unmute 100% >/dev/null 2>&1; amixer -c 0 sset Speaker unmute 100% >/dev/null 2>&1; amixer -c 0 sset 'Auto-Mute Mode' Disabled >/dev/null 2>&1"

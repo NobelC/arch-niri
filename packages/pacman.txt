@@ -1,5 +1,6 @@
 # Paquetes explícitos de repositorios oficiales (generado automáticamente)
 7zip
+alsa-utils
 awww
 base
 base-devel
