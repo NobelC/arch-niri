@@ -101,7 +101,9 @@ BarDrawer {
             return list;
         }
         readonly property var current: networks.length > 0 && networks[0].connected ? networks[0] : null
-        readonly property var others: current ? networks.slice(1) : networks
+        readonly property var liveOthers: current ? networks.slice(1) : networks
+        property var frozenOthers: []
+        readonly property var others: askingFor !== "" ? frozenOthers : liveOthers
 
         // ---------- Utilidades ----------
         function pct(s) {
@@ -133,7 +135,13 @@ BarDrawer {
 
         function updateScanner() {
             if (wifiDevice)
-                wifiDevice.scannerEnabled = root.active && root.wifiOn;
+                wifiDevice.scannerEnabled = root.active && root.wifiOn && root.askingFor === "";
+        }
+
+        onAskingForChanged: {
+            if (askingFor !== "")
+                root.frozenOthers = root.liveOthers.slice();
+            root.updateScanner();
         }
 
         onActiveChanged: {
@@ -815,6 +823,9 @@ BarDrawer {
 
                 // Contraseña de redes protegidas nuevas
                 Rectangle {
+                    id: passBox
+                    property bool revealPass: false
+
                     visible: row.asking
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -828,18 +839,29 @@ BarDrawer {
 
                     TextInput {
                         id: pass
-                        anchors.fill: parent
+                        anchors.left: parent.left
+                        anchors.right: eyeBtn.left
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
                         anchors.leftMargin: 10
-                        anchors.rightMargin: 10
+                        anchors.rightMargin: 6
                         verticalAlignment: TextInput.AlignVCenter
-                        echoMode: TextInput.Password
+                        echoMode: passBox.revealPass ? TextInput.Normal : TextInput.Password
+                        passwordCharacter: "•"
                         color: Theme.text
                         selectionColor: Theme.accent
                         selectedTextColor: Theme.bg
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: passBox.revealPass ? 11 : 13
+                        font.letterSpacing: (!passBox.revealPass && text.length > 0) ? 3.5 : 0.4
                         focus: row.asking
                         clip: true
+                        onVisibleChanged: {
+                            if (visible) {
+                                passBox.revealPass = false;
+                                forceActiveFocus();
+                            }
+                        }
                         Keys.onEscapePressed: {
                             root.askingFor = "";
                             text = "";
@@ -857,7 +879,41 @@ BarDrawer {
                             anchors.verticalCenter: parent.verticalCenter
                             text: "PASSKEY // ENTER TO CONNECT"
                             color: Theme.muted
-                            font: pass.font
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            font.letterSpacing: 0.4
+                        }
+                    }
+
+                    Rectangle {
+                        id: eyeBtn
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.rightMargin: 4
+                        width: 24
+                        height: 22
+                        radius: Theme.radius
+                        color: eyeArea.containsMouse ? Theme.cardAlt : "transparent"
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: passBox.revealPass ? "󰈉" : "󰈈"
+                            color: passBox.revealPass
+                                ? Theme.accent
+                                : (eyeArea.containsMouse ? Theme.text : Theme.muted)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                        }
+
+                        MouseArea {
+                            id: eyeArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                passBox.revealPass = !passBox.revealPass;
+                                pass.forceActiveFocus();
+                            }
                         }
                     }
                 }

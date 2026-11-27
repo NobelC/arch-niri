@@ -1,6 +1,7 @@
 # Paquetes explícitos de repositorios oficiales (generado automáticamente)
 7zip
 alsa-utils
+arp-scan
 awww
 base
 base-devel
