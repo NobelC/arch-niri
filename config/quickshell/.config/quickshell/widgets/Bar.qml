@@ -32,7 +32,7 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "quickshell-bar"
     readonly property string screenName: screen ? screen.name : ""
-    readonly property bool drawerOnThisScreen: Niri.activeBarDrawerWidth > 0 && (Niri.activeBarDrawerScreen === "" || Niri.activeBarDrawerScreen === screenName)
+    readonly property bool drawerOnThisScreen: Niri.activeBarMenu !== "" && Niri.activeBarDrawerWidth > 0 && (Niri.activeBarDrawerScreen === "" || Niri.activeBarDrawerScreen === screenName)
     readonly property bool barEnabled: {
         const _p = Displays.primary;
         const _o = Displays.outputs;
@@ -78,7 +78,7 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 height: Theme.borderWidth
-                color: Theme.border
+                color: Theme.text
                 visible: !barWindow.drawerOnThisScreen
 
                 Behavior on color { ColorAnimation { duration: Theme.animMedium } }
@@ -90,7 +90,7 @@ PanelWindow {
                 anchors.bottom: parent.bottom
                 width: Math.max(0, Niri.activeBarDrawerX)
                 height: Theme.borderWidth
-                color: Theme.border
+                color: Theme.text
                 visible: barWindow.drawerOnThisScreen
             }
 
@@ -101,7 +101,7 @@ PanelWindow {
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 height: Theme.borderWidth
-                color: Theme.border
+                color: Theme.text
                 visible: barWindow.drawerOnThisScreen
             }
         }

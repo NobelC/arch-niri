@@ -82,13 +82,13 @@ PanelWindow {
     function osdLabelText() {
         if (mode === "audio-device") return deviceSwitchName.toUpperCase();
         if (mode === "layout") {
-            return Niri.keyboardLayoutCode === "ES" ? "ES // LATAM" : "EN // US";
+            return Niri.keyboardLayoutCode === "ES" ? "LAY-01 // ES LATAM" : "LAY-02 // EN US";
         }
         if (mode === "capslock") {
-            return CapsLock.active ? "CAPS // ON" : "CAPS // OFF";
+            return CapsLock.active ? "KBD-01 // CAPS ON" : "KBD-00 // CAPS OFF";
         }
         if (mode === "privacy") {
-            return Privacy.active ? "PRIVACY // ON" : "PRIVACY // OFF";
+            return Privacy.active ? "PRV-01 // PRIVACY ON" : "PRV-00 // PRIVACY OFF";
         }
         return osdWindow.isMuted ? "MUTE" : (String(osdWindow.currentValue).padStart(2, "0") + "%");
     }

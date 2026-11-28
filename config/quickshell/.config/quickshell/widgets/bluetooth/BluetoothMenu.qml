@@ -12,6 +12,7 @@ BarDrawer {
     rightOffset: 18
     contentHeight: root.implicitHeight
 
+    flushHeader: true
     // ---------- Aviso reutilizable (nivel raíz) ----------
     component Hint: Rectangle {
         id: hint
@@ -43,9 +44,10 @@ BarDrawer {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: hint.hintText
                 color: Theme.text
-                font.family: Theme.cjkFont
+                font.family: Theme.industrialFont
+                font.weight: Font.Black
+                font.capitalization: Font.AllUppercase
                 font.pixelSize: 11
-                font.bold: true
                 font.letterSpacing: 1
             }
             Text {
@@ -99,7 +101,7 @@ BarDrawer {
                 return (connectedList[0].name && connectedList[0].name.length > 0 ? connectedList[0].name : connectedList[0].address).toUpperCase();
             if (connectedCount > 1)
                 return "[ " + String(connectedCount).padStart(2, "0") + " ] CONNECTED";
-            return scanning ? "SCANNING..." : "ONLINE // IDLE";
+            return scanning ? "SCANNING..." : "BTH-01 // ONLINE // IDLE";
         }
 
         // ---------- Utilidades ----------
@@ -144,134 +146,148 @@ BarDrawer {
             if (adapter)
                 adapter.discovering = false;
         }
-
-        // ---------- Cabecera integrada ----------
-        RowLayout {
+        // ---------- Franja de cabecera industrial ----------
+        Rectangle {
             Layout.fillWidth: true
-            spacing: 10
+            implicitHeight: 42
+            color: Theme.accent
 
-            Rectangle {
-                width: 32
-                height: 32
-                radius: Theme.radius
-                color: (root.adapterOn && root.connectedCount > 0) ? Theme.accent : Theme.card
-                border.width: Theme.borderWidth
-                border.color: (root.adapterOn && root.connectedCount > 0) ? Theme.accent : Theme.border
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
 
-                Text {
-                    anchors.centerIn: parent
-                    text: (root.adapterOn && root.connectedCount > 0) ? "󰂱" : ""
-                    color: (root.adapterOn && root.connectedCount > 0) ? Theme.bg : Theme.muted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15
+                Rectangle {
+                    implicitWidth: codeLbl.implicitWidth + 10
+                    implicitHeight: 20
+                    radius: Theme.radius
+                    color: Theme.bg
+
+                    Text {
+                        id: codeLbl
+                        anchors.centerIn: parent
+                        text: "BT-01"
+                        color: Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
                 }
-            }
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 1
-
-                Text {
-                    text: "青歯 // BLUETOOTH"
-                    color: Theme.text
-                    font.family: Theme.cjkFont
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 1.2
-                }
-                Text {
+                ColumnLayout {
                     Layout.fillWidth: true
-                    text: root.subtitle
-                    color: (root.adapterOn && root.connectedCount > 0) ? Theme.accentSoft : Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    font.bold: root.adapterOn && root.connectedCount > 0
-                    font.letterSpacing: 0.8
-                    elide: Text.ElideRight
-                }
-            }
+                    spacing: 0
 
-            // Botón respaldo técnico (bluetui)
-            Rectangle {
-                width: 26
-                height: 24
-                radius: Theme.radius
-                color: tuiHover.containsMouse ? Theme.cardAlt : Theme.card
-                border.width: Theme.borderWidth
-                border.color: tuiHover.containsMouse ? Theme.text : Theme.border
+                    Text {
+                        Layout.fillWidth: true
+                        text: "接続 // BLUETOOTH"
+                        color: Theme.bg
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        elide: Text.ElideRight
+                    }
 
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: ""
-                    color: tuiHover.containsMouse ? Theme.text : Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.subtitle
+                        color: Theme.bg
+                        opacity: 0.85
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.7
+                        elide: Text.ElideRight
+                    }
                 }
 
-                MouseArea {
-                    id: tuiHover
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        Niri.closeBarMenu();
-                        Bluetooth.openManager();
+                Rectangle {
+                    width: 24
+                    height: 24
+                    radius: Theme.radius
+                    color: tuiHover.containsMouse ? Theme.text : Theme.bg
+                    border.width: 1
+                    border.color: Theme.bg
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: ""
+                        color: tuiHover.containsMouse ? Theme.bg : Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                    }
+
+                    MouseArea {
+                        id: tuiHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Niri.closeBarMenu();
+                            Bluetooth.openManager();
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 40
+                    height: 24
+                    radius: Theme.radius
+                    opacity: root.hasAdapter ? 1.0 : 0.4
+                    color: root.adapterOn ? Theme.bg : Theme.card
+                    border.width: Theme.borderWidth
+                    border.color: Theme.bg
+
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: Theme.radius
+                        y: 6
+                        x: root.adapterOn ? 22 : 6
+                        color: root.adapterOn ? Theme.accent : Theme.sub
+
+                        Behavior on x { NumberAnimation { duration: Theme.animFast; easing.type: Theme.easeOut } }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: root.hasAdapter
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.adapter.enabled = !root.adapter.enabled
                     }
                 }
             }
 
-            // Switch rígido On/Off
             Rectangle {
-                width: 42
-                height: 24
-                radius: Theme.radius
-                opacity: root.hasAdapter ? 1.0 : 0.4
-                color: root.adapterOn ? Theme.accent : Theme.card
-                border.width: Theme.borderWidth
-                border.color: root.adapterOn ? Theme.accent : Theme.border
-
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
-
-                Rectangle {
-                    width: 14
-                    height: 14
-                    radius: Theme.radius
-                    y: 5
-                    x: root.adapterOn ? 23 : 5
-                    color: root.adapterOn ? Theme.bg : Theme.sub
-
-                    Behavior on x { NumberAnimation { duration: Theme.animFast; easing.type: Theme.easeOut } }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    enabled: root.hasAdapter
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.adapter.enabled = !root.adapter.enabled
-                }
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Theme.borderWidth
+                color: Theme.text
             }
         }
 
-        // Divisor
-        Rectangle {
+        // ---------- Cuerpo acolchado ----------
+        ColumnLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.borderWidth
-            color: Theme.border
-        }
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            spacing: 10
+
 
         // ---------- Avisos de estado ----------
         Hint {
             visible: !root.hasAdapter
             hintIcon: "󰂲"
-            hintText: "機器なし // NO BT ADAPTER"
+            hintText: "BTH-01 // 機器なし // NO BT ADAPTER"
         }
         Hint {
             visible: root.hasAdapter && !root.adapterOn
             hintIcon: "󰂲"
-            hintText: "青歯停止 // BLUETOOTH IS OFF"
+            hintText: "BTH-01 // 青歯停止 // BLUETOOTH IS OFF"
             hintSub: "Enable Bluetooth to connect devices"
         }
 
@@ -283,7 +299,7 @@ BarDrawer {
             Text {
                 Layout.fillWidth: true
                 text: root.devices.length > 0
-                    ? "DEVICES // [ " + String(root.devices.length).padStart(2, "0") + " ]"
+                    ? "BTH-01 // DEVICES // [ " + String(root.devices.length).padStart(2, "0") + " ]"
                     : "DEVICES"
                 color: Theme.sub
                 font.family: Theme.fontFamily
@@ -504,8 +520,9 @@ BarDrawer {
         Hint {
             visible: root.adapterOn && root.devices.length === 0
             hintIcon: "󰂲"
-            hintText: root.scanning ? "探索中 // SCANNING..." : "機器なし // NO DEVICES"
+            hintText: root.scanning ? "BTH-01 // 探索中 // SCANNING..." : "BTH-01 // 機器なし // NO DEVICES"
             hintSub: root.scanning ? "" : "Press SCAN to search nearby devices"
+        }
         }
     }
 }

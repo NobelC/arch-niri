@@ -272,6 +272,26 @@ Singleton {
         }
     }
 
+    function colorFor(item) {
+        if (!item) return Theme.accent;
+        if (item.urgency === NotificationUrgency.Critical) return Theme.warn;
+        if (item.urgency === NotificationUrgency.Low) return Theme.sub;
+
+        const key = (item.desktopEntry || item.appName || "system").toLowerCase();
+        if (key.indexOf("error") !== -1 || key.indexOf("fail") !== -1 || key.indexOf("nettrust") !== -1)
+            return Theme.warn;
+        if (key.indexOf("spotify") !== -1 || key.indexOf("simpmusic") !== -1 || key.indexOf("mpv") !== -1)
+            return Theme.highlight;
+
+        let hash = 0;
+        for (let i = 0; i < key.length; i++) {
+            hash = ((hash << 5) - hash) + key.charCodeAt(i);
+            hash |= 0;
+        }
+        const palette = [Theme.accent, Theme.accentSoft, Theme.highlight, Theme.success];
+        return palette[Math.abs(hash) % palette.length];
+    }
+
     function activate(id) {
         const item = root.popups.find(n => n.id === id) || root.history.find(n => n.id === id);
         if (!item) return;

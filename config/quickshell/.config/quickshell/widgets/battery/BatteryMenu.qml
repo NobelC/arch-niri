@@ -11,6 +11,7 @@ BarDrawer {
     rightOffset: 62
     contentHeight: root.implicitHeight
 
+    flushHeader: true
     ColumnLayout {
         id: root
         width: parent.width
@@ -19,7 +20,7 @@ BarDrawer {
         readonly property color stateColor: {
             if (Battery.charging || Battery.full) return Theme.success;
             if (Battery.capacity <= 15) return Theme.warn;
-            if (Battery.capacity <= 30) return Theme.highlight;
+            if (Battery.capacity <= 30) return Theme.accentWarn2;
             return Theme.info;
         }
 
@@ -49,81 +50,100 @@ BarDrawer {
             if (c >= 15) return "󰁻";
             return "󰂎";
         }
-
-        // ---------- Cabecera integrada ----------
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 10
-
-            Rectangle {
-                width: 32
-                height: 32
-                radius: Theme.radius
-                color: root.stateColor
-                border.width: Theme.borderWidth
-                border.color: root.stateColor
-
-                Behavior on color { ColorAnimation { duration: Theme.animMedium } }
-                Behavior on border.color { ColorAnimation { duration: Theme.animMedium } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root.batteryIcon()
-                    color: Theme.bg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 1
-
-                Text {
-                    text: "電力 // BATTERY"
-                    color: Theme.text
-                    font.family: Theme.cjkFont
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 1.2
-                }
-                Text {
-                    Layout.fillWidth: true
-                    text: root.statusSubtitle
-                    color: Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    font.letterSpacing: 0.6
-                    elide: Text.ElideRight
-                }
-            }
-
-            Rectangle {
-                implicitWidth: pctTxt.implicitWidth + 12
-                implicitHeight: 24
-                radius: Theme.radius
-                color: Theme.card
-                border.width: Theme.borderWidth
-                border.color: root.stateColor
-
-                Text {
-                    id: pctTxt
-                    anchors.centerIn: parent
-                    text: Battery.capacity + "%"
-                    color: root.stateColor
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    font.bold: true
-                }
-            }
-        }
-
-        // Divisor
+        // ---------- Franja de cabecera industrial ----------
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.borderWidth
-            color: Theme.border
+            implicitHeight: 42
+            color: Theme.accent
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                Rectangle {
+                    implicitWidth: pwrCodeLbl.implicitWidth + 10
+                    implicitHeight: 20
+                    radius: Theme.radius
+                    color: Theme.bg
+
+                    Text {
+                        id: pwrCodeLbl
+                        anchors.centerIn: parent
+                        text: "PWR-01"
+                        color: Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "電力 // BATTERY"
+                        color: Theme.bg
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.statusSubtitle
+                        color: Theme.bg
+                        opacity: 0.85
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.7
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    implicitWidth: pctTxt.implicitWidth + 12
+                    implicitHeight: 22
+                    radius: Theme.radius
+                    color: Theme.bg
+                    border.width: 1
+                    border.color: Theme.bg
+
+                    Text {
+                        id: pctTxt
+                        anchors.centerIn: parent
+                        text: Battery.capacity + "%"
+                        color: root.stateColor
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 10
+                        font.bold: true
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Theme.borderWidth
+                color: Theme.text
+            }
         }
+
+        // ---------- Cuerpo acolchado ----------
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            spacing: 10
+
 
         // ---------- Tarjeta de carga y métricas ----------
         Rectangle {
@@ -230,11 +250,12 @@ BarDrawer {
             spacing: 6
 
             Text {
-                text: "POWER // PROFILE"
+                text: "PWR-01 // POWER // PROFILE"
                 color: Theme.muted
-                font.family: Theme.fontFamily
+                font.family: Theme.industrialFont
+                font.weight: Font.Black
+                font.capitalization: Font.AllUppercase
                 font.pixelSize: 9
-                font.bold: true
                 font.letterSpacing: 1
             }
 
@@ -300,6 +321,7 @@ BarDrawer {
                     }
                 }
             }
+        }
         }
     }
 }

@@ -1,6 +1,7 @@
 # Paquetes explícitos de repositorios oficiales (generado automáticamente)
 7zip
 alsa-utils
+android-udev
 arp-scan
 awww
 base
@@ -34,6 +35,7 @@ greetd
 grim
 grub
 grub-btrfs
+gvfs-mtp
 hunspell-en_us
 hunspell-es_any
 imagemagick
@@ -44,6 +46,7 @@ keepassxc
 less
 libayatana-appindicator
 libisoburn
+libmtp
 libnotify
 libva-utils
 linux

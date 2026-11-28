@@ -195,6 +195,18 @@ Item {
         }
     }
 
+    HalftonePattern {
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        width: 240
+        dotColor: Theme.accent
+        dotOpacity: 0.14
+        spacing: 9
+        dotRadius: 1.4
+        fadeRight: true
+    }
+
     // ---------- Contenido principal ----------
     Item {
         id: content
@@ -260,10 +272,10 @@ Item {
                 Text {
                     id: sysBadge
                     anchors.centerIn: parent
-                    text: "SYS // ARCH-NIRI"
+                    text: "LCK-01 // SYS // ARCH-NIRI"
                     color: Theme.bg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.family: Theme.codeTagFont
+                    font.pixelSize: Theme.codeTagSize
                     font.bold: true
                     font.letterSpacing: 1.5
                 }
@@ -280,10 +292,10 @@ Item {
                 Text {
                     id: outBadge
                     anchors.centerIn: parent
-                    text: (root.screenName !== "" ? root.screenName : "OUT-0").toUpperCase()
+                    text: (root.screenName !== "" ? root.screenName : "OUT-00").toUpperCase()
                     color: Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
+                    font.family: Theme.codeTagFont
+                    font.pixelSize: Theme.codeTagSize
                     font.letterSpacing: 1.2
                 }
             }
@@ -309,10 +321,10 @@ Item {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.isError
-                    ? "警告 // ACCESS DENIED"
+                    ? "LCK-01 // 警告 // ACCESS DENIED"
                     : (root.isUnlocking
-                        ? "認証完了 // ACCESS GRANTED"
-                        : (LockState.busy ? "認証処理中 // AUTH" : "端末待機中 // STANDBY"))
+                        ? "LCK-01 // 認証完了 // ACCESS GRANTED"
+                        : (LockState.busy ? "LCK-01 // 認証処理中 // AUTH" : "LCK-01 // 端末待機中 // STANDBY"))
                 color: root.isError ? Theme.warn : (root.isUnlocking ? Theme.accent : Theme.sub)
                 font.family: root.uiCjkFont
                 font.pixelSize: 12
@@ -386,34 +398,13 @@ Item {
 
                         Behavior on color { ColorAnimation { duration: 140 } }
 
-                        Canvas {
-                            id: stripeCanvas
+                        HazardStripe {
                             anchors.top: parent.top
                             anchors.bottom: parent.bottom
                             anchors.right: parent.right
-                            width: 112
-
-                            Connections {
-                                target: Theme
-                                function onBgChanged() { stripeCanvas.requestPaint(); }
-                            }
-
-                            onPaint: {
-                                const ctx = getContext("2d");
-                                ctx.clearRect(0, 0, width, height);
-                                ctx.fillStyle = Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.25).toString();
-                                const stripeW = 8;
-                                const gap = 16;
-                                for (let x = -height; x < width + height; x += gap) {
-                                    ctx.beginPath();
-                                    ctx.moveTo(x, height);
-                                    ctx.lineTo(x + stripeW, height);
-                                    ctx.lineTo(x + stripeW + height, 0);
-                                    ctx.lineTo(x + height, 0);
-                                    ctx.closePath();
-                                    ctx.fill();
-                                }
-                            }
+                            width: 136
+                            stripeColor: Theme.bg
+                            stripeOpacity: 0.28
                         }
 
                         RowLayout {
@@ -423,8 +414,8 @@ Item {
 
                             Text {
                                 text: root.isUnlocking
-                                    ? "認証完了 // ACCESS GRANTED"
-                                    : "認証 // SESSION LOCK"
+                                    ? "LCK-01 // 認証完了 // ACCESS GRANTED"
+                                    : "LCK-01 // 認証 // SESSION LOCK"
                                 color: Theme.bg
                                 font.family: root.uiCjkFont
                                 font.pixelSize: 12
@@ -445,10 +436,40 @@ Item {
                         }
                     }
 
-                    // 2. Bloque de Reloj y Fecha (se mantiene fijo)
+                    // 2. Bloque de Reloj y Fecha
+                    // Trama de medio tono interna + columna vertical + sello hanko (se mantiene fijo)
                     Item {
                         Layout.fillWidth: true
                         Layout.preferredHeight: clockCol.implicitHeight + 36
+
+                        HalftonePattern {
+                            anchors.fill: parent
+                            dotColor: Theme.text
+                            dotOpacity: 0.06
+                            spacing: 7
+                            dotRadius: 1.0
+                        }
+
+                        VerticalStamp {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.isError ? "警告" : (LockState.busy ? "認証" : "端末待機")
+                            textColor: root.isError ? Theme.warn : Theme.muted
+                            barColor: root.isError ? Theme.warn : Theme.accent
+                            fontSize: 10
+                        }
+
+                        HankoStamp {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 18
+                            anchors.top: parent.top
+                            anchors.topMargin: 14
+                            kanji: root.isError ? "拒否" : (LockState.busy ? "検証" : "極秘")
+                            stampColor: root.isError ? Theme.warn : Theme.accent
+                            stampSize: 32
+                            stampRotation: -5
+                        }
 
                         ColumnLayout {
                             id: clockCol
@@ -538,9 +559,8 @@ Item {
 
                                     Text {
                                         text: {
-                                            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-                                            const city = tz.includes("/") ? tz.split("/").pop().replace(/_/g, " ") : tz;
-                                            return (city || "LOCAL TIME").toUpperCase();
+                                            const m = new Date().toString().match(/\(([^)]+)\)/);
+                                            return (m && m[1] ? m[1] : "LOCAL TIME").toUpperCase();
                                         }
                                         color: Theme.muted
                                         font.family: Theme.fontFamily
@@ -750,13 +770,13 @@ Item {
                                     Layout.fillWidth: true
                                     text: root.isUnlocking
                                         ? (root.unlockProgress < 0.55
-                                            ? "環境復元中 // RESTORING SESSION..."
-                                            : "起動完了 // WORKSPACE READY")
+                                            ? "LCK-01 // 環境復元中 // RESTORING SESSION..."
+                                            : "LCK-01 // 起動完了 // WORKSPACE READY")
                                         : (LockState.busy
-                                            ? "検証中 // VERIFYING..."
+                                            ? "LCK-01 // 検証中 // VERIFYING..."
                                             : (root.isError
                                                 ? "アクセス拒否 // " + LockState.message.toUpperCase()
-                                                : "入力待機 // ENTER PASSKEY"))
+                                                : "LCK-01 // 入力待機 // ENTER PASSKEY"))
                                     color: root.isError
                                         ? Theme.warn
                                         : (root.isUnlocking || LockState.busy ? Theme.accent : Theme.muted)
@@ -812,8 +832,8 @@ Item {
                     }
                     Text {
                         text: root.isUnlocking
-                            ? "解除中 // UNLOCKING"
-                            : (LockState.busy ? "検証中 // BUSY" : "ロック中 // LOCKED")
+                            ? "LCK-01 // 解除中 // UNLOCKING"
+                            : (LockState.busy ? "LCK-01 // 検証中 // BUSY" : "LCK-01 // ロック中 // LOCKED")
                         color: Theme.text
                         font.family: root.uiCjkFont
                         font.pixelSize: 11
@@ -847,10 +867,10 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Text {
-                        text: "CAPS // ON"
+                        text: "KBD-01 // CAPS ON"
                         color: Theme.bg
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
                         font.bold: true
                         font.letterSpacing: 1.2
                         anchors.verticalCenter: parent.verticalCenter
@@ -863,7 +883,8 @@ Item {
                 readonly property var bat: UPower.displayDevice
                 readonly property int pct: bat ? Math.round(bat.percentage * 100) : 0
                 readonly property bool charging: bat && bat.state === UPowerDeviceState.Charging
-                readonly property bool low: pct <= 15 && !charging
+                readonly property bool crit: pct <= 15 && !charging
+                readonly property bool low: pct <= 30 && !charging
                 readonly property int litBlocks: Math.max(0, Math.min(5, Math.ceil(pct / 20)))
 
                 visible: bat && bat.isPresent && bat.isLaptopBattery
@@ -872,7 +893,7 @@ Item {
                 radius: root.uiRadius
                 color: Theme.card
                 border.width: root.uiBorder
-                border.color: low ? Theme.warn : Theme.border
+                border.color: crit ? Theme.warn : (low ? Theme.accentWarn2 : Theme.border)
                 clip: true
 
                 Row {
@@ -882,7 +903,7 @@ Item {
 
                     Text {
                         text: batChip.charging ? "" : "PWR"
-                        color: batChip.low ? Theme.warn : (batChip.charging ? Theme.accent : Theme.muted)
+                        color: batChip.crit ? Theme.warn : (batChip.low ? Theme.accentWarn2 : (batChip.charging ? Theme.accent : Theme.text))
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
                         font.bold: true
@@ -901,7 +922,7 @@ Item {
                                 height: 12
                                 radius: root.uiRadius
                                 color: index < batChip.litBlocks
-                                    ? (batChip.low ? Theme.warn : Theme.accentSoft)
+                                    ? (batChip.crit ? Theme.warn : (batChip.low ? Theme.accentWarn2 : Theme.accentSoft))
                                     : Theme.cardAlt
                             }
                         }
@@ -909,7 +930,7 @@ Item {
 
                     Text {
                         text: batChip.pct + "%"
-                        color: batChip.low ? Theme.warn : Theme.text
+                        color: batChip.crit ? Theme.warn : (batChip.low ? Theme.accentWarn2 : Theme.text)
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
                         font.bold: true

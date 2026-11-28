@@ -592,8 +592,8 @@ PanelWindow {
 
                             Text {
                                 text: launcherWindow.effectiveRootMode
-                                    ? "権限 // ROOT LAUNCH"
-                                    : (launcherWindow.showCalc ? "計算 // CALC + LAUNCH" : "起動 // LAUNCH")
+                                    ? "LCH-01 // 権限 // ROOT LAUNCH"
+                                    : (launcherWindow.showCalc ? "LCH-01 // 計算 // CALC + LAUNCH" : "LCH-01 // 起動 // LAUNCH")
                                 color: Theme.bg
                                 font.family: Theme.cjkFont
                                 font.pixelSize: 11

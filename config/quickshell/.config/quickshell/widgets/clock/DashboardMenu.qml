@@ -104,6 +104,18 @@ BarDrawer {
         }
     }
 
+    VerticalStamp {
+        anchors.right: parent.right
+        anchors.rightMargin: -4
+        anchors.top: parent.top
+        anchors.topMargin: 4
+        text: "系統監視"
+        textColor: Theme.muted
+        barColor: Theme.accent
+        fontSize: 10
+        z: 2
+    }
+
     Item {
         id: root
         width: parent.width
@@ -182,7 +194,7 @@ BarDrawer {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.left: parent.left
                         anchors.leftMargin: 8
-                        text: "時刻 // TIME"
+                        text: "CLK-01 // 時刻 // TIME"
                         color: Theme.bg
                         font.family: Theme.cjkFont
                         font.pixelSize: 10
@@ -289,7 +301,7 @@ BarDrawer {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.left: parent.left
                         anchors.leftMargin: 8
-                        text: "資源 // SYS"
+                        text: "CLK-01 // 資源 // SYS"
                         color: Theme.text
                         font.family: Theme.cjkFont
                         font.pixelSize: 10
@@ -583,9 +595,30 @@ BarDrawer {
                     Layout.margins: 12
                     spacing: 10
 
-                    Text {
+                    RowLayout {
                         Layout.fillWidth: true
-                        text: SystemStats.osName.toUpperCase()
+                        spacing: 8
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: SystemStats.osName.toUpperCase()
+                            color: Theme.sub
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            font.letterSpacing: 1
+                            elide: Text.ElideRight
+                        }
+
+                        HankoStamp {
+                            kanji: "稼働"
+                            stampColor: Theme.accent
+                            stampSize: 24
+                            stampRotation: -4
+                        }
+                    }
+
+                    Text {
+                        visible: false
                         color: Theme.sub
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
@@ -663,10 +696,10 @@ BarDrawer {
                         spacing: 6
 
                         Text {
-                            text: "LID // POWER POLICY"
+                            text: "CLK-01 // LID // POWER POLICY"
                             color: Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 9
+                            font.family: Theme.codeTagFont
+                            font.pixelSize: Theme.codeTagSize
                             font.bold: true
                             font.letterSpacing: 1
                         }

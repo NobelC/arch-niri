@@ -9,7 +9,7 @@ Item {
     implicitHeight: 24
 
     readonly property var enLocale: Qt.locale("en_US")
-    readonly property bool isActive: mouseArea.containsMouse || Niri.activeBarMenu === "dashboard"
+    readonly property bool isActive: true
     readonly property color fgColor: isActive ? Theme.bg : Theme.text
 
     SystemClock {
@@ -35,6 +35,47 @@ Item {
         anchors.margins: 3
         radius: Theme.radius
         color: Theme.accent
+        clip: true
+
+        Canvas {
+            id: clockHalftone
+            anchors.fill: parent
+            antialiasing: true
+
+            Connections {
+                target: Theme
+                function onBgChanged() { clockHalftone.requestPaint(); }
+                function onAccentChanged() { clockHalftone.requestPaint(); }
+            }
+
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.clearRect(0, 0, width, height);
+                if (width <= 0 || height <= 0) return;
+
+                const step = 4;
+                const baseR = 1.15;
+                const fadeLimit = width * 0.50;
+
+                for (let y = step / 2; y < height; y += step) {
+                    const rowOffset = (Math.floor(y / step) % 2) * (step / 2);
+                    for (let x = step / 2 + rowOffset; x < fadeLimit; x += step) {
+                        const progress = Math.min(1.0, Math.max(0.0, x / fadeLimit));
+                        const factor = Math.pow(1.0 - progress, 1.5);
+                        if (factor <= 0.02) continue;
+
+                        const r = baseR * (0.35 + 0.65 * factor);
+                        ctx.fillStyle = Qt.rgba(Theme.bg.r, Theme.bg.g, Theme.bg.b, 0.48 * factor).toString();
+                        ctx.beginPath();
+                        ctx.arc(x, y, r, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+        }
         opacity: root.isActive ? 1.0 : 0.0
 
         Behavior on opacity { NumberAnimation { duration: Theme.animFast } }
@@ -47,10 +88,10 @@ Item {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.enLocale.toString(sysClock.date, "MMM dd // ddd // ").toUpperCase()
+            text: root.enLocale.toString(sysClock.date, "CLK-01 // MMM dd // ddd // ").toUpperCase()
             color: root.fgColor
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
+            font.family: Theme.codeTagFont
+            font.pixelSize: Theme.codeTagSize
             font.bold: true
             font.letterSpacing: 1.0
 

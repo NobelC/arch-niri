@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import "../../services"
+import "../common"
 
 PanelWindow {
     id: popupWindow
@@ -45,7 +46,7 @@ PanelWindow {
                 id: toastItem
                 required property var modelData
                 readonly property bool isCritical: modelData.urgency === NotificationUrgency.Critical
-                readonly property color accentCol: isCritical ? Theme.warn : Theme.accent
+                readonly property color accentCol: Notifications.colorFor(modelData)
 
                 Layout.fillWidth: true
                 implicitHeight: cardBox.implicitHeight + popupWindow.shadowSize
@@ -76,9 +77,30 @@ PanelWindow {
                     radius: Theme.radius
                     color: cardHover.containsMouse ? Theme.card : Theme.bg
                     border.width: Theme.borderWidth
-                    border.color: (toastItem.isCritical || cardHover.containsMouse) ? toastItem.accentCol : Theme.text
+                    border.color: (toastItem.isCritical || cardHover.containsMouse) ? toastItem.accentCol : Theme.border
                     clip: true
 
+
+                    HazardStripe {
+                        visible: toastItem.isCritical
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        height: 22
+                        stripeColor: Theme.warn
+                        stripeOpacity: 0.22
+                    }
+
+                    HankoStamp {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.bottom: parent.bottom
+                        anchors.bottomMargin: 8
+                        kanji: toastItem.isCritical ? "緊急" : "通知"
+                        stampColor: toastItem.isCritical ? Theme.warn : Theme.accent
+                        stampSize: 24
+                        stampRotation: -6
+                    }
                     Behavior on color { ColorAnimation { duration: Theme.animFast } }
                     Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
 
@@ -117,7 +139,7 @@ PanelWindow {
                                 spacing: 6
 
                                 Text {
-                                    text: toastItem.isCritical ? "警告 // CRITICAL" : "通知 // NOTIF"
+                                    text: toastItem.isCritical ? "NTF-99 // 警告 CRITICAL" : (toastItem.modelData.urgency === NotificationUrgency.Low ? "NTF-00 // 記録 LOW" : "NTF-01 // 通知 NOTIF")
                                     color: Theme.bg
                                     font.family: Theme.cjkFont
                                     font.pixelSize: 10

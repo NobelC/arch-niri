@@ -13,6 +13,7 @@ BarDrawer {
     panelWidth: 660
     contentHeight: root.implicitHeight
 
+    flushHeader: true
     IpcHandler {
         target: "performance"
         function toggle(): void {
@@ -155,9 +156,9 @@ BarDrawer {
         readonly property bool busy: false || false
 
         readonly property var profiles: [
-            { id: "power-saver", code: "01", label: "ECO", hint: "COOL // MAX BATTERY", glyph: "󰾆" },
-            { id: "balanced",    code: "02", label: "BAL", hint: "AUTO // DAILY LOAD",  glyph: "󰾅" },
-            { id: "performance", code: "03", label: "MAX", hint: "BOOST // FULL TDP",   glyph: "󰓅" }
+            { id: "power-saver", code: "01", label: "ECO", hint: "SYS-01 // COOL // MAX BATTERY", glyph: "󰾆" },
+            { id: "balanced",    code: "02", label: "BAL", hint: "SYS-01 // AUTO // DAILY LOAD",  glyph: "󰾅" },
+            { id: "performance", code: "03", label: "MAX", hint: "SYS-01 // BOOST // FULL TDP",   glyph: "󰓅" }
         ]
 
         // ---------- Telemetría en vivo (centralizada en SystemStats) ----------
@@ -220,80 +221,101 @@ BarDrawer {
                 }
             }
         }
-
-        // ================= 1. CABECERA INDUSTRIAL =================
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 10
-
-            Rectangle {
-                width: 32
-                height: 32
-                radius: Theme.radius
-                color: Theme.accent
-                border.width: Theme.borderWidth
-                border.color: Theme.accent
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root.currentProfile === "performance" ? "󰓅"
-                        : (root.currentProfile === "power-saver" ? "󰾆" : "󰾅")
-                    color: Theme.bg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 16
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 1
-
-                Text {
-                    text: "性能 // PERFORMANCE HUD"
-                    color: Theme.text
-                    font.family: Theme.cjkFont
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 1.3
-                }
-
-                Text {
-                    text: root.busy && false
-                        ? "SWITCHING PROFILE..."
-                        : ("GOVERNOR // " + root.cpuGovernor + "  ·  LIVE 1.5S")
-                    color: Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 9
-                    font.letterSpacing: 0.9
-                }
-            }
-
-            Rectangle {
-                implicitWidth: badgeTxt.implicitWidth + 14
-                implicitHeight: 22
-                radius: Theme.radius
-                color: root.currentProfile === "performance" ? Theme.warn : Theme.accent
-                border.width: Theme.borderWidth
-                border.color: Theme.text
-
-                Text {
-                    id: badgeTxt
-                    anchors.centerIn: parent
-                    text: root.currentProfile !== "" ? root.currentProfile.toUpperCase() : "READING"
-                    color: Theme.bg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 9
-                    font.bold: true
-                    font.letterSpacing: 1.0
-                }
-            }
-        }
-
+        // ================= 1. FRANJA DE CABECERA INDUSTRIAL =================
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.borderWidth
-            color: Theme.border
+            implicitHeight: 42
+            color: Theme.accent
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                Rectangle {
+                    implicitWidth: prfCodeLbl.implicitWidth + 10
+                    implicitHeight: 20
+                    radius: Theme.radius
+                    color: Theme.bg
+
+                    Text {
+                        id: prfCodeLbl
+                        anchors.centerIn: parent
+                        text: "PRF-01"
+                        color: Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "性能 // PERFORMANCE HUD"
+                        color: Theme.bg
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "GOVERNOR // " + root.cpuGovernor + "  ·  LIVE 1.5S"
+                        color: Theme.bg
+                        opacity: 0.85
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.7
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    implicitWidth: badgeTxt.implicitWidth + 12
+                    implicitHeight: 22
+                    radius: Theme.radius
+                    color: root.currentProfile === "performance" ? Theme.warn : Theme.bg
+                    border.width: 1
+                    border.color: root.currentProfile === "performance" ? Theme.warn : Theme.bg
+
+                    Text {
+                        id: badgeTxt
+                        anchors.centerIn: parent
+                        text: root.currentProfile !== "" ? root.currentProfile.toUpperCase() : "READING"
+                        color: root.currentProfile === "performance" ? Theme.bg : Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.8
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Theme.borderWidth
+                color: Theme.text
+            }
         }
+
+        // ---------- Cuerpo acolchado ----------
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            spacing: 10
+
 
         // ================= 2. SELECTOR DE PERFIL (3 COLUMNAS) =================
         RowLayout {
@@ -424,11 +446,12 @@ BarDrawer {
                     spacing: 10
 
                     Text {
-                        text: "資源 // SYSTEM LOAD"
+                        text: "SYS-01 // 資源 // SYSTEM LOAD"
                         color: Theme.accentSoft
-                        font.family: Theme.cjkFont
+                        font.family: Theme.industrialFont
+                        font.weight: Font.Black
+                        font.capitalization: Font.AllUppercase
                         font.pixelSize: 10
-                        font.bold: true
                         font.letterSpacing: 1.2
                     }
 
@@ -488,11 +511,12 @@ BarDrawer {
                     spacing: 8
 
                     Text {
-                        text: "詳細 // TELEMETRY"
+                        text: "SYS-01 // 詳細 // TELEMETRY"
                         color: Theme.accentSoft
-                        font.family: Theme.cjkFont
+                        font.family: Theme.industrialFont
+                        font.weight: Font.Black
+                        font.capitalization: Font.AllUppercase
                         font.pixelSize: 10
-                        font.bold: true
                         font.letterSpacing: 1.2
                     }
 
@@ -509,7 +533,7 @@ BarDrawer {
                         }
 
                         MetricCell {
-                            tag: "THERMAL // FREQ"
+                            tag: "SYS-01 // THERMAL // FREQ"
                             value: root.cpuTemp >= 0 ? (Math.round(root.cpuTemp) + " °C") : "-- °C"
                             sub: root.cpuFreqGhz > 0 ? (root.cpuFreqGhz.toFixed(2) + " GHz AVG") : "--"
                             alert: root.cpuTemp >= 82
@@ -538,11 +562,12 @@ BarDrawer {
 
                                 Text {
                                     Layout.fillWidth: true
-                                    text: "上位 // TOP CPU"
+                                    text: "SYS-01 // 上位 // TOP CPU"
                                     color: Theme.muted
-                                    font.family: Theme.cjkFont
+                                    font.family: Theme.industrialFont
+                                    font.weight: Font.Black
+                                    font.capitalization: Font.AllUppercase
                                     font.pixelSize: 8
-                                    font.bold: true
                                     font.letterSpacing: 1.0
                                 }
 
@@ -616,6 +641,7 @@ BarDrawer {
                     }
                 }
             }
+        }
         }
     }
 }

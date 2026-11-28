@@ -11,62 +11,112 @@ BarDrawer {
     rightOffset: 120
     contentHeight: root.implicitHeight
 
+    flushHeader: true
     ColumnLayout {
         id: root
         width: parent.width
         spacing: 10
-
-        // ---------- Cabecera ----------
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 10
-
-            Rectangle {
-                width: 32
-                height: 32
-                radius: Theme.radius
-                color: Theme.accent
-                border.width: Theme.borderWidth
-                border.color: Theme.accent
-
-                Text {
-                    anchors.centerIn: parent
-                    text: Displays.count > 1 ? "󰍺" : "󰍹"
-                    color: Theme.bg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 1
-
-                Text {
-                    text: "画面 // DISPLAYS"
-                    color: Theme.text
-                    font.family: Theme.cjkFont
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 1.2
-                }
-                Text {
-                    text: "[ " + String(Displays.count).padStart(2, "0") + " ] "
-                        + (Displays.count === 1 ? "MONITOR CONNECTED" : "MONITORS CONNECTED")
-                    color: Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    font.letterSpacing: 0.8
-                }
-            }
-        }
-
-        // Divisor
+        // ---------- Franja de cabecera industrial ----------
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.borderWidth
-            color: Theme.border
+            implicitHeight: 42
+            color: Theme.accent
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                Rectangle {
+                    implicitWidth: dspCodeLbl.implicitWidth + 10
+                    implicitHeight: 20
+                    radius: Theme.radius
+                    color: Theme.bg
+
+                    Text {
+                        id: dspCodeLbl
+                        anchors.centerIn: parent
+                        text: "DSP-01"
+                        color: Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "画面 // DISPLAYS"
+                        color: Theme.bg
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "[ " + String(Displays.count).padStart(2, "0") + " ] "
+                            + (Displays.count === 1 ? "MONITOR CONNECTED" : "MONITORS CONNECTED")
+                        color: Theme.bg
+                        opacity: 0.85
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.7
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    width: 24
+                    height: 24
+                    radius: Theme.radius
+                    color: studioHdrHover.containsMouse ? Theme.text : Theme.bg
+                    border.width: 1
+                    border.color: Theme.bg
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: ""
+                        color: studioHdrHover.containsMouse ? Theme.bg : Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                    }
+
+                    MouseArea {
+                        id: studioHdrHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Displays.openStudio(Displays.primary)
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Theme.borderWidth
+                color: Theme.text
+            }
         }
+
+        // ---------- Cuerpo acolchado ----------
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            spacing: 10
+
 
         // ---------- Lista de monitores conectados ----------
         Repeater {
@@ -196,6 +246,7 @@ BarDrawer {
                     }
                 }
             }
+        }
         }
     }
 }

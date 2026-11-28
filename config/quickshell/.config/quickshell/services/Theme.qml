@@ -22,12 +22,15 @@ Singleton {
     property color accent: "#cba6f7"
     property color accentSoft: "#89b4fa"
     property color highlight: "#f5c2e7"
+    property color accentWarn2: dark ? "#f9a825" : "#d97706"
     property color warn: "#f38ba8"
     property color success: "#a6e3a1"
     property color info: "#89b4fa"
 
     // ---------- Tipografías globales ----------
     readonly property string fontFamily: "JetBrainsMono Nerd Font"
+    readonly property string codeTagFont: "JetBrainsMono Nerd Font"
+    readonly property int codeTagSize: 10
     readonly property string cjkFont: "Noto Sans CJK JP"
     readonly property string displayFont: "Anton"
 

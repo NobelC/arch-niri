@@ -10,6 +10,7 @@ BarDrawer {
     rightOffset: 245
     contentHeight: root.implicitHeight
 
+    flushHeader: true
     component ActionTile: Rectangle {
         id: tile
         required property string glyph
@@ -86,68 +87,112 @@ BarDrawer {
         id: root
         width: parent.width
         spacing: 10
-
-        // ---------- Cabecera ----------
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
-
-            Rectangle {
-                width: 32
-                height: 32
-                radius: Theme.radius
-                color: Capture.recording ? Theme.warn : Theme.accent
-                border.width: Theme.borderWidth
-                border.color: Capture.recording ? Theme.warn : Theme.accent
-
-                Text {
-                    anchors.centerIn: parent
-                    text: Capture.recording ? "󰑊" : "󰄀"
-                    color: Theme.bg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 1
-
-                Text {
-                    text: "撮影 // SCREEN CAPTURE"
-                    color: Theme.text
-                    font.family: Theme.cjkFont
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 1.1
-                }
-
-                Text {
-                    text: Capture.recording
-                        ? ("REC ACTIVE // " + Capture.elapsedText)
-                        : "AUTO-SAVE  ·  CLIPBOARD SYNC"
-                    color: Capture.recording ? Theme.warn : Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 9
-                    font.bold: Capture.recording
-                    font.letterSpacing: 0.7
-                }
-            }
-        }
-
+        // ---------- Franja de cabecera industrial ----------
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.borderWidth
-            color: Theme.border
+            implicitHeight: 42
+            color: Capture.recording ? Theme.warn : Theme.accent
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                Rectangle {
+                    implicitWidth: capCodeLbl.implicitWidth + 10
+                    implicitHeight: 20
+                    radius: Theme.radius
+                    color: Theme.bg
+
+                    Text {
+                        id: capCodeLbl
+                        anchors.centerIn: parent
+                        text: "CAP-01"
+                        color: Capture.recording ? Theme.warn : Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "撮影 // SCREEN CAPTURE"
+                        color: Theme.bg
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: Capture.recording
+                            ? ("REC ACTIVE // " + Capture.elapsedText)
+                            : "AUTO-SAVE  ·  CLIPBOARD SYNC"
+                        color: Theme.bg
+                        opacity: 0.88
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.7
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    implicitWidth: capStateTxt.implicitWidth + 12
+                    implicitHeight: 22
+                    radius: Theme.radius
+                    color: Theme.bg
+                    border.width: 1
+                    border.color: Theme.bg
+
+                    Text {
+                        id: capStateTxt
+                        anchors.centerIn: parent
+                        text: Capture.recording ? "REC" : "READY"
+                        color: Capture.recording ? Theme.warn : Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.8
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Theme.borderWidth
+                color: Theme.text
+            }
         }
+
+        // ---------- Cuerpo acolchado ----------
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            spacing: 10
+
 
         // ---------- Capturas ----------
         Text {
-            text: "STATIC // SCREENSHOTS"
+            text: "SYS-01 // STATIC // SCREENSHOTS"
             color: Theme.muted
-            font.family: Theme.fontFamily
+            font.family: Theme.industrialFont
+            font.weight: Font.Black
+            font.capitalization: Font.AllUppercase
             font.pixelSize: 9
-            font.bold: true
             font.letterSpacing: 0.9
         }
 
@@ -174,11 +219,12 @@ BarDrawer {
 
         // ---------- Grabación ----------
         Text {
-            text: "MOTION // RECORDING"
+            text: "SYS-01 // MOTION // RECORDING"
             color: Theme.muted
-            font.family: Theme.fontFamily
+            font.family: Theme.industrialFont
+            font.weight: Font.Black
+            font.capitalization: Font.AllUppercase
             font.pixelSize: 9
-            font.bold: true
             font.letterSpacing: 0.9
         }
 
@@ -271,6 +317,7 @@ BarDrawer {
                     onClicked: Capture.openRecordings()
                 }
             }
+        }
         }
     }
 }

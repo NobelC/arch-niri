@@ -11,12 +11,14 @@ PanelWindow {
     property real panelWidth: 340
     property real rightOffset: 12
     property bool centered: false
+    property bool flushHeader: false
 
     readonly property bool isOpen: Niri.activeBarMenu === menuName
-    readonly property int shadowSize: 5
-    readonly property string screenName: screen ? screen.name : ""
+    readonly property int shadowSize: Theme.shadowOffset !== undefined ? Theme.shadowOffset : 6
     readonly property real effectiveWidth: width > 0 ? Math.min(panelWidth, Math.max(240, width - shadowSize - 16)) : panelWidth
-    readonly property real targetHeight: height > 0 ? Math.min(contentHeight + 28, Math.max(120, height - shadowSize - 12)) : (contentHeight + 28)
+    readonly property real topPad: flushHeader ? 0 : 14
+    readonly property real totalInnerPad: flushHeader ? (14 + Theme.borderWidth) : ((14 + Theme.borderWidth) * 2)
+    readonly property real targetHeight: height > 0 ? Math.min(contentHeight + totalInnerPad, Math.max(120, height - shadowSize - 8)) : (contentHeight + totalInnerPad)
 
     anchors {
         top: true
@@ -26,7 +28,7 @@ PanelWindow {
     }
 
     margins {
-        top: Theme.barHeight
+        top: drawerWindow.flushHeader ? (34 - Theme.borderWidth) : 34
     }
 
     color: "transparent"
@@ -42,17 +44,7 @@ PanelWindow {
 
     onIsOpenChanged: {
         if (isOpen) {
-            Qt.callLater(() => {
-                if (drawerWindow.isOpen) keyScope.forceActiveFocus();
-            });
-        }
-    }
-
-    onVisibleChanged: {
-        if (visible && isOpen) {
-            Qt.callLater(() => {
-                if (drawerWindow.isOpen) keyScope.forceActiveFocus();
-            });
+            keyScope.forceActiveFocus();
         }
     }
 
@@ -80,7 +72,7 @@ PanelWindow {
             id: drawerContainer
             anchors.top: parent.top
             anchors.right: drawerWindow.centered ? undefined : parent.right
-            anchors.rightMargin: drawerWindow.centered ? 0 : Math.max(0, drawerWindow.rightOffset - drawerWindow.shadowSize)
+            anchors.rightMargin: drawerWindow.centered ? 0 : Math.max(8, drawerWindow.rightOffset)
             anchors.horizontalCenter: drawerWindow.centered ? parent.horizontalCenter : undefined
 
             width: drawerWindow.effectiveWidth + drawerWindow.shadowSize
@@ -90,15 +82,15 @@ PanelWindow {
 
             Behavior on height {
                 NumberAnimation {
-                    duration: drawerWindow.isOpen ? Theme.animSlow : Theme.animMedium
-                    easing.type: drawerWindow.isOpen ? Theme.easeOut : Theme.easeIn
+                    duration: drawerWindow.isOpen ? 220 : 160
+                    easing.type: drawerWindow.isOpen ? Easing.OutExpo : Easing.InCubic
                 }
             }
 
             function syncSeamGap() {
                 if (drawerWindow.isOpen || height > 0.5) {
                     Niri.activeBarDrawerScreen = drawerWindow.screenName;
-                    Niri.activeBarDrawerX = x + Theme.borderWidth;
+                    Niri.activeBarDrawerX = drawerContainer.x + Theme.borderWidth;
                     Niri.activeBarDrawerWidth = drawerWindow.effectiveWidth - (Theme.borderWidth * 2);
                 } else if (Niri.activeBarMenu === "") {
                     Niri.activeBarDrawerWidth = 0;
@@ -135,7 +127,7 @@ PanelWindow {
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: Theme.borderWidth
-                    color: Theme.border
+                    color: Theme.text
                 }
 
                 Rectangle {
@@ -143,7 +135,7 @@ PanelWindow {
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: Theme.borderWidth
-                    color: Theme.border
+                    color: Theme.text
                 }
 
                 Rectangle {
@@ -151,7 +143,7 @@ PanelWindow {
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     height: Theme.borderWidth
-                    color: Theme.border
+                    color: Theme.text
                 }
             }
 
@@ -166,9 +158,9 @@ PanelWindow {
                     bottom: drawerBody.bottom
                     left: drawerBody.left
                     right: drawerBody.right
-                    bottomMargin: 16
-                    leftMargin: 16
-                    rightMargin: 16
+                    bottomMargin: 14 + Theme.borderWidth
+                    leftMargin: drawerWindow.flushHeader ? Theme.borderWidth : (14 + Theme.borderWidth)
+                    rightMargin: drawerWindow.flushHeader ? Theme.borderWidth : (14 + Theme.borderWidth)
                 }
                 height: drawerWindow.contentHeight
             }

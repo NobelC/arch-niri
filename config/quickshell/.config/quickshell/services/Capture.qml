@@ -96,9 +96,19 @@ Singleton {
         launchDelay.restart();
     }
 
-    function captureRegion() { runDelayed("region"); }
-    function captureFull() { runDelayed("full"); }
-    function captureWindow() { runDelayed("window"); }
+    function captureRegion() {
+        if (Niri.activeBarMenu !== "" || Niri.launcherOpen) {
+            runDelayed("region");
+        } else {
+            Quickshell.execDetached([root.scriptPath, "region"]);
+        }
+    }
+    function captureFull() {
+        Quickshell.execDetached([root.scriptPath, "full"]);
+    }
+    function captureWindow() {
+        Quickshell.execDetached([root.scriptPath, "window"]);
+    }
     function toggleRecordRegion() {
         if (root.recording) stopRecording();
         else runDelayed("record-region");

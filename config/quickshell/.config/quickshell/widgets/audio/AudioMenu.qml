@@ -9,9 +9,10 @@ BarDrawer {
     id: drawer
     menuName: "audio"
     panelWidth: 360
-    rightOffset: 6
+    rightOffset: 14
     contentHeight: root.implicitHeight
 
+    flushHeader: true
     PwObjectTracker {
         objects: [
             Pipewire.defaultAudioSink,
@@ -180,91 +181,109 @@ BarDrawer {
             if (sinkVol < 0.70) return "";
             return "";
         }
-
-        // ---------- Cabecera fija ----------
-        RowLayout {
+        // ---------- Franja de cabecera industrial ----------
+        Rectangle {
             Layout.fillWidth: true
-            spacing: 10
+            implicitHeight: 42
+            color: Theme.accent
 
-            Rectangle {
-                width: 32
-                height: 32
-                radius: Theme.radius
-                color: root.sinkMuted ? Theme.warn : Theme.accent
-                border.width: Theme.borderWidth
-                border.color: root.sinkMuted ? Theme.warn : Theme.accent
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
 
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root.sinkIcon()
+                Rectangle {
+                    implicitWidth: audCodeLbl.implicitWidth + 10
+                    implicitHeight: 20
+                    radius: Theme.radius
                     color: Theme.bg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15
-                }
-            }
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 1
-
-                Text {
-                    text: "音響 // AUDIO"
-                    color: Theme.text
-                    font.family: Theme.cjkFont
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 1.2
+                    Text {
+                        id: audCodeLbl
+                        anchors.centerIn: parent
+                        text: "AUD-01"
+                        color: Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
                 }
-                Text {
+
+                ColumnLayout {
                     Layout.fillWidth: true
-                    text: Audio.nodeLabel(root.sink, "NO OUTPUT DEVICE").toUpperCase()
-                    color: root.sinkMuted ? Theme.warn : Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    font.letterSpacing: 0.6
-                    elide: Text.ElideRight
+                    spacing: 0
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "音響 // AUDIO"
+                        color: Theme.bg
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "PIPEWIRE // MIXER"
+                        color: Theme.bg
+                        opacity: 0.85
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.7
+                        elide: Text.ElideRight
+                    }
                 }
-            }
 
-            Rectangle {
-                width: 26
-                height: 24
-                radius: Theme.radius
-                color: tuiHover.containsMouse ? Theme.cardAlt : Theme.card
-                border.width: Theme.borderWidth
-                border.color: tuiHover.containsMouse ? Theme.text : Theme.border
+                Rectangle {
+                    width: 24
+                    height: 24
+                    radius: Theme.radius
+                    color: mixHover.containsMouse ? Theme.text : Theme.bg
+                    border.width: 1
+                    border.color: Theme.bg
 
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
+                    Text {
+                        anchors.centerIn: parent
+                        text: ""
+                        color: mixHover.containsMouse ? Theme.bg : Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                    }
 
-                Text {
-                    anchors.centerIn: parent
-                    text: ""
-                    color: tuiHover.containsMouse ? Theme.text : Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                }
-
-                MouseArea {
-                    id: tuiHover
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        Niri.closeBarMenu();
-                        Audio.openMixer();
+                    MouseArea {
+                        id: mixHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Niri.closeBarMenu();
+                            Audio.openManager();
+                        }
                     }
                 }
             }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Theme.borderWidth
+                color: Theme.text
+            }
         }
 
-        // Divisor
-        Rectangle {
+        // ---------- Cuerpo acolchado ----------
+        ColumnLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.borderWidth
-            color: Theme.border
-        }
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            spacing: 10
+
 
         // ---------- Control Maestro fijo (Salida + Micrófono) ----------
         Rectangle {
@@ -755,6 +774,7 @@ BarDrawer {
                     }
                 }
             }
+        }
         }
     }
 }

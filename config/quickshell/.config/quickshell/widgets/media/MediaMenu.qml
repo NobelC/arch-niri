@@ -13,6 +13,7 @@ BarDrawer {
     panelWidth: 540
     contentHeight: root.implicitHeight
 
+    flushHeader: true
     IpcHandler {
         target: "media"
         function toggle(): void {
@@ -67,10 +68,10 @@ BarDrawer {
         }
     }
 
-    Item {
+    ColumnLayout {
         id: root
         width: parent.width
-        implicitHeight: 158
+        spacing: 12
 
         property var allowedPlayers: ["spotify", "simpmusic"]
 
@@ -122,7 +123,104 @@ BarDrawer {
             onTriggered: root.player.positionChanged()
         }
 
-        // ---------- Sin reproductor ----------
+        // ---------- Franja de cabecera industrial ----------
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: 42
+            color: Theme.accent
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                Rectangle {
+                    implicitWidth: medCodeLbl.implicitWidth + 10
+                    implicitHeight: 20
+                    radius: Theme.radius
+                    color: Theme.bg
+
+                    Text {
+                        id: medCodeLbl
+                        anchors.centerIn: parent
+                        text: "MED-01"
+                        color: Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "音楽 // MEDIA PLAYER"
+                        color: Theme.bg
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.hasPlayer
+                            ? ("SOURCE // " + root.player.identity.toUpperCase())
+                            : "SPOTIFY // SIMPMUSIC"
+                        color: Theme.bg
+                        opacity: 0.85
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.7
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    implicitWidth: medStateTxt.implicitWidth + 12
+                    implicitHeight: 22
+                    radius: Theme.radius
+                    color: Theme.bg
+                    border.width: 1
+                    border.color: Theme.bg
+
+                    Text {
+                        id: medStateTxt
+                        anchors.centerIn: parent
+                        text: !root.hasPlayer ? "IDLE" : (root.player.isPlaying ? "PLAYING" : "PAUSED")
+                        color: (root.hasPlayer && root.player.isPlaying) ? Theme.accent : Theme.text
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.8
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Theme.borderWidth
+                color: Theme.text
+            }
+        }
+
+        // ---------- Cuerpo acolchado del reproductor ----------
+        Item {
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            implicitHeight: 158
+
+            // ---------- Sin reproductor ----------
         Rectangle {
             anchors.fill: parent
             visible: !root.hasPlayer
@@ -144,19 +242,20 @@ BarDrawer {
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "再生停止 // NOTHING PLAYING"
+                    text: "MED-01 // 再生停止 // NOTHING PLAYING"
                     color: Theme.text
-                    font.family: Theme.cjkFont
+                    font.family: Theme.industrialFont
+                    font.weight: Font.Black
+                    font.capitalization: Font.AllUppercase
                     font.pixelSize: 12
-                    font.bold: true
                     font.letterSpacing: 1.4
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: "SPOTIFY // SIMPMUSIC"
+                    text: "MED-01 // SPOTIFY // SIMPMUSIC"
                     color: Theme.muted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
+                    font.family: Theme.codeTagFont
+                    font.pixelSize: Theme.codeTagSize
                     font.letterSpacing: 1
                 }
             }
@@ -231,9 +330,10 @@ BarDrawer {
                         text: "音楽 // " + (root.hasPlayer ? root.player.identity.toUpperCase() : "PLAYER")
                         elide: Text.ElideRight
                         color: Theme.accentSoft
-                        font.family: Theme.cjkFont
+                        font.family: Theme.industrialFont
+                        font.weight: Font.Black
+                        font.capitalization: Font.AllUppercase
                         font.pixelSize: 10
-                        font.bold: true
                         font.letterSpacing: 1.2
                     }
 
@@ -360,6 +460,7 @@ BarDrawer {
                     }
                 }
             }
+        }
         }
     }
 }

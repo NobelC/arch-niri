@@ -13,6 +13,7 @@ BarDrawer {
     rightOffset: 32
     contentHeight: root.implicitHeight
 
+    flushHeader: true
     // ---------- Aviso reutilizable (nivel raíz) ----------
     component Hint: Rectangle {
         id: hint
@@ -44,9 +45,10 @@ BarDrawer {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: hint.hintText
                 color: Theme.text
-                font.family: Theme.cjkFont
+                font.family: Theme.industrialFont
+                font.weight: Font.Black
+                font.capitalization: Font.AllUppercase
                 font.pixelSize: 11
-                font.bold: true
                 font.letterSpacing: 1
             }
             Text {
@@ -226,130 +228,142 @@ BarDrawer {
 
         Process { id: radio }
         Process { id: portal; command: ["xdg-open", "http://detectportal.firefox.com"] }
-
-        // ---------- Cabecera integrada ----------
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 10
-
-            Rectangle {
-                width: 32
-                height: 32
-                radius: Theme.radius
-                color: (root.wifiOn && root.current) ? root.trustColor : Theme.card
-                border.width: Theme.borderWidth
-                border.color: (root.wifiOn && root.current) ? root.trustColor : Theme.border
-
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root.wifiOn && root.current ? root.sigGlyph(root.current.signalStrength) : "󰤭"
-                    color: (root.wifiOn && root.current) ? Theme.bg : Theme.muted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15
-                }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 1
-
-                Text {
-                    text: "無線 // WI-FI"
-                    color: Theme.text
-                    font.family: Theme.cjkFont
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 1.2
-                }
-                Text {
-                    Layout.fillWidth: true
-                    text: {
-                        if (!root.hasAdapter) return "NO ADAPTER";
-                        if (!root.wifiOn) return "OFFLINE";
-                        if (root.current) return root.current.name.toUpperCase();
-                        return root.networks.length > 0 ? "NOT CONNECTED" : "SCANNING...";
-                    }
-                    color: (root.wifiOn && root.current) ? Theme.accentSoft : Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    font.bold: root.wifiOn && root.current !== null
-                    font.letterSpacing: 0.8
-                    elide: Text.ElideRight
-                }
-            }
-
-            // Botón respaldo técnico (nmtui)
-            Rectangle {
-                width: 26
-                height: 24
-                radius: Theme.radius
-                color: tuiHover.containsMouse ? Theme.cardAlt : Theme.card
-                border.width: Theme.borderWidth
-                border.color: tuiHover.containsMouse ? Theme.text : Theme.border
-
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: ""
-                    color: tuiHover.containsMouse ? Theme.text : Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                }
-
-                MouseArea {
-                    id: tuiHover
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        Niri.closeBarMenu();
-                        Network.openManager();
-                    }
-                }
-            }
-
-            // Switch rígido On/Off
-            Rectangle {
-                width: 42
-                height: 24
-                radius: Theme.radius
-                opacity: root.hasAdapter ? 1.0 : 0.4
-                color: root.wifiOn ? Theme.accent : Theme.card
-                border.width: Theme.borderWidth
-                border.color: root.wifiOn ? Theme.accent : Theme.border
-
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
-
-                Rectangle {
-                    width: 14
-                    height: 14
-                    radius: Theme.radius
-                    y: 5
-                    x: root.wifiOn ? 23 : 5
-                    color: root.wifiOn ? Theme.bg : Theme.sub
-
-                    Behavior on x { NumberAnimation { duration: Theme.animFast; easing.type: Theme.easeOut } }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    enabled: root.hasAdapter
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.setWifi(!root.wifiOn)
-                }
-            }
-        }
-
-        // Divisor
+        // ---------- Franja de cabecera industrial ----------
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Theme.borderWidth
-            color: Theme.border
+            implicitHeight: 42
+            color: Theme.accent
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
+
+                Rectangle {
+                    implicitWidth: codeLbl.implicitWidth + 10
+                    implicitHeight: 20
+                    radius: Theme.radius
+                    color: Theme.bg
+
+                    Text {
+                        id: codeLbl
+                        anchors.centerIn: parent
+                        text: "NET-01"
+                        color: Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "無線 // WIFI"
+                        color: Theme.bg
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: {
+                            if (!root.hasAdapter) return "NO ADAPTER";
+                            if (!root.wifiOn) return "OFFLINE";
+                            if (root.current) return root.current.name.toUpperCase();
+                            return root.networks.length > 0 ? "NOT CONNECTED" : "SCANNING...";
+                        }
+                        color: Theme.bg
+                        opacity: 0.85
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.7
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    width: 24
+                    height: 24
+                    radius: Theme.radius
+                    color: tuiHover.containsMouse ? Theme.text : Theme.bg
+                    border.width: 1
+                    border.color: Theme.bg
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: ""
+                        color: tuiHover.containsMouse ? Theme.bg : Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                    }
+
+                    MouseArea {
+                        id: tuiHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Niri.closeBarMenu();
+                            Network.openManager();
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 40
+                    height: 24
+                    radius: Theme.radius
+                    opacity: root.hasAdapter ? 1.0 : 0.4
+                    color: root.wifiOn ? Theme.bg : Theme.card
+                    border.width: Theme.borderWidth
+                    border.color: Theme.bg
+
+                    Rectangle {
+                        width: 12
+                        height: 12
+                        radius: Theme.radius
+                        y: 6
+                        x: root.wifiOn ? 22 : 6
+                        color: root.wifiOn ? Theme.accent : Theme.sub
+
+                        Behavior on x { NumberAnimation { duration: Theme.animFast; easing.type: Theme.easeOut } }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: root.hasAdapter
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.setWifi(!root.wifiOn)
+                    }
+                }
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Theme.borderWidth
+                color: Theme.text
+            }
         }
+
+        // ---------- Cuerpo acolchado ----------
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            spacing: 10
+
 
         // ---------- Portal cautivo ----------
         Rectangle {
@@ -363,10 +377,10 @@ BarDrawer {
 
             Text {
                 anchors.centerIn: parent
-                text: "PORTAL // SIGN IN TO NETWORK"
+                text: "NET-01 // PORTAL // SIGN IN TO NETWORK"
                 color: Theme.bg
-                font.family: Theme.fontFamily
-                font.pixelSize: 11
+                font.family: Theme.codeTagFont
+                font.pixelSize: Theme.codeTagSize
                 font.bold: true
                 font.letterSpacing: 1
             }
@@ -381,12 +395,12 @@ BarDrawer {
         Hint {
             visible: !root.hasAdapter
             hintIcon: "󰤭"
-            hintText: "機器なし // NO WI-FI ADAPTER"
+            hintText: "NET-01 // 機器なし // NO WI-FI ADAPTER"
         }
         Hint {
             visible: root.hasAdapter && !root.wifiOn
             hintIcon: "󰤭"
-            hintText: "無線停止 // WI-FI IS OFF"
+            hintText: "NET-01 // 無線停止 // WI-FI IS OFF"
             hintSub: "Enable Wi-Fi to scan nearby networks"
         }
 
@@ -453,8 +467,8 @@ BarDrawer {
                             text: root.current
                                 ? "LINK // " + root.quality(root.current.signalStrength) + " " + root.pct(root.current.signalStrength) + "%"
                                 : ""
-                            color: Theme.sub
-                            font.family: Theme.fontFamily
+                            color: (root.current && root.current.signalStrength < 0.4) ? Theme.accentWarn2 : Theme.sub
+                            font.family: Theme.codeTagFont
                             font.pixelSize: 10
                             font.letterSpacing: 0.6
                             elide: Text.ElideRight
@@ -508,7 +522,7 @@ BarDrawer {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 6
                             radius: Theme.radius
-                            color: index < card.litSegments ? root.trustColor : Theme.cardAlt
+                            color: index < card.litSegments ? (root.current && root.current.signalStrength < 0.4 ? Theme.accentWarn2 : root.trustColor) : Theme.cardAlt
                         }
                     }
                 }
@@ -555,11 +569,12 @@ BarDrawer {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "防衛 // TRUST PROFILE"
+                        text: "NET-01 // 防衛 // TRUST PROFILE"
                         color: Theme.muted
-                        font.family: Theme.cjkFont
+                        font.family: Theme.industrialFont
+                        font.weight: Font.Black
+                        font.capitalization: Font.AllUppercase
                         font.pixelSize: 9
-                        font.bold: true
                         font.letterSpacing: 1.0
                     }
 
@@ -579,9 +594,9 @@ BarDrawer {
 
                     Repeater {
                         model: [
-                            { id: "high", label: "01 // HIGH", tone: "accent" },
-                            { id: "med",  label: "02 // MED",  tone: "highlight" },
-                            { id: "low",  label: "03 // LOW",  tone: "warn" }
+                            { id: "high", label: "SEC-01 // HIGH", tone: "accent" },
+                            { id: "med",  label: "SEC-02 // MED",  tone: "highlight" },
+                            { id: "low",  label: "SEC-03 // LOW",  tone: "warn" }
                         ]
 
                         delegate: Rectangle {
@@ -590,7 +605,7 @@ BarDrawer {
                             readonly property bool selected: NetTrust.profile === modelData.id
                             readonly property color btnTone: modelData.tone === "warn"
                                 ? Theme.warn
-                                : (modelData.tone === "highlight" ? Theme.highlight : Theme.accent)
+                                : (modelData.tone === "highlight" ? Theme.accentWarn2 : Theme.accent)
 
                             Layout.fillWidth: true
                             implicitHeight: 26
@@ -634,7 +649,7 @@ BarDrawer {
                         if (NetTrust.profile === "high")
                             return "LAN OPEN // SSH · SYNCTHING · LOCALSEND · MDNS";
                         if (NetTrust.profile === "med")
-                            return "PORTS CLOSED // STABLE MAC · TEMP PASSES BELOW";
+                            return "NET-01 // PORTS CLOSED // STABLE MAC · TEMP PASSES BELOW";
                         return "LOCKDOWN // DROP ALL · RANDOM MAC · DNS-OVER-TLS";
                     }
                     color: NetTrust.profile === "low" ? Theme.warn : Theme.sub
@@ -786,10 +801,10 @@ BarDrawer {
                         }
                         Text {
                             width: parent.width
-                            text: (row.net.known ? "SAVED // " : "") + (row.secured ? "SECURED" : "OPEN") + " // " + root.pct(row.net.signalStrength) + "%"
+                            text: (row.net.known ? "NET-01 // SAVED // " : "NET-00 // ") + (row.secured ? "SECURED" : "OPEN") + " // " + root.pct(row.net.signalStrength) + "%"
                             color: Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 9
+                            font.family: Theme.codeTagFont
+                            font.pixelSize: Theme.codeTagSize
                             font.letterSpacing: 0.5
                             elide: Text.ElideRight
                         }
@@ -877,10 +892,10 @@ BarDrawer {
                         Text {
                             visible: pass.text === ""
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "PASSKEY // ENTER TO CONNECT"
+                            text: "NET-01 // PASSKEY // ENTER TO CONNECT"
                             color: Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
+                            font.family: Theme.codeTagFont
+                            font.pixelSize: Theme.codeTagSize
                             font.letterSpacing: 0.4
                         }
                     }
@@ -923,7 +938,8 @@ BarDrawer {
         Hint {
             visible: root.wifiOn && root.hasAdapter && root.others.length === 0
             hintIcon: "󰤟"
-            hintText: root.current ? "他網なし // NO OTHER NETWORKS" : "探索中 // SCANNING..."
+            hintText: root.current ? "NET-01 // 他網なし // NO OTHER NETWORKS" : "NET-01 // 探索中 // SCANNING..."
+        }
         }
     }
 }

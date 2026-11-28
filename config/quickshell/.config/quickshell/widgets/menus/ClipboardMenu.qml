@@ -12,6 +12,7 @@ BarDrawer {
     panelWidth: 520
     contentHeight: root.implicitHeight
 
+    flushHeader: true
     IpcHandler {
         target: "clipboard"
         function toggle(): void {
@@ -149,84 +150,112 @@ BarDrawer {
                 root.selectedIndex = 0;
             }
         }
-
-        // ================= 1. CABECERA INDUSTRIAL =================
-        RowLayout {
+        // ================= 1. FRANJA DE CABECERA INDUSTRIAL =================
+        Rectangle {
             Layout.fillWidth: true
-            spacing: 10
+            implicitHeight: 42
+            color: Theme.accent
 
-            Rectangle {
-                width: 32
-                height: 32
-                radius: Theme.radius
-                color: Theme.accent
-                border.width: Theme.borderWidth
-                border.color: Theme.accent
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 8
 
-                Text {
-                    anchors.centerIn: parent
-                    text: "󰅌"
+                Rectangle {
+                    implicitWidth: clpCodeLbl.implicitWidth + 10
+                    implicitHeight: 20
+                    radius: Theme.radius
                     color: Theme.bg
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15
+
+                    Text {
+                        id: clpCodeLbl
+                        anchors.centerIn: parent
+                        text: "CLP-01"
+                        color: Theme.accent
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
+                        font.bold: true
+                        font.letterSpacing: 1.0
+                    }
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "履歴 // CLIPBOARD"
+                        color: Theme.bg
+                        font.family: Theme.cjkFont
+                        font.pixelSize: 12
+                        font.bold: true
+                        font.letterSpacing: 1.2
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "[ " + String(root.filteredEntries.length).padStart(2, "0") + " ] ENTRIES  ·  ↵ COPY  ·  ESC CLOSE"
+                        color: Theme.bg
+                        opacity: 0.85
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.7
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Rectangle {
+                    visible: root.allEntries.length > 0
+                    implicitWidth: wipeTxt.implicitWidth + 12
+                    implicitHeight: 24
+                    radius: Theme.radius
+                    color: wipeArea.containsMouse ? Theme.warn : Theme.bg
+                    border.width: 1
+                    border.color: wipeArea.containsMouse ? Theme.warn : Theme.bg
+
+                    Behavior on color { ColorAnimation { duration: 100 } }
+
+                    Text {
+                        id: wipeTxt
+                        anchors.centerIn: parent
+                        text: "WIPE"
+                        color: wipeArea.containsMouse ? Theme.bg : Theme.warn
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: 9
+                        font.bold: true
+                        font.letterSpacing: 0.8
+                    }
+
+                    MouseArea {
+                        id: wipeArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.wipeAll()
+                    }
                 }
             }
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 1
-
-                Text {
-                    text: "履歴 // CLIPBOARD"
-                    color: Theme.text
-                    font.family: Theme.cjkFont
-                    font.pixelSize: 12
-                    font.bold: true
-                    font.letterSpacing: 1.3
-                }
-
-                Text {
-                    text: "[ " + String(root.filteredEntries.length).padStart(2, "0") + " ] ENTRIES  ·  ↵ COPY  ·  ESC CLOSE"
-                    color: Theme.sub
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 9
-                    font.letterSpacing: 0.8
-                }
-            }
-
-            // Botón WIPE ALL
             Rectangle {
-                visible: root.allEntries.length > 0
-                implicitWidth: wipeTxt.implicitWidth + 14
-                implicitHeight: 24
-                radius: Theme.radius
-                color: wipeArea.containsMouse ? Theme.warn : Theme.card
-                border.width: Theme.borderWidth
-                border.color: wipeArea.containsMouse ? Theme.warn : Theme.border
-
-                Behavior on color { ColorAnimation { duration: Theme.animFast } }
-                Behavior on border.color { ColorAnimation { duration: Theme.animFast } }
-
-                Text {
-                    id: wipeTxt
-                    anchors.centerIn: parent
-                    text: "WIPE"
-                    color: wipeArea.containsMouse ? Theme.bg : Theme.warn
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 9
-                    font.bold: true
-                    font.letterSpacing: 0.8
-                }
-
-                MouseArea {
-                    id: wipeArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.wipeAll()
-                }
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: Theme.borderWidth
+                color: Theme.text
             }
         }
+
+        // ---------- Cuerpo acolchado ----------
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            spacing: 10
+
 
         // ================= 2. BARRA DE BÚSQUEDA =================
         Rectangle {
@@ -328,11 +357,12 @@ BarDrawer {
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: root.searchText.length > 0 ? "一致なし // NO MATCHES" : "履歴なし // CLIPBOARD EMPTY"
+                    text: root.searchText.length > 0 ? "SYS-01 // 一致なし // NO MATCHES" : "SYS-01 // 履歴なし // CLIPBOARD EMPTY"
                     color: Theme.text
-                    font.family: Theme.cjkFont
+                    font.family: Theme.industrialFont
+                    font.weight: Font.Black
+                    font.capitalization: Font.AllUppercase
                     font.pixelSize: 11
-                    font.bold: true
                     font.letterSpacing: 1.0
                 }
             }
@@ -425,10 +455,10 @@ BarDrawer {
 
                         Text {
                             Layout.fillWidth: true
-                            text: clipRow.modelData.isImage ? "IMAGE // BITMAP" : clipRow.modelData.preview
+                            text: clipRow.modelData.isImage ? "SYS-01 // IMAGE // BITMAP" : clipRow.modelData.preview
                             color: clipRow.isSelected ? Theme.bg : Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
+                            font.family: Theme.codeTagFont
+                            font.pixelSize: Theme.codeTagSize
                             font.bold: clipRow.isSelected || clipRow.modelData.isImage
                             elide: Text.ElideRight
                         }
@@ -476,6 +506,7 @@ BarDrawer {
                     }
                 }
             }
+        }
         }
     }
 }

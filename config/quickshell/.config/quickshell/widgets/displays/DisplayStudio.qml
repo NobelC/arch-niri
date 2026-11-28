@@ -148,7 +148,7 @@ PanelWindow {
                         spacing: 1
 
                         Text {
-                            text: "画面設定 // DISPLAY STUDIO"
+                            text: "DSP-01 // 画面設定 // DISPLAY STUDIO"
                             color: Theme.text
                             font.family: Theme.cjkFont
                             font.pixelSize: 13
@@ -216,10 +216,10 @@ PanelWindow {
                     spacing: 6
 
                     Text {
-                        text: "01 // WORK MODE"
+                        text: "DSP-01 // 01 // WORK MODE"
                         color: Theme.muted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 9
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
                         font.bold: true
                         font.letterSpacing: 1.0
                     }
@@ -290,10 +290,10 @@ PanelWindow {
                     spacing: 6
 
                     Text {
-                        text: "02 // RESOLUTION & REFRESH"
+                        text: "DSP-01 // 02 // RESOLUTION & REFRESH"
                         color: Theme.muted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 9
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
                         font.bold: true
                         font.letterSpacing: 1.0
                     }
@@ -361,10 +361,10 @@ PanelWindow {
                     spacing: 6
 
                     Text {
-                        text: "03 // SCALE"
+                        text: "DSP-01 // 03 // SCALE"
                         color: Theme.muted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 9
+                        font.family: Theme.codeTagFont
+                        font.pixelSize: Theme.codeTagSize
                         font.bold: true
                         font.letterSpacing: 1.0
                     }
@@ -418,10 +418,10 @@ PanelWindow {
                         spacing: 6
 
                         Text {
-                            text: "04 // ROTATION"
+                            text: "DSP-01 // 04 // ROTATION"
                             color: Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 9
+                            font.family: Theme.codeTagFont
+                            font.pixelSize: Theme.codeTagSize
                             font.bold: true
                             font.letterSpacing: 1.0
                         }
@@ -476,10 +476,10 @@ PanelWindow {
                         spacing: 6
 
                         Text {
-                            text: "05 // POSITION"
+                            text: "DSP-01 // 05 // POSITION"
                             color: Theme.muted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 9
+                            font.family: Theme.codeTagFont
+                            font.pixelSize: Theme.codeTagSize
                             font.bold: true
                             font.letterSpacing: 1.0
                         }
@@ -584,10 +584,10 @@ PanelWindow {
                         Text {
                             id: cancelTxt
                             anchors.centerIn: parent
-                            text: "ESC // CLOSE"
+                            text: "DSP-01 // ESC // CLOSE"
                             color: Theme.sub
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
+                            font.family: Theme.codeTagFont
+                            font.pixelSize: Theme.codeTagSize
                             font.bold: true
                         }
 

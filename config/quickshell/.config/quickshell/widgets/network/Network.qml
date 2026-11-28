@@ -17,7 +17,7 @@ Item {
     readonly property color trustColor: {
         if (!root.isConnected) return Theme.muted;
         if (NetTrust.profile === "low") return Theme.warn;
-        if (NetTrust.profile === "med") return Theme.highlight;
+        if (NetTrust.profile === "med") return Theme.accentWarn2;
         return Theme.accent;
     }
 

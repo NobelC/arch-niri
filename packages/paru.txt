@@ -1,4 +1,5 @@
 # Paquetes explícitos de AUR (generado automáticamente)
+appimg-bin
 libtiff5
 localsend-bin
 matugen-bin

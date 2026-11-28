@@ -67,7 +67,7 @@ nohup nice -n 19 ionice -c 3 bash -c '
     for cf in "$cache_dir"/*; do
       base="${cf##*/}"
       ch="${base%%[-.]*}"
-      if [[ ( "$base" == *.hex || "$base" == *-overview.jpg ) && -n "${valid_hashes[$ch]:-}" ]]; then
+      if [[ ( "$base" == *.hex || "$base" == *-overview.jpg || "$base" == *-swatches.json ) && -n "${valid_hashes[$ch]:-}" ]]; then
         continue
       fi
       rm -f "$cf"

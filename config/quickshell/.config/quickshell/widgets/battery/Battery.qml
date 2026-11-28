@@ -18,7 +18,7 @@ Item {
     readonly property color activeColor: {
         if (Battery.charging || Battery.full) return Theme.accent;
         if (Battery.capacity <= 15) return Theme.warn;
-        if (Battery.capacity <= 30) return Theme.highlight;
+        if (Battery.capacity <= 30) return Theme.accentWarn2;
         return Theme.accent;
     }
 

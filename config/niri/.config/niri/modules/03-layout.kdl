@@ -16,13 +16,13 @@ layout {
     off
   }
   border {
-    width 2
+    width 3
   }
   shadow {
     on
     softness 0
     spread 0
-    offset x=4 y=4
+    offset x=7 y=7
     color "#000000d9"
   }
 }
